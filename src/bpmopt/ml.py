@@ -94,14 +94,19 @@ def rework_tasks(log: pd.DataFrame, model: ProcessModel, *, seed: int) -> list[d
     that never predicts rework, and F1 0 at the default 0.5 threshold. ROC-AUC
     doesn't depend on the threshold. The reference stays unweighted on purpose:
     it shows what always guessing the majority class scores.
+
+    A gateway where the training or the test cases all went the same way (e.g.
+    a loop that never sends work back) can't be fitted or scored. Its task has
+    no models or drivers, only `skipped` with the reason, so one such gateway
+    doesn't stop the run.
     """
     tasks = []
     for gateway_id, target in rework_targets(log, model).items():
         data = training_data(log, target)
-        if data.y_train.nunique() < 2 or data.y_test.nunique() < 2:
-            raise ValueError(
-                f"{gateway_id}: the training and the test cases both need cases that loop back and cases that don't"
-            )
+        reason = _single_class_reason(data)
+        if reason:
+            tasks.append({"id": f"rework_{gateway_id}", "kind": "classification", "gateway_id": gateway_id, "skipped": reason})
+            continue
         models = {
             "reference": DummyClassifier(strategy="most_frequent"),
             "linear": Pipeline(
@@ -132,6 +137,20 @@ def rework_tasks(log: pd.DataFrame, model: ProcessModel, *, seed: int) -> list[d
             }
         )
     return tasks
+
+
+def _single_class_reason(data: "TrainingData") -> str | None:
+    """Why a classifier can't be fitted or scored, or None when both splits hold both classes."""
+    parts = []
+    for name, y in (("training", data.y_train), ("test", data.y_test)):
+        if y.empty:
+            parts.append(f"no {name} case reached the gateway")
+        elif y.nunique() < 2:
+            went = "looped back" if bool(y.iloc[0]) else "didn't loop back"
+            parts.append(f"all {len(y)} {name} cases {went}")
+    if not parts:
+        return None
+    return f"Not fitted: {' and '.join(parts)}, so there is nothing to tell apart."
 
 
 def rework_targets(log: pd.DataFrame, model: ProcessModel) -> dict[str, pd.Series]:

@@ -3,6 +3,7 @@
 The ranges below are the targets stated at the top of models/as_is.params.toml.
 """
 
+import json
 import re
 import time
 from pathlib import Path
@@ -12,13 +13,17 @@ import pytest
 
 from bpmopt.analysis import cycle_times
 from bpmopt.bpmn import read_bpmn
+from bpmopt.ml import cycle_time_task, ml_section, rework_tasks
 from bpmopt.parameters import Logistic, ScaledDuration, load_parameters
+from bpmopt.results import build_results, export_results, validate_results
 from bpmopt.simulation import simulate
+from bpmopt.value_added import load_value_added
 
 ROOT = Path(__file__).parents[1]
 MODEL = ROOT / "models" / "as_is.bpmn"
 PARAMETERS = ROOT / "models" / "as_is.params.toml"
 PLANTED_EFFECTS = ROOT / "models" / "as_is_planted_effects.md"
+VALUE_ADDED = ROOT / "models" / "as_is.value_added.toml"
 N_CASES = 2_000
 NEGATIVE_CONTROL = "requesting_unit"
 
@@ -151,3 +156,19 @@ def test_the_negative_control_has_no_effect_and_is_listed_as_such(params):
     assert all(name != NEGATIVE_CONTROL for _, name in _planted(params))
     text = PLANTED_EFFECTS.read_text(encoding="utf-8")
     assert re.search(rf"`{NEGATIVE_CONTROL}`.*negative control", text, re.IGNORECASE)
+
+
+def test_the_as_is_pipeline_writes_results_that_validate(tmp_path, model, params, log):
+    # The notebook's path on the real model, parameters and seed (ticket 14).
+    results = build_results(log=log, model=model, params=params, seed=42)
+    results["value_added"] = load_value_added(VALUE_ADDED, model)
+    results["ml"] = ml_section([cycle_time_task(log, seed=42), *rework_tasks(log, model, seed=42)])
+
+    path = export_results(results, tmp_path, models={"as_is": MODEL})
+
+    exported = json.loads(path.read_text())
+    validate_results(exported)
+    assert exported["models"]["as_is"]["lint"] == []
+    assert exported["meta"]["case_count"] == N_CASES
+    rework_ids = {f"rework_{r['gateway_id']}" for r in exported["baseline"]["rework"]}
+    assert {t["id"] for t in exported["ml"]["tasks"]} == {"cycle_time"} | rework_ids

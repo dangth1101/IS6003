@@ -9,6 +9,7 @@ import shutil
 import tomllib
 from collections import Counter
 from collections.abc import Iterator
+from dataclasses import asdict
 from datetime import UTC, datetime
 from itertools import combinations
 from functools import cache
@@ -20,6 +21,7 @@ import pandas as pd
 
 from bpmopt.analysis import baseline_metrics, flow_analysis_check
 from bpmopt.bpmn import ProcessModel
+from bpmopt.lint import lint
 from bpmopt.parameters import Parameters, assumptions
 
 SCHEMA_VERSION = 2
@@ -62,9 +64,10 @@ def load_page_text(lang: str = "en") -> dict:
 
 
 def export_results(results: dict, out_dir: str | Path, *, models: dict[str, Path]) -> Path:
-    """Copy each BPMN model into out_dir/models/ and write out_dir/results.json.
+    """Copy each BPMN model into out_dir/models/, lint it, and write out_dir/results.json.
 
-    out_dir ends up self-contained, so it can be served as a static site.
+    out_dir ends up self-contained, so it can be served as a static site. Each
+    model's lint list is empty when it is clean.
     """
     out_dir = Path(out_dir)
     (out_dir / "models").mkdir(parents=True, exist_ok=True)
@@ -72,7 +75,7 @@ def export_results(results: dict, out_dir: str | Path, *, models: dict[str, Path
     for key, source in models.items():
         target = Path("models") / f"{key}.bpmn"
         shutil.copyfile(source, out_dir / target)
-        results["models"][key] = {"bpmn": target.as_posix()}
+        results["models"][key] = {"bpmn": target.as_posix(), "lint": [asdict(v) for v in lint(source)]}
 
     validate_results(results)
     path = out_dir / "results.json"

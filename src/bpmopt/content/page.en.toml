@@ -29,6 +29,7 @@ paragraphs = [
   "We trained models on the event log, using only what is known when a request comes in. One model predicts the cycle time. The others predict, for each gateway that can send work back, whether a case loops back at least once.",
   "Each model is compared with a reference that ignores the inputs. The data is split by start date, so no model learns from the future.",
   "Drivers are ranked by the mean absolute SHAP value of the gradient boosting model. A longer bar means that attribute moves the prediction more.",
+  "Expect low scores. Much of a case's cycle time depends on luck, such as how often work is sent back and how long the queues are when it arrives. No attribute known at the start can predict that. The ranking of the drivers matters more here than the scores.",
 ]
 
 [sections.redesign]
@@ -78,6 +79,7 @@ cycle_time_efficiency = "Cycle time efficiency"
 days = "days"
 rework = "Rework"
 gateway = "Gateway"
+gateway_after = "Decision after {task}"
 rework_rate = "Cases that loop back"
 waiting_by_activity = "Waiting time per activity"
 activity = "Activity"
@@ -140,4 +142,4 @@ complexity = "Complexity"
 integrations = "Number of integrations"
 security_level = "Security level"
 requesting_unit = "Requesting unit"
-workload = "Team workload at start"
+team_workload = "Team workload at start"

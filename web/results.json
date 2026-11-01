@@ -3,10 +3,10 @@
     "schema_version": 2,
     "seed": 42,
     "replications": 1,
-    "case_count": 100,
-    "warm_up": 0.0,
-    "parameter_version": "placeholder-1",
-    "generated_at": "2026-11-01T06:46:51+00:00"
+    "case_count": 2000,
+    "warm_up": 250.0,
+    "parameter_version": "proposed-1",
+    "generated_at": "2026-11-01T07:08:20+00:00"
   },
   "text": {
     "lang": "en",
@@ -35,7 +35,8 @@
         "paragraphs": [
           "We trained models on the event log, using only what is known when a request comes in. One model predicts the cycle time. The others predict, for each gateway that can send work back, whether a case loops back at least once.",
           "Each model is compared with a reference that ignores the inputs. The data is split by start date, so no model learns from the future.",
-          "Drivers are ranked by the mean absolute SHAP value of the gradient boosting model. A longer bar means that attribute moves the prediction more."
+          "Drivers are ranked by the mean absolute SHAP value of the gradient boosting model. A longer bar means that attribute moves the prediction more.",
+          "Expect low scores. Much of a case's cycle time depends on luck, such as how often work is sent back and how long the queues are when it arrives. No attribute known at the start can predict that. The ranking of the drivers matters more here than the scores."
         ]
       },
       "redesign": {
@@ -86,6 +87,7 @@
       "days": "days",
       "rework": "Rework",
       "gateway": "Gateway",
+      "gateway_after": "Decision after {task}",
       "rework_rate": "Cases that loop back",
       "waiting_by_activity": "Waiting time per activity",
       "activity": "Activity",
@@ -148,243 +150,308 @@
       "integrations": "Number of integrations",
       "security_level": "Security level",
       "requesting_unit": "Requesting unit",
-      "workload": "Team workload at start"
+      "team_workload": "Team workload at start"
     }
   },
   "assumptions": [
     {
+      "parameter": "arrivals.rate",
+      "value": 0.25,
+      "rationale": "Proposed default. About one new request a week (62 a year), plausible for the change portfolio of a mid-size bank's IT division."
+    },
+    {
+      "parameter": "warm_up.length",
+      "value": 250.0,
+      "rationale": "Proposed default. One working year, long enough for every lane queue to fill from the empty start; cases arriving before it are dropped from the log."
+    },
+    {
+      "parameter": "attributes.project_type.distribution",
+      "value": "choice(enhancement: 0.55, new_system: 0.25, regulatory: 0.2)",
+      "rationale": "Proposed default. Most requests change an existing system; new systems and regulatory changes (e.g. central bank reporting) are the rest."
+    },
+    {
+      "parameter": "attributes.complexity.distribution",
+      "value": "choice(1: 0.35, 2: 0.45, 3: 0.2)",
+      "rationale": "Proposed default. Ordinal scale 1 low, 2 medium, 3 high, as rated at intake. Medium is most common."
+    },
+    {
+      "parameter": "attributes.integrations.distribution",
+      "value": "poisson(2)",
+      "rationale": "Proposed default. Number of other systems the application connects to (core banking, CRM, payment gateway, ...). Two on average."
+    },
+    {
+      "parameter": "attributes.security_level.distribution",
+      "value": "choice(1: 0.4, 2: 0.4, 3: 0.2)",
+      "rationale": "Proposed default. Data classification: 1 internal data, 2 customer data, 3 payments or other critical data."
+    },
+    {
+      "parameter": "attributes.requesting_unit.distribution",
+      "value": "choice(retail: 0.35, corporate: 0.2, treasury: 0.1, operations: 0.2, risk_compliance: 0.15)",
+      "rationale": "Proposed default. Retail banking sends the most requests. Has no effect in the simulation on purpose: a negative control for the ML."
+    },
+    {
+      "parameter": "attributes.team_workload.distribution",
+      "value": "triangular(0.5, 0.8, 1)",
+      "rationale": "Proposed default. Share of the development team already allocated when the request arrives, as reported at intake. Usually high."
+    },
+    {
+      "parameter": "lanes.Lane_BusinessUnit.capacity",
+      "value": 5,
+      "rationale": "Proposed default. Five business analysts or PMO staff who register requests, run kick-offs and write requirements."
+    },
+    {
+      "parameter": "lanes.Lane_ITManagement.capacity",
+      "value": 3,
+      "rationale": "Proposed default. Three IT managers who review proposals, plans and releases."
+    },
+    {
+      "parameter": "lanes.Lane_Development.capacity",
+      "value": 13,
+      "rationale": "Proposed default. Thirteen development teams, each working on one task at a time."
+    },
+    {
+      "parameter": "lanes.Lane_QualityControl.capacity",
+      "value": 8,
+      "rationale": "Proposed default. Eight QC testers or test teams. Kept the tightest lane, since testing is a common bottleneck in bank IT."
+    },
+    {
+      "parameter": "lanes.Lane_ITOperations.capacity",
+      "value": 5,
+      "rationale": "Proposed default. Five operations and app support staff who also revise proposals and run hypercare."
+    },
+    {
       "parameter": "tasks.Task_RegisterRequest.duration",
-      "value": 1.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(0.5, 1, 2)",
+      "rationale": "Proposed default. Filling in the request form and logging it, about a day."
     },
     {
       "parameter": "tasks.Task_ApproveProposal.duration",
-      "value": 3.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(2, 4, 8)",
+      "rationale": "Proposed default. Reading the proposal, asking questions and deciding, about a week of a manager's attention."
     },
     {
       "parameter": "tasks.Task_ReviseProposal.duration",
-      "value": 3.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(2, 4, 8)",
+      "rationale": "Proposed default. Reworking the proposal on the managers' comments, about as long as reviewing it."
     },
     {
       "parameter": "tasks.Task_HoldKickOff.duration",
-      "value": 1.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(0.5, 1, 2)",
+      "rationale": "Proposed default. Preparing and holding one kick-off meeting."
     },
     {
       "parameter": "tasks.Task_SpecifyRequirements.duration",
-      "value": 10.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(5, 8, 16) × (1 + 0.3 × complexity)",
+      "rationale": "Proposed default. Business and technical requirements take two to five weeks, 30% of the base more per complexity step. About 15 days on average."
     },
     {
       "parameter": "tasks.Task_DraftPlan.duration",
-      "value": 5.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(2, 4, 7)",
+      "rationale": "Proposed default. Estimating and scheduling the work, about a week."
     },
     {
       "parameter": "tasks.Task_ApprovePlan.duration",
-      "value": 2.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(1, 2, 4)",
+      "rationale": "Proposed default. Plan review is lighter than proposal review."
     },
     {
       "parameter": "tasks.Task_BuildApplication.duration",
-      "value": 30.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(8, 14, 25) × (1 + 0.4 × complexity + 0.1 × integrations + 0.6 × team_workload)",
+      "rationale": "Proposed default. A base of two to five weeks, then 40% of the base more per complexity step, 10% per integration and 60% for a fully loaded team. About 38 days on average (about 27 for a simple app with no integrations and a light load, about 45 for a typical complex one), the longest task, as in most bank projects."
     },
     {
       "parameter": "tasks.Task_ReviewSourceCode.duration",
-      "value": 3.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(1, 2, 4)",
+      "rationale": "Proposed default. A code review takes a few days."
     },
     {
       "parameter": "tasks.Task_RunFunctionalTests.duration",
-      "value": 5.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(3, 6, 10)",
+      "rationale": "Proposed default. One to two weeks of functional testing per round, mostly manual regression testing."
     },
     {
       "parameter": "tasks.Task_RunSecurityTests.duration",
-      "value": 3.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(1, 2, 4) × (1 + 0.5 × security_level)",
+      "rationale": "Proposed default. Vulnerability scan and review, 50% longer per security level step, since critical systems also get penetration testing."
     },
     {
       "parameter": "tasks.Task_RunAcceptanceTests.duration",
-      "value": 5.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(2, 4, 8)",
+      "rationale": "Proposed default. User acceptance testing with the business unit, about a week per round."
     },
     {
       "parameter": "tasks.Task_FixDefects.duration",
-      "value": 4.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(2, 4, 8)",
+      "rationale": "Proposed default. Fixing the defects found in one test round, about a week."
     },
     {
       "parameter": "tasks.Task_ApproveRelease.duration",
-      "value": 2.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(0.5, 1, 2)",
+      "rationale": "Proposed default. Release approval at the change advisory board, about a day."
     },
     {
       "parameter": "tasks.Task_RefineApplication.duration",
-      "value": 4.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(3, 5, 10)",
+      "rationale": "Proposed default. Changes asked for at release approval are larger than defect fixes."
     },
     {
       "parameter": "tasks.Task_DeployApplication.duration",
-      "value": 1.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(0.5, 1, 2)",
+      "rationale": "Proposed default. One deployment window."
     },
     {
       "parameter": "tasks.Task_StartOperation.duration",
-      "value": 1.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(0.5, 1, 2)",
+      "rationale": "Proposed default. Handover to operations and go-live checks."
     },
     {
       "parameter": "tasks.Task_MonitorOperation.duration",
-      "value": 20.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(5, 10, 20)",
+      "rationale": "Proposed default. About two weeks of hypercare after go-live, counted in the cycle time (open question in the change log)."
     },
     {
       "parameter": "tasks.Task_EvaluateProject.duration",
-      "value": 2.0,
-      "rationale": "Placeholder until ticket 10."
+      "value": "triangular(1, 2, 4)",
+      "rationale": "Proposed default. Closing report and lessons learned."
     },
     {
       "parameter": "gateways.Gateway_ProposalSplit.branches",
-      "value": "Flow_ProposalApproved: 0.7, Flow_ProposalChangesRequested: 0.2, Flow_ProposalRejected: 0.1",
-      "rationale": "Placeholder until ticket 10."
+      "value": "Flow_ProposalApproved: 0.72, Flow_ProposalChangesRequested: 0.2, Flow_ProposalRejected: 0.08",
+      "rationale": "Proposed default. One proposal decision in five asks for changes and 8% reject outright, so about 10% of requests end rejected. A three-way split can't be logistic, so no attribute effect here."
     },
     {
       "parameter": "gateways.Gateway_PlanSplit.branches",
-      "value": "Flow_PlanApproved: 0.8, Flow_PlanChangesRequested: 0.2",
-      "rationale": "Placeholder until ticket 10."
+      "value": "Flow_PlanApproved: rest, Flow_PlanChangesRequested: logistic(-1.8 + 1 × [project_type = new_system])",
+      "rationale": "Proposed default. 14% of plans sent back, 31% for a new system, whose estimates are least certain. About 18% overall."
     },
     {
       "parameter": "gateways.Gateway_TestSplit.branches",
-      "value": "Flow_TestsPassed: 0.7, Flow_DefectsFound: 0.3",
-      "rationale": "Placeholder until ticket 10."
+      "value": "Flow_TestsPassed: rest, Flow_DefectsFound: logistic(-3 + 0.6 × complexity + 0.15 × integrations + 0.5 × security_level)",
+      "rationale": "Proposed default. About a third of test rounds find defects: 13% for a simple internal app, over 70% for a complex, highly integrated payments app. Security level acts here because the four checks share one decision."
     },
     {
       "parameter": "gateways.Gateway_ReleaseSplit.branches",
-      "value": "Flow_ReleaseApproved: 0.9, Flow_ReleaseRejected: 0.1",
-      "rationale": "Placeholder until ticket 10."
+      "value": "Flow_ReleaseApproved: rest, Flow_ReleaseRejected: logistic(-2.6 + 1 × [project_type = regulatory])",
+      "rationale": "Proposed default. 7% of releases rejected, 17% for regulatory changes, which compliance signs off at release. About 9% overall."
     }
   ],
   "baseline": {
     "time_unit": "working days",
     "cycle_time": {
-      "mean": 93.64,
-      "median": 97.0,
-      "p90": 136.0
+      "mean": 140.37099166542467,
+      "median": 136.45060132099616,
+      "p90": 211.28447841734663
     },
     "processing_time": {
-      "mean": 93.64,
-      "median": 97.0,
-      "p90": 136.0
+      "mean": 111.11325414582065,
+      "median": 110.8722674927144,
+      "p90": 160.2070591978692
     },
     "waiting_time": {
-      "mean": 0.0,
-      "median": 0.0,
-      "p90": 0.0
+      "mean": 29.25773751960401,
+      "median": 20.935103569180797,
+      "p90": 66.42404841376366
     },
-    "cycle_time_efficiency": 1.0,
+    "cycle_time_efficiency": 0.7915684916628639,
     "rework": [
       {
         "gateway_id": "Gateway_ReleaseSplit",
-        "rate": 0.10714285714285714
+        "rate": 0.08402893711741792
       },
       {
         "gateway_id": "Gateway_TestSplit",
-        "rate": 0.34523809523809523
+        "rate": 0.3745130773511408
       },
       {
         "gateway_id": "Gateway_PlanSplit",
-        "rate": 0.2261904761904762
+        "rate": 0.19031719532554256
       },
       {
         "gateway_id": "Gateway_ProposalSplit",
-        "rate": 0.18
+        "rate": 0.193
       }
     ],
     "waiting_by_activity": [
       {
-        "activity_id": "Task_ApprovePlan",
-        "mean": 0.0
-      },
-      {
         "activity_id": "Task_ApproveProposal",
-        "mean": 0.0
-      },
-      {
-        "activity_id": "Task_ApproveRelease",
-        "mean": 0.0
-      },
-      {
-        "activity_id": "Task_BuildApplication",
-        "mean": 0.0
-      },
-      {
-        "activity_id": "Task_DeployApplication",
-        "mean": 0.0
-      },
-      {
-        "activity_id": "Task_DraftPlan",
-        "mean": 0.0
-      },
-      {
-        "activity_id": "Task_EvaluateProject",
-        "mean": 0.0
-      },
-      {
-        "activity_id": "Task_FixDefects",
-        "mean": 0.0
-      },
-      {
-        "activity_id": "Task_HoldKickOff",
-        "mean": 0.0
-      },
-      {
-        "activity_id": "Task_MonitorOperation",
-        "mean": 0.0
-      },
-      {
-        "activity_id": "Task_RefineApplication",
-        "mean": 0.0
-      },
-      {
-        "activity_id": "Task_RegisterRequest",
-        "mean": 0.0
-      },
-      {
-        "activity_id": "Task_ReviewSourceCode",
-        "mean": 0.0
-      },
-      {
-        "activity_id": "Task_ReviseProposal",
-        "mean": 0.0
-      },
-      {
-        "activity_id": "Task_RunAcceptanceTests",
-        "mean": 0.0
-      },
-      {
-        "activity_id": "Task_RunFunctionalTests",
-        "mean": 0.0
+        "mean": 2.0129406801258423
       },
       {
         "activity_id": "Task_RunSecurityTests",
-        "mean": 0.0
+        "mean": 1.9872438375075758
+      },
+      {
+        "activity_id": "Task_RunAcceptanceTests",
+        "mean": 1.9854355101397156
+      },
+      {
+        "activity_id": "Task_RunFunctionalTests",
+        "mean": 1.9730327558240655
+      },
+      {
+        "activity_id": "Task_ApprovePlan",
+        "mean": 1.9246582660848754
+      },
+      {
+        "activity_id": "Task_ReviewSourceCode",
+        "mean": 1.8893985178347028
+      },
+      {
+        "activity_id": "Task_ApproveRelease",
+        "mean": 1.8449902629061026
+      },
+      {
+        "activity_id": "Task_HoldKickOff",
+        "mean": 1.6591834831151424
+      },
+      {
+        "activity_id": "Task_RegisterRequest",
+        "mean": 1.5977761769445384
+      },
+      {
+        "activity_id": "Task_RefineApplication",
+        "mean": 1.5575684857479486
       },
       {
         "activity_id": "Task_SpecifyRequirements",
-        "mean": 0.0
+        "mean": 1.1252135661325542
+      },
+      {
+        "activity_id": "Task_DeployApplication",
+        "mean": 1.0795097532097375
+      },
+      {
+        "activity_id": "Task_FixDefects",
+        "mean": 1.0723526332130162
+      },
+      {
+        "activity_id": "Task_DraftPlan",
+        "mean": 1.0410556947355387
+      },
+      {
+        "activity_id": "Task_EvaluateProject",
+        "mean": 0.9913092483933257
+      },
+      {
+        "activity_id": "Task_ReviseProposal",
+        "mean": 0.9826204446437141
       },
       {
         "activity_id": "Task_StartOperation",
-        "mean": 0.0
+        "mean": 0.9684251099883131
+      },
+      {
+        "activity_id": "Task_MonitorOperation",
+        "mean": 0.8388759676548366
+      },
+      {
+        "activity_id": "Task_BuildApplication",
+        "mean": 0.806955638526216
       }
     ],
     "flow_analysis": {
-      "theoretical": 96.25347222222221,
-      "simulated": 93.64
+      "theoretical": 111.65158277344834,
+      "simulated": 111.11325414582063
     }
   },
   "value_added": {
@@ -465,9 +532,287 @@
       "reason": "Archives project records and collects lessons learned; useful to the bank, not to the requester."
     }
   },
+  "ml": {
+    "split": {
+      "method": "chronological",
+      "train_share": 0.8
+    },
+    "tasks": [
+      {
+        "id": "cycle_time",
+        "kind": "regression",
+        "models": [
+          {
+            "id": "reference",
+            "metrics": {
+              "mae": 42.54868971194718,
+              "r2": -0.007139928631750614
+            }
+          },
+          {
+            "id": "linear",
+            "metrics": {
+              "mae": 42.371224538887894,
+              "r2": 0.017258877713532628
+            }
+          },
+          {
+            "id": "gradient_boosting",
+            "metrics": {
+              "mae": 42.72457273255728,
+              "r2": -0.007720612774653635
+            }
+          }
+        ],
+        "drivers": [
+          {
+            "feature": "complexity",
+            "mean_abs_shap": 9.728781468632668
+          },
+          {
+            "feature": "security_level",
+            "mean_abs_shap": 7.1692056919001494
+          },
+          {
+            "feature": "integrations",
+            "mean_abs_shap": 3.5447118652309886
+          },
+          {
+            "feature": "team_workload",
+            "mean_abs_shap": 3.493589279219647
+          },
+          {
+            "feature": "requesting_unit",
+            "mean_abs_shap": 3.439962621773394
+          },
+          {
+            "feature": "project_type",
+            "mean_abs_shap": 3.391423087844492
+          }
+        ]
+      },
+      {
+        "id": "rework_Gateway_ReleaseSplit",
+        "kind": "classification",
+        "gateway_id": "Gateway_ReleaseSplit",
+        "models": [
+          {
+            "id": "reference",
+            "metrics": {
+              "roc_auc": 0.5,
+              "f1": 0.0
+            }
+          },
+          {
+            "id": "linear",
+            "metrics": {
+              "roc_auc": 0.7089607733779513,
+              "f1": 0.2692307692307692
+            }
+          },
+          {
+            "id": "gradient_boosting",
+            "metrics": {
+              "roc_auc": 0.5653002416806098,
+              "f1": 0.1830065359477124
+            }
+          }
+        ],
+        "drivers": [
+          {
+            "feature": "team_workload",
+            "mean_abs_shap": 0.3175634207425985
+          },
+          {
+            "feature": "project_type",
+            "mean_abs_shap": 0.2509244331384135
+          },
+          {
+            "feature": "complexity",
+            "mean_abs_shap": 0.19623095179195382
+          },
+          {
+            "feature": "requesting_unit",
+            "mean_abs_shap": 0.08448493114110801
+          },
+          {
+            "feature": "integrations",
+            "mean_abs_shap": 0.07234574727691302
+          },
+          {
+            "feature": "security_level",
+            "mean_abs_shap": 0.016774776837066144
+          }
+        ]
+      },
+      {
+        "id": "rework_Gateway_TestSplit",
+        "kind": "classification",
+        "gateway_id": "Gateway_TestSplit",
+        "models": [
+          {
+            "id": "reference",
+            "metrics": {
+              "roc_auc": 0.5,
+              "f1": 0.0
+            }
+          },
+          {
+            "id": "linear",
+            "metrics": {
+              "roc_auc": 0.6407526449712067,
+              "f1": 0.5187713310580204
+            }
+          },
+          {
+            "id": "gradient_boosting",
+            "metrics": {
+              "roc_auc": 0.6283145841703496,
+              "f1": 0.5068493150684932
+            }
+          }
+        ],
+        "drivers": [
+          {
+            "feature": "complexity",
+            "mean_abs_shap": 0.3507325869246218
+          },
+          {
+            "feature": "security_level",
+            "mean_abs_shap": 0.2652810077682811
+          },
+          {
+            "feature": "integrations",
+            "mean_abs_shap": 0.22963438971659714
+          },
+          {
+            "feature": "team_workload",
+            "mean_abs_shap": 0.10897927853583861
+          },
+          {
+            "feature": "requesting_unit",
+            "mean_abs_shap": 0.05577842202935315
+          },
+          {
+            "feature": "project_type",
+            "mean_abs_shap": 0.04906166228787944
+          }
+        ]
+      },
+      {
+        "id": "rework_Gateway_PlanSplit",
+        "kind": "classification",
+        "gateway_id": "Gateway_PlanSplit",
+        "models": [
+          {
+            "id": "reference",
+            "metrics": {
+              "roc_auc": 0.5,
+              "f1": 0.0
+            }
+          },
+          {
+            "id": "linear",
+            "metrics": {
+              "roc_auc": 0.5430893477816398,
+              "f1": 0.27906976744186046
+            }
+          },
+          {
+            "id": "gradient_boosting",
+            "metrics": {
+              "roc_auc": 0.5627683500306686,
+              "f1": 0.3225806451612903
+            }
+          }
+        ],
+        "drivers": [
+          {
+            "feature": "project_type",
+            "mean_abs_shap": 0.29034980241055824
+          },
+          {
+            "feature": "team_workload",
+            "mean_abs_shap": 0.20922358090503262
+          },
+          {
+            "feature": "requesting_unit",
+            "mean_abs_shap": 0.06262644586612169
+          },
+          {
+            "feature": "integrations",
+            "mean_abs_shap": 0.06164404184989194
+          },
+          {
+            "feature": "security_level",
+            "mean_abs_shap": 0.05845175424810236
+          },
+          {
+            "feature": "complexity",
+            "mean_abs_shap": 0.053141083292805084
+          }
+        ]
+      },
+      {
+        "id": "rework_Gateway_ProposalSplit",
+        "kind": "classification",
+        "gateway_id": "Gateway_ProposalSplit",
+        "models": [
+          {
+            "id": "reference",
+            "metrics": {
+              "roc_auc": 0.5,
+              "f1": 0.0
+            }
+          },
+          {
+            "id": "linear",
+            "metrics": {
+              "roc_auc": 0.5370995670995671,
+              "f1": 0.2888086642599278
+            }
+          },
+          {
+            "id": "gradient_boosting",
+            "metrics": {
+              "roc_auc": 0.5431601731601732,
+              "f1": 0.2833333333333333
+            }
+          }
+        ],
+        "drivers": [
+          {
+            "feature": "team_workload",
+            "mean_abs_shap": 0.1741028450320078
+          },
+          {
+            "feature": "requesting_unit",
+            "mean_abs_shap": 0.11537507713269703
+          },
+          {
+            "feature": "security_level",
+            "mean_abs_shap": 0.08986304320389761
+          },
+          {
+            "feature": "integrations",
+            "mean_abs_shap": 0.069258756400274
+          },
+          {
+            "feature": "complexity",
+            "mean_abs_shap": 0.029538728796148436
+          },
+          {
+            "feature": "project_type",
+            "mean_abs_shap": 0.018439440114772342
+          }
+        ]
+      }
+    ]
+  },
   "models": {
     "as_is": {
-      "bpmn": "models/as_is.bpmn"
+      "bpmn": "models/as_is.bpmn",
+      "lint": []
     }
   }
 }
