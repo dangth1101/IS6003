@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lint fixture: breaks only G5. An OR split and its OR join. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_Or" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_1" name="App development" processRef="Process_Or" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Or" isExecutable="false">
+    <bpmn:startEvent id="Start_AppBuilt" name="Application built" />
+    <bpmn:inclusiveGateway id="Gateway_OrSplit" />
+    <bpmn:task id="Task_TestSecurity" name="Test security" />
+    <bpmn:task id="Task_TestPerformance" name="Test performance" />
+    <bpmn:inclusiveGateway id="Gateway_OrJoin" />
+    <bpmn:endEvent id="End_AppTested" name="Application tested" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_AppBuilt" targetRef="Gateway_OrSplit" />
+    <bpmn:sequenceFlow id="Flow_2" name="handles personal data" sourceRef="Gateway_OrSplit" targetRef="Task_TestSecurity" />
+    <bpmn:sequenceFlow id="Flow_3" name="high load expected" sourceRef="Gateway_OrSplit" targetRef="Task_TestPerformance" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_TestSecurity" targetRef="Gateway_OrJoin" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_TestPerformance" targetRef="Gateway_OrJoin" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Gateway_OrJoin" targetRef="End_AppTested" />
+  </bpmn:process>
+</bpmn:definitions>

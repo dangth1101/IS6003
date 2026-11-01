@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lint fixture: breaks only EVENT-LABEL. Unlabeled start, generic "End", one-word "Approved". -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_EventLabels" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_1" name="App development" processRef="Process_EventLabels" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_EventLabels" isExecutable="false">
+    <bpmn:startEvent id="Start_Unlabeled" />
+    <bpmn:task id="Task_ReviewRequest" name="Review request" />
+    <bpmn:exclusiveGateway id="Gateway_Approved" />
+    <bpmn:endEvent id="End_Generic" name="End" />
+    <bpmn:endEvent id="End_NoObject" name="Approved" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_Unlabeled" targetRef="Task_ReviewRequest" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_ReviewRequest" targetRef="Gateway_Approved" />
+    <bpmn:sequenceFlow id="Flow_3" name="request rejected" sourceRef="Gateway_Approved" targetRef="End_Generic" />
+    <bpmn:sequenceFlow id="Flow_4" name="request approved" sourceRef="Gateway_Approved" targetRef="End_NoObject" />
+  </bpmn:process>
+</bpmn:definitions>
