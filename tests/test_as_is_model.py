@@ -2,6 +2,7 @@
 
 import math
 import re
+from dataclasses import replace
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -30,7 +31,7 @@ def test_corrected_as_is_model_simulates_to_both_outcomes():
     traces = log.groupby("case_id").activity_id.agg(list)
     assert len(traces) == 200
     assert traces.str[0].eq("Start_RequestReceived").all()
-    # With the placeholder probabilities, 200 cases reach both outcomes.
+    # About 10% of proposals are rejected, so 200 cases reach both outcomes.
     assert set(traces.str[-1]) == {"End_ProjectClosed", "End_ProposalRejected"}
     # The four checks that used to be one compound "test" task are timed separately.
     tests = {"Task_ReviewSourceCode", "Task_RunFunctionalTests", "Task_RunSecurityTests", "Task_RunAcceptanceTests"}
@@ -58,8 +59,9 @@ def test_change_log_accounts_for_every_element_of_the_original_model():
 def test_flow_analysis_of_the_as_is_model_agrees_with_its_simulation():
     # Ticket 08: the as-is model has a "Proposal rejected" end event on a rework split and
     # several rework loops. The cross-check must work on it, not only on fixtures.
+    # Flow analysis has no waiting (§7.1), so the lanes are unlimited here.
     model = read_bpmn(MODEL)
-    params = load_parameters(PARAMETERS)
+    params = replace(load_parameters(PARAMETERS), lane_capacities={})
     log = simulate(model, params, n_cases=10_000, seed=1)
 
     ct = cycle_times(log)

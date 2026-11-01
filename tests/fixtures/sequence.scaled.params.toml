@@ -1,0 +1,25 @@
+# sequence.bpmn where the build time scales with the case attributes:
+# 4 days x (1 + 0.5 x complexity + 1 x [mobile]).
+# E[complexity] = 1.9 and P(mobile) = 0.3, so the build averages 4 x 2.25 = 9 days, 14 days in all.
+
+version = "fixture-1"
+
+[attributes.project_type]
+distribution = { choice = ["web", "mobile", "core"], weights = [0.5, 0.3, 0.2] }
+rationale = "Fixture value."
+
+[attributes.complexity]
+distribution = { choice = [1, 2, 3], weights = [0.3, 0.5, 0.2] }
+rationale = "Fixture value."
+
+[tasks.Task_WriteSpec]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[tasks.Task_BuildApp]
+duration = { fixed = 4.0, scale = { complexity = 0.5, project_type = { mobile = 1.0 } } }
+rationale = "Fixture value."
+
+[tasks.Task_TestApp]
+duration = { fixed = 3.0 }
+rationale = "Fixture value."

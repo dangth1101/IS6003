@@ -146,3 +146,22 @@ def test_a_logistic_split_without_attribute_effects_gives_the_plain_formula(fixt
     ct = theoretical_cycle_time(read_bpmn(fixtures_dir / "rework_with_activity.bpmn"), load_parameters(path))
 
     assert ct == pytest.approx(10.0, abs=1e-9)
+
+
+def test_a_scaled_duration_inside_a_logistic_loop_uses_the_case_duration(fixtures_dir, tmp_path):
+    # Our extension again. Testing takes 4 x (1 + 0.5 x complexity), and complexity also raises
+    # the chance of failing, so long test rounds and many test rounds go together. Per case the
+    # formula is (T + r x 2) / (1 - r) with that case's T; the population-mean T would be too low.
+    params = (fixtures_dir / "rework_with_activity.logistic.params.toml").read_text()
+    params = params.replace(
+        "[tasks.Task_TestBuild]\nduration = { fixed = 4.0 }",
+        "[tasks.Task_TestBuild]\nduration = { fixed = 4.0, scale = { complexity = 0.5 } }",
+    )
+    path = tmp_path / "scaled.params.toml"
+    path.write_text(params)
+    complexity = [1, 2, 3, 1, 2, 3]  # of the LOGISTIC_GROUPS rows
+    exact = sum(w * (4 * (1 + 0.5 * c) + r * 2) / (1 - r) for (w, r), c in zip(LOGISTIC_GROUPS, complexity))
+
+    ct = theoretical_cycle_time(read_bpmn(fixtures_dir / "rework_with_activity.bpmn"), load_parameters(path))
+
+    assert ct == pytest.approx(exact, rel=0.02)

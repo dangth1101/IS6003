@@ -34,9 +34,12 @@ attribute vector, and the process CT is their mean over the attribute
 distributions in the parameter file. That mean is estimated from a fixed
 number of attribute draws with a fixed seed, so it is reproducible. Putting
 the mean probability into the formulas instead would be wrong: 1 / (1 - r) is
-convex, so it would underestimate rework (Jensen's inequality). Durations
-don't depend on attributes, so their means go in as they are. With only fixed
-splits nothing is drawn and the result is the plain formula.
+convex, so it would underestimate rework (Jensen's inequality). A duration
+that scales with the attributes goes in with its mean for the drawn case,
+since a case with long test rounds may also fail more often. With only fixed
+splits nothing is drawn, scaled durations go in with their mean over the
+attribute distributions (exact, since the scale is linear), and the result is
+the plain formula.
 
 Like the book's equations, this only works for block-structured models
 (§7.1.7, p.272). Anything else raises ValueError.
@@ -48,7 +51,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from bpmopt.bpmn import Flow, Node, ProcessModel
-from bpmopt.parameters import AttributeValue, Parameters
+from bpmopt.parameters import AttributeValue, Parameters, ScaledDuration
 
 
 def theoretical_cycle_time(model: ProcessModel, params: Parameters, *, n_draws: int = 5_000, seed: int = 0) -> float:
@@ -94,6 +97,13 @@ class _Reducer:
     def probabilities(self, split_id: str) -> dict[str, float]:
         return self.params.branch_probabilities[split_id].probabilities(self.attributes)
 
+    def task_mean(self, task_id: str) -> float:
+        """Mean duration of the task, for this case's attributes when it scales with them."""
+        duration = self.params.task_durations[task_id]
+        if isinstance(duration, ScaledDuration) and self.attributes:
+            return duration.mean_given(self.attributes)
+        return duration.mean
+
     def fragment(self, flow: Flow) -> tuple[float, Flow | None, float]:
         """The fragment entered by `flow`, up to the first join or end event."""
         ct, p = 0.0, 1.0
@@ -104,7 +114,7 @@ class _Reducer:
             elif node.element_type == "endEvent" or _is_join(self.model, node) or node.id in self.loops:
                 return ct, flow, p
             elif node.element_type == "task":
-                part_ct, flow, part_p = self.params.task_durations[node.id].mean, _single_outgoing(self.model, node), 1.0
+                part_ct, flow, part_p = self.task_mean(node.id), _single_outgoing(self.model, node), 1.0
             elif _is_split(self.model, node):
                 probabilities = self.probabilities(node.id) if node.element_type == "exclusiveGateway" else None
                 part_ct, flow, part_p = self.block(node, self.model.outgoing(node.id), probabilities)
@@ -164,7 +174,7 @@ class _Reducer:
             raise ValueError(f"{loop.split}: a rework split needs an exit arc")
         # With body_p = 1 this is (T + r x R) / (1 - r), see the module docstring.
         loops_back = body_p * r
-        back_ct = sum(self.params.task_durations[task].mean for task in loop.back_tasks)
+        back_ct = sum(self.task_mean(task) for task in loop.back_tasks)
         ct = (body_ct + loops_back * back_ct) / (1 - loops_back)
         leaves = body_p * (1 - r) / (1 - loops_back)
         if len(exits) == 1:

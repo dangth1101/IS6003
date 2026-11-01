@@ -140,6 +140,11 @@ def test_an_entry_without_a_rationale_fails_validation(write, entry, where):
             r"logistic.kind.*table of label",
         ),
         ('[gateways.G]\nbranches = { F1 = 0.3, F2 = 0.3, F3 = "rest", F4 = "rest" }\nrationale = "x"\n', r'only one branch can be "rest"'),
+        (
+            '[tasks.T]\nduration = { fixed = 2.0, scale = { size = 0.1 } }\nrationale = "x"\n',
+            r"tasks.T.duration.scale.size.*no attribute",
+        ),
+        ('[tasks.T]\nduration = { fixed = 2.0, scale = 0.1 }\nrationale = "x"\n', r"tasks.T.duration.scale.*table"),
     ],
 )
 def test_mistakes_in_the_file_get_a_clear_error(write, text, match):

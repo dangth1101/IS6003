@@ -25,6 +25,10 @@ which goes into the assumptions table of the results. The file looks like:
     duration = { triangular = [10, 20, 45] }   # or { fixed = 20 }
     rationale = "..."
 
+    [tasks.Task_Test]               # a duration can scale with the case attributes
+    duration = { triangular = [2, 4, 8], scale = { integrations = 0.1, project_type = { mobile = 0.5 } } }
+    rationale = "..."
+
     [gateways.Gateway_TestsPassed]  # every XOR-split, one branch per outgoing flow
     branches = { Flow_Ok = "rest", Flow_Rework = { logistic = { intercept = -2, complexity = 0.8, project_type = { mobile = 1.5 } } } }
     rationale = "..."
@@ -32,6 +36,10 @@ which goes into the assumptions table of the results. The file looks like:
 A branch is a fixed probability, "rest" (whatever the others leave), or a
 logistic of the case attributes. A numeric attribute takes a number; a label
 attribute takes a table of label -> coefficient, unlisted labels count 0.
+
+A scaled duration multiplies the drawn duration by 1 + the sum of its terms,
+written the same way as logistic terms. The example above takes 10% longer per
+integration and 50% longer for a mobile project.
 """
 
 import math
@@ -53,7 +61,7 @@ class FixedDuration:
     def mean(self) -> float:
         return self.value
 
-    def sample(self, rng: np.random.Generator) -> float:
+    def sample(self, rng: np.random.Generator, attributes: Mapping[str, "AttributeValue"] | None = None) -> float:
         return self.value
 
 
@@ -89,12 +97,54 @@ class Triangular:
     def mean(self) -> float:
         return (self.low + self.mode + self.high) / 3
 
-    def sample(self, rng: np.random.Generator) -> float:
+    def sample(self, rng: np.random.Generator, attributes: Mapping[str, AttributeValue] | None = None) -> float:
         return float(rng.triangular(self.low, self.mode, self.high))
 
 
-Duration = FixedDuration | Triangular
 Distribution = Choice | Poisson | Triangular
+Coefficients = dict[str, float | dict[str, float]]  # attribute -> coefficient, or label -> coefficient
+
+
+def _linear(coefficients: Coefficients, attributes: Mapping[str, AttributeValue]) -> float:
+    """Sum of the attribute terms: coefficient x value, or the coefficient of the label (0 if not listed)."""
+    total = 0.0
+    for name, coefficient in coefficients.items():
+        value = attributes[name]
+        total += coefficient.get(value, 0.0) if isinstance(coefficient, dict) else coefficient * value
+    return total
+
+
+@dataclass(frozen=True)
+class ScaledDuration:
+    """A base duration times 1 + the attribute terms, e.g. builds that take longer per integration.
+
+    `mean_factor` is the mean of that factor over the attribute distributions in
+    the parameter file. The factor is linear and drawn independently of the base,
+    so mean = base mean x mean factor exactly.
+    """
+
+    base: FixedDuration | Triangular
+    coefficients: Coefficients
+    mean_factor: float
+
+    @property
+    def mean(self) -> float:
+        return self.base.mean * self.mean_factor
+
+    def mean_given(self, attributes: Mapping[str, AttributeValue]) -> float:
+        """Mean duration for a case with these attributes."""
+        return self.base.mean * (1 + _linear(self.coefficients, attributes))
+
+    def sample(self, rng: np.random.Generator, attributes: Mapping[str, AttributeValue] | None = None) -> float:
+        if attributes is None:
+            raise ValueError("a scaled duration needs the case attributes")
+        factor = 1 + _linear(self.coefficients, attributes)
+        if factor <= 0:
+            raise ValueError(f"duration scale factor {factor:g} isn't positive for attributes {dict(attributes)}")
+        return self.base.sample(rng) * factor
+
+
+Duration = FixedDuration | Triangular | ScaledDuration
 
 
 @dataclass(frozen=True)
@@ -106,13 +156,10 @@ class Logistic:
     """
 
     intercept: float
-    coefficients: dict[str, float | dict[str, float]]  # attribute -> coefficient, or label -> coefficient
+    coefficients: Coefficients
 
     def probability(self, attributes: Mapping[str, AttributeValue]) -> float:
-        z = self.intercept
-        for name, coefficient in self.coefficients.items():
-            value = attributes[name]
-            z += coefficient.get(value, 0.0) if isinstance(coefficient, dict) else coefficient * value
+        z = self.intercept + _linear(self.coefficients, attributes)
         return 1 / (1 + math.exp(-z))
 
 
@@ -166,7 +213,6 @@ def load_parameters(path: str | Path, model: ProcessModel | None = None) -> Para
     with open(path, "rb") as f:
         raw = tomllib.load(f)
     rationales = _check_layout(raw)
-    durations = {task_id: _duration(task_id, entry["duration"]) for task_id, entry in raw.get("tasks", {}).items()}
     arrival_rate = float(raw["arrivals"]["rate"]) if "arrivals" in raw else None
     if arrival_rate is not None and arrival_rate <= 0:
         raise ValueError(f"arrivals.rate must be positive, got {arrival_rate}")
@@ -177,6 +223,7 @@ def load_parameters(path: str | Path, model: ProcessModel | None = None) -> Para
         raise ValueError("warm_up needs an arrival rate: without [arrivals] every case arrives at time 0")
     capacities = {lane_id: _capacity(lane_id, entry["capacity"]) for lane_id, entry in raw.get("lanes", {}).items()}
     attributes = {name: _distribution(name, entry["distribution"]) for name, entry in raw.get("attributes", {}).items()}
+    durations = {task_id: _duration(task_id, entry["duration"], attributes) for task_id, entry in raw.get("tasks", {}).items()}
     branches = {
         gateway_id: _branches(gateway_id, entry["branches"], attributes) for gateway_id, entry in raw.get("gateways", {}).items()
     }
@@ -212,7 +259,7 @@ def apply_overrides(params: Parameters, overrides: dict) -> Parameters:
     if unknown:
         raise ValueError(f"can't override {', '.join(sorted(unknown))}: only {', '.join(_OVERRIDABLE)} can change between scenarios")
     rationales = _check_layout({"version": params.version, **overrides})
-    durations = {task_id: _duration(task_id, entry["duration"]) for task_id, entry in overrides.get("tasks", {}).items()}
+    durations = {task_id: _duration(task_id, entry["duration"], params.attributes) for task_id, entry in overrides.get("tasks", {}).items()}
     capacities = {lane_id: _capacity(lane_id, entry["capacity"]) for lane_id, entry in overrides.get("lanes", {}).items()}
     branches = {
         gateway_id: _branches(gateway_id, entry["branches"], params.attributes) for gateway_id, entry in overrides.get("gateways", {}).items()
@@ -259,12 +306,17 @@ def _describe(value: object) -> AttributeValue:
             return "choice(" + ", ".join(f"{_n(v)}: {_n(w)}" for v, w in zip(choices, weights)) + ")"
         case Branches(flows):
             return ", ".join(f"{flow_id}: {_describe(p) if isinstance(p, Logistic) else _n(p)}" for flow_id, p in flows.items())
+        case ScaledDuration(base, coefficients):
+            return f"{_n(_describe(base))} × ({_terms(1.0, coefficients)})"
         case Logistic(intercept, coefficients):
-            terms = [(c, name) for name, c in coefficients.items() if not isinstance(c, dict)]
-            terms += [(c, f"[{name} = {label}]") for name, table in coefficients.items() if isinstance(table, dict) for label, c in table.items()]
-            z = _n(intercept) + "".join(f" {'-' if c < 0 else '+'} {_n(abs(c))} × {term}" for c, term in terms)
-            return f"logistic({z})"
+            return f"logistic({_terms(intercept, coefficients)})"
     raise TypeError(f"can't describe {value!r}")
+
+
+def _terms(constant: float, coefficients: Coefficients) -> str:
+    terms = [(c, name) for name, c in coefficients.items() if not isinstance(c, dict)]
+    terms += [(c, f"[{name} = {label}]") for name, table in coefficients.items() if isinstance(table, dict) for label, c in table.items()]
+    return _n(constant) + "".join(f" {'-' if c < 0 else '+'} {_n(abs(c))} × {term}" for c, term in terms)
 
 
 def _n(value: AttributeValue) -> str:
@@ -404,12 +456,35 @@ def _capacity(lane_id: str, value: object) -> int:
     raise ValueError(f"lanes.{lane_id}.capacity must be a whole number of at least 1, got {value!r}")
 
 
-def _duration(task_id: str, spec: dict) -> Duration:
+def _duration(task_id: str, spec: dict, attributes: dict[str, Distribution]) -> Duration:
+    where = f"tasks.{task_id}.duration"
+    spec = dict(spec)
+    scale = spec.pop("scale", None)
     if set(spec) == {"fixed"}:
-        return FixedDuration(float(spec["fixed"]))
-    if set(spec) == {"triangular"}:
-        low, mode, high = _triangular(f"tasks.{task_id}.duration", spec["triangular"])
+        base = FixedDuration(float(spec["fixed"]))
+    elif set(spec) == {"triangular"}:
+        low, mode, high = _triangular(where, spec["triangular"])
         if low < 0:
-            raise ValueError(f"tasks.{task_id}.duration: a duration can't be negative, got min {low}")
-        return Triangular(low, mode, high)
-    raise ValueError(f"tasks.{task_id}.duration: unsupported distribution {spec!r}")
+            raise ValueError(f"{where}: a duration can't be negative, got min {low}")
+        base = Triangular(low, mode, high)
+    else:
+        raise ValueError(f"{where}: unsupported distribution {spec!r}")
+    if scale is None:
+        return base
+    if not isinstance(scale, dict) or not scale:
+        raise ValueError(f"{where}.scale: expected a table of attribute terms, got {scale!r}")
+    coefficients = {name: _coefficient(f"{where}.scale.{name}", c, attributes.get(name)) for name, c in scale.items()}
+    mean_factor = 1 + sum(_mean_term(c, attributes[name]) for name, c in coefficients.items())
+    return ScaledDuration(base, coefficients, mean_factor)
+
+
+def _mean_term(coefficient: float | dict[str, float], attribute: Distribution) -> float:
+    """Mean of one attribute term over the attribute's distribution."""
+    if isinstance(coefficient, dict):
+        return sum(w * coefficient.get(v, 0.0) for v, w in zip(attribute.values, attribute.weights))
+    match attribute:
+        case Choice(values, weights):
+            return coefficient * sum(w * v for v, w in zip(values, weights))
+        case Poisson() | Triangular():
+            return coefficient * attribute.mean
+    raise TypeError(f"no mean for {attribute!r}")
