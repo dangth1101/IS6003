@@ -1,4 +1,4 @@
-"""Value-added classification (book §6.1, ticket 09): one class per task, kept as data."""
+"""Value-added classification (book §6.1): one class per task, kept as data."""
 
 import json
 from pathlib import Path

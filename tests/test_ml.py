@@ -1,4 +1,4 @@
-"""ML task A: cycle time from case-start attributes, with SHAP drivers (ticket 11).
+"""ML task A: cycle time from case-start attributes, with SHAP drivers.
 
 The fixture plants one driver: only project_type changes how often a case
 fails testing and loops back, so it should explain most of the cycle time.

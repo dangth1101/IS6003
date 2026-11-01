@@ -1,4 +1,4 @@
-"""Proposed default parameters for the as-is model and the synthetic log they give (ticket 10).
+"""Proposed default parameters for the as-is model and the synthetic log they give.
 
 The ranges below are the targets stated at the top of models/as_is.params.toml.
 """
@@ -159,7 +159,7 @@ def test_the_negative_control_has_no_effect_and_is_listed_as_such(params):
 
 
 def test_the_as_is_pipeline_writes_results_that_validate(tmp_path, model, params, log):
-    # The notebook's path on the real model, parameters and seed (ticket 14).
+    # The notebook's path on the real model, parameters and seed.
     results = build_results(log=log, model=model, params=params, seed=42)
     results["value_added"] = load_value_added(VALUE_ADDED, model)
     results["ml"] = ml_section([cycle_time_task(log, seed=42), *rework_tasks(log, model, seed=42)])

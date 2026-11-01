@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Not from the book: the shape of the corrected as-is model's approval step (ticket 06).
+<!-- Not from the book: the shape of the corrected as-is model's approval step.
      The approval split has three branches: go ahead, revise and resubmit (rework), or reject,
      which ends the case at its own end event. A second rework loop follows on the approved path. -->
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_proposal_rejected" targetNamespace="https://example.org/is6003/fixtures">

@@ -11,9 +11,9 @@ from collections import Counter
 from collections.abc import Iterator
 from dataclasses import asdict
 from datetime import UTC, datetime
-from itertools import combinations
 from functools import cache
 from importlib import resources
+from itertools import combinations
 from pathlib import Path
 
 import jsonschema
@@ -34,14 +34,14 @@ def build_results(*, log: pd.DataFrame, model: ProcessModel, params: Parameters,
     analysis check simulates the model once more with unlimited capacity, with
     the same seed and case count.
 
-    Later tickets add their own sections (value_added, ml, changes,
+    The notebook adds the other sections (value_added, ml, changes,
     scenarios, threats) to this dict before export.
     """
     return {
         "meta": {
             "schema_version": SCHEMA_VERSION,
             "seed": seed,
-            "replications": 1,  # one baseline run; ticket 13 runs R replications per scenario
+            "replications": 1,  # one baseline run; run_scenarios runs R replications per scenario
             "case_count": int(log.case_id.nunique()),
             "warm_up": params.warm_up,
             "parameter_version": params.version,

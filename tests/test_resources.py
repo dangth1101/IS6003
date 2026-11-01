@@ -1,4 +1,4 @@
-"""Lanes as resource pools, case arrivals, waiting time and warm-up (ticket 04)."""
+"""Lanes as resource pools, case arrivals, waiting time and warm-up."""
 
 import pandas as pd
 import pytest

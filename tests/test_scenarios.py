@@ -1,4 +1,4 @@
-"""Change catalog, scenarios and the scenario runner (ticket 13).
+"""Change catalog, scenarios and the scenario runner.
 
 Fixture catalog: tests/fixtures/sequence.catalog.toml on sequence.bpmn.
 C1 takes 2 days off Build application (parameter-only), C2 removes Write

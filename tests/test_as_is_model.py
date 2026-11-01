@@ -1,4 +1,4 @@
-"""The corrected as-is model (ticket 06): the project's source of truth for the as-is process."""
+"""The corrected as-is model: the project's source of truth for the as-is process."""
 
 import math
 import re
@@ -57,7 +57,7 @@ def test_change_log_accounts_for_every_element_of_the_original_model():
 
 
 def test_flow_analysis_of_the_as_is_model_agrees_with_its_simulation():
-    # Ticket 08: the as-is model has a "Proposal rejected" end event on a rework split and
+    # The as-is model has a "Proposal rejected" end event on a rework split and
     # several rework loops. The cross-check must work on it, not only on fixtures.
     # Flow analysis has no waiting (§7.1), so the lanes are unlimited here.
     model = read_bpmn(MODEL)

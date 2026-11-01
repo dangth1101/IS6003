@@ -1,4 +1,4 @@
-"""ML on the event log: predict from case-start attributes and rank the drivers (tickets 11, 12).
+"""ML on the event log: predict from case-start attributes and rank the drivers.
 
 Every task follows the same recipe:
 

@@ -1,4 +1,4 @@
-"""Case attributes, attribute-dependent branching and triangular durations in the simulator (ticket 07)."""
+"""Case attributes, attribute-dependent branching and triangular durations in the simulator."""
 
 import math
 

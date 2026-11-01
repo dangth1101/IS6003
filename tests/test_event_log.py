@@ -1,4 +1,4 @@
-"""CSV export of the event log, in the shape of the book's Fig. 11.4 (§11.3, p.423) (ticket 10)."""
+"""CSV export of the event log, in the shape of the book's Fig. 11.4 (§11.3, p.423)."""
 
 import pandas as pd
 import pytest

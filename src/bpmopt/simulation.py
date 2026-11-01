@@ -169,7 +169,7 @@ class _Streams:
 
     Keyed by element ID, not by draw order, so adding or removing a task or a
     gateway elsewhere doesn't change what this case draws for the others. That
-    keeps common random numbers between designs (ticket 13). A task that runs
+    keeps common random numbers between designs. A task that runs
     again in a rework loop takes the next draw from its own stream.
     """
 
