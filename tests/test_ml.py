@@ -67,3 +67,10 @@ def test_ml_section_validates_against_the_schema(tmp_path, planted_log, task, fi
     validate_results(exported)
     assert exported["ml"]["split"] == {"method": "chronological", "train_share": 0.8}
     assert [t["id"] for t in exported["ml"]["tasks"]] == ["cycle_time"]
+
+
+def test_a_log_without_case_attributes_is_refused_with_a_clear_message(simulate_fixture):
+    log = simulate_fixture("sequence", n_cases=50)
+
+    with pytest.raises(ValueError, match="no case attributes"):
+        cycle_time_task(log, seed=1)

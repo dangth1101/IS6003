@@ -22,4 +22,5 @@
 - Gradient boosting uses fixed, conservative settings (`max_depth=3`, `learning_rate=0.05`, `min_samples_leaf=50`). With 800 training cases sklearn's defaults overfit: R² fell below the mean predictor on one seed and the noise attribute `workload` got about 2 days of mean |SHAP|. With these settings it's about 1. No early stopping, since that draws a random validation split.
 - SHAP is computed on the test cases.
 - Expect modest R² even with a strong planted driver. The number of loop-backs is geometric, so most of the cycle time variance is luck. On the fixture R² is about 0.15 to 0.3 and the linear model is often slightly better than boosting, which is worth a line in the 14 discussion.
+- `models/as_is.params.toml` (from 06) has no attributes yet, so ML on it raises "the log has no case attributes" until 10 adds them.
 - Not added: WIP at arrival as a derived feature (07's note). It's known at case start and could be computed from the log, but the caller asked to keep the table to the drawn attributes for now.

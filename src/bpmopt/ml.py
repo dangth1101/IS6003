@@ -89,6 +89,8 @@ class TrainingData:
 def training_data(log: pd.DataFrame, target: pd.Series) -> TrainingData:
     """Join a per-case target (indexed by case_id) to the case features and split by start time."""
     features = case_features(log)
+    if features.columns.size == 1:
+        raise ValueError("the log has no case attributes to learn from; add [attributes.*] to the parameter file")
     train, test = chronological_split(features, TRAIN_SHARE)
     return TrainingData(
         x_train=train.drop(columns="start_time"),
