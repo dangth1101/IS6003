@@ -4,7 +4,7 @@ Plan: `PLAN.md`. Spec and tickets: `.scratch/bpmn-time-optimization/`.
 
 ## Layout
 
-- `src/bpmopt/`: the Python package (BPMN reader, linter, simulator, flow analysis, log analysis, results export)
+- `src/bpmopt/`: the Python package (BPMN reader, linter, simulator, flow analysis, log analysis, case features and ML, results export)
 - `src/bpmopt/schema/results.schema.json`: the results contract between the notebook and the page
 - `src/bpmopt/content/page.en.toml`: all page text, copied into every results file
 - `tests/`: pytest suite, fixture models in `tests/fixtures/`
