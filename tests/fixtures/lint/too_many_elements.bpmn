@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lint fixture: breaks only G7. 32 flow nodes (start, 30 tasks, end), over the limit of 30. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_Large" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_1" name="App development" processRef="Process_Large" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Large" isExecutable="false">
+    <bpmn:startEvent id="Start_RequestReceived" name="Request received" />
+    <bpmn:task id="Task_01" name="Check item 1" />
+    <bpmn:task id="Task_02" name="Check item 2" />
+    <bpmn:task id="Task_03" name="Check item 3" />
+    <bpmn:task id="Task_04" name="Check item 4" />
+    <bpmn:task id="Task_05" name="Check item 5" />
+    <bpmn:task id="Task_06" name="Check item 6" />
+    <bpmn:task id="Task_07" name="Check item 7" />
+    <bpmn:task id="Task_08" name="Check item 8" />
+    <bpmn:task id="Task_09" name="Check item 9" />
+    <bpmn:task id="Task_10" name="Check item 10" />
+    <bpmn:task id="Task_11" name="Check item 11" />
+    <bpmn:task id="Task_12" name="Check item 12" />
+    <bpmn:task id="Task_13" name="Check item 13" />
+    <bpmn:task id="Task_14" name="Check item 14" />
+    <bpmn:task id="Task_15" name="Check item 15" />
+    <bpmn:task id="Task_16" name="Check item 16" />
+    <bpmn:task id="Task_17" name="Check item 17" />
+    <bpmn:task id="Task_18" name="Check item 18" />
+    <bpmn:task id="Task_19" name="Check item 19" />
+    <bpmn:task id="Task_20" name="Check item 20" />
+    <bpmn:task id="Task_21" name="Check item 21" />
+    <bpmn:task id="Task_22" name="Check item 22" />
+    <bpmn:task id="Task_23" name="Check item 23" />
+    <bpmn:task id="Task_24" name="Check item 24" />
+    <bpmn:task id="Task_25" name="Check item 25" />
+    <bpmn:task id="Task_26" name="Check item 26" />
+    <bpmn:task id="Task_27" name="Check item 27" />
+    <bpmn:task id="Task_28" name="Check item 28" />
+    <bpmn:task id="Task_29" name="Check item 29" />
+    <bpmn:task id="Task_30" name="Check item 30" />
+    <bpmn:endEvent id="End_ItemsChecked" name="Items checked" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_RequestReceived" targetRef="Task_01" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_01" targetRef="Task_02" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_02" targetRef="Task_03" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_03" targetRef="Task_04" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_04" targetRef="Task_05" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_05" targetRef="Task_06" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_06" targetRef="Task_07" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Task_07" targetRef="Task_08" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Task_08" targetRef="Task_09" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Task_09" targetRef="Task_10" />
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="Task_10" targetRef="Task_11" />
+    <bpmn:sequenceFlow id="Flow_12" sourceRef="Task_11" targetRef="Task_12" />
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="Task_12" targetRef="Task_13" />
+    <bpmn:sequenceFlow id="Flow_14" sourceRef="Task_13" targetRef="Task_14" />
+    <bpmn:sequenceFlow id="Flow_15" sourceRef="Task_14" targetRef="Task_15" />
+    <bpmn:sequenceFlow id="Flow_16" sourceRef="Task_15" targetRef="Task_16" />
+    <bpmn:sequenceFlow id="Flow_17" sourceRef="Task_16" targetRef="Task_17" />
+    <bpmn:sequenceFlow id="Flow_18" sourceRef="Task_17" targetRef="Task_18" />
+    <bpmn:sequenceFlow id="Flow_19" sourceRef="Task_18" targetRef="Task_19" />
+    <bpmn:sequenceFlow id="Flow_20" sourceRef="Task_19" targetRef="Task_20" />
+    <bpmn:sequenceFlow id="Flow_21" sourceRef="Task_20" targetRef="Task_21" />
+    <bpmn:sequenceFlow id="Flow_22" sourceRef="Task_21" targetRef="Task_22" />
+    <bpmn:sequenceFlow id="Flow_23" sourceRef="Task_22" targetRef="Task_23" />
+    <bpmn:sequenceFlow id="Flow_24" sourceRef="Task_23" targetRef="Task_24" />
+    <bpmn:sequenceFlow id="Flow_25" sourceRef="Task_24" targetRef="Task_25" />
+    <bpmn:sequenceFlow id="Flow_26" sourceRef="Task_25" targetRef="Task_26" />
+    <bpmn:sequenceFlow id="Flow_27" sourceRef="Task_26" targetRef="Task_27" />
+    <bpmn:sequenceFlow id="Flow_28" sourceRef="Task_27" targetRef="Task_28" />
+    <bpmn:sequenceFlow id="Flow_29" sourceRef="Task_28" targetRef="Task_29" />
+    <bpmn:sequenceFlow id="Flow_30" sourceRef="Task_29" targetRef="Task_30" />
+    <bpmn:sequenceFlow id="Flow_31" sourceRef="Task_30" targetRef="End_ItemsChecked" />
+  </bpmn:process>
+</bpmn:definitions>

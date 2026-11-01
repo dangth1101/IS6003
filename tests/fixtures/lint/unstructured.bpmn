@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lint fixture: breaks only G4. An AND split closed by an XOR join (lack of synchronization). -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_Unstructured" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_1" name="App development" processRef="Process_Unstructured" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Unstructured" isExecutable="false">
+    <bpmn:startEvent id="Start_AppBuilt" name="Application built" />
+    <bpmn:parallelGateway id="Gateway_AndSplit" />
+    <bpmn:task id="Task_ReviewCode" name="Review code" />
+    <bpmn:task id="Task_TestSecurity" name="Test security" />
+    <bpmn:exclusiveGateway id="Gateway_XorJoin" />
+    <bpmn:endEvent id="End_AppTested" name="Application tested" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_AppBuilt" targetRef="Gateway_AndSplit" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Gateway_AndSplit" targetRef="Task_ReviewCode" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Gateway_AndSplit" targetRef="Task_TestSecurity" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_ReviewCode" targetRef="Gateway_XorJoin" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_TestSecurity" targetRef="Gateway_XorJoin" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Gateway_XorJoin" targetRef="End_AppTested" />
+  </bpmn:process>
+</bpmn:definitions>

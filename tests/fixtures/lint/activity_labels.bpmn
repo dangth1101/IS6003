@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lint fixture: breaks only G6. Activity labels that are not verb-object
+     (examples from the book, Fig. 5.18 and §3.1 p.77). -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_ActivityLabels" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_1" name="Complaint handling" processRef="Process_ActivityLabels" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_ActivityLabels" isExecutable="false">
+    <bpmn:startEvent id="Start_ComplaintReceived" name="Complaint received" />
+    <bpmn:task id="Task_ActionNoun" name="Complaint analysis" />
+    <bpmn:task id="Task_Gerund" name="Archiving system" />
+    <bpmn:task id="Task_GeneralVerb" name="Perform check" />
+    <bpmn:task id="Task_NoObject" name="Review" />
+    <bpmn:task id="Task_Lowercase" name="inform complainant" />
+    <bpmn:task id="Task_Unlabeled" />
+    <bpmn:task id="Task_VerbObject" name="Inform complainant" />
+    <bpmn:endEvent id="End_ComplaintClosed" name="Complaint closed" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_ComplaintReceived" targetRef="Task_ActionNoun" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_ActionNoun" targetRef="Task_Gerund" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_Gerund" targetRef="Task_GeneralVerb" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_GeneralVerb" targetRef="Task_NoObject" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_NoObject" targetRef="Task_Lowercase" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_Lowercase" targetRef="Task_Unlabeled" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_Unlabeled" targetRef="Task_VerbObject" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Task_VerbObject" targetRef="End_ComplaintClosed" />
+  </bpmn:process>
+</bpmn:definitions>

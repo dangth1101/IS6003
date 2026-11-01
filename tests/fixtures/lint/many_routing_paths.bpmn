@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lint fixture: breaks only G2. AND split and join with 1 + 5 = 6 routing paths each (limit 5). -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_Routing" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_1" name="App development" processRef="Process_Routing" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Routing" isExecutable="false">
+    <bpmn:startEvent id="Start_AppBuilt" name="Application built" />
+    <bpmn:parallelGateway id="Gateway_AndSplit" />
+    <bpmn:task id="Task_1" name="Review code" />
+    <bpmn:task id="Task_2" name="Test functions" />
+    <bpmn:task id="Task_3" name="Test security" />
+    <bpmn:task id="Task_4" name="Test performance" />
+    <bpmn:task id="Task_5" name="Check accessibility" />
+    <bpmn:parallelGateway id="Gateway_AndJoin" />
+    <bpmn:endEvent id="End_AppTested" name="Application tested" />
+    <bpmn:sequenceFlow id="Flow_0" sourceRef="Start_AppBuilt" targetRef="Gateway_AndSplit" />
+    <bpmn:sequenceFlow id="Flow_S1" sourceRef="Gateway_AndSplit" targetRef="Task_1" />
+    <bpmn:sequenceFlow id="Flow_S2" sourceRef="Gateway_AndSplit" targetRef="Task_2" />
+    <bpmn:sequenceFlow id="Flow_S3" sourceRef="Gateway_AndSplit" targetRef="Task_3" />
+    <bpmn:sequenceFlow id="Flow_S4" sourceRef="Gateway_AndSplit" targetRef="Task_4" />
+    <bpmn:sequenceFlow id="Flow_S5" sourceRef="Gateway_AndSplit" targetRef="Task_5" />
+    <bpmn:sequenceFlow id="Flow_J1" sourceRef="Task_1" targetRef="Gateway_AndJoin" />
+    <bpmn:sequenceFlow id="Flow_J2" sourceRef="Task_2" targetRef="Gateway_AndJoin" />
+    <bpmn:sequenceFlow id="Flow_J3" sourceRef="Task_3" targetRef="Gateway_AndJoin" />
+    <bpmn:sequenceFlow id="Flow_J4" sourceRef="Task_4" targetRef="Gateway_AndJoin" />
+    <bpmn:sequenceFlow id="Flow_J5" sourceRef="Task_5" targetRef="Gateway_AndJoin" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Gateway_AndJoin" targetRef="End_AppTested" />
+  </bpmn:process>
+</bpmn:definitions>

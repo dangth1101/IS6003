@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lint fixture: breaks only G3. Two end events for the same outcome (like the book's Fig. 5.18). -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_DuplicateOutcome" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_1" name="Complaint handling" processRef="Process_DuplicateOutcome" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_DuplicateOutcome" isExecutable="false">
+    <bpmn:startEvent id="Start_ComplaintReceived" name="Complaint received" />
+    <bpmn:task id="Task_AnalyzeComplaint" name="Analyze complaint" />
+    <bpmn:exclusiveGateway id="Gateway_Justified" />
+    <bpmn:task id="Task_RefundCustomer" name="Pay refund" />
+    <bpmn:endEvent id="End_ClosedAfterRefund" name="Complaint closed" />
+    <bpmn:endEvent id="End_ClosedDirectly" name="Complaint closed" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_ComplaintReceived" targetRef="Task_AnalyzeComplaint" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_AnalyzeComplaint" targetRef="Gateway_Justified" />
+    <bpmn:sequenceFlow id="Flow_3" name="complaint justified" sourceRef="Gateway_Justified" targetRef="Task_RefundCustomer" />
+    <bpmn:sequenceFlow id="Flow_4" name="complaint unjustified" sourceRef="Gateway_Justified" targetRef="End_ClosedDirectly" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_RefundCustomer" targetRef="End_ClosedAfterRefund" />
+  </bpmn:process>
+</bpmn:definitions>
