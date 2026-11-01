@@ -5,8 +5,8 @@
     "replications": 1,
     "case_count": 100,
     "warm_up": 0.0,
-    "parameter_version": "fixture-1",
-    "generated_at": "2026-11-01T06:41:54+00:00"
+    "parameter_version": "placeholder-1",
+    "generated_at": "2026-11-01T06:43:00+00:00"
   },
   "text": {
     "lang": "en",
@@ -153,32 +153,132 @@
   },
   "assumptions": [
     {
-      "parameter": "tasks.Task_WriteSpec.duration",
-      "value": 2.0,
-      "rationale": "Fixture value."
+      "parameter": "tasks.Task_RegisterRequest.duration",
+      "value": 1.0,
+      "rationale": "Placeholder until ticket 10."
     },
     {
-      "parameter": "tasks.Task_BuildApp.duration",
-      "value": 5.5,
-      "rationale": "Fixture value."
-    },
-    {
-      "parameter": "tasks.Task_TestApp.duration",
+      "parameter": "tasks.Task_ApproveProposal.duration",
       "value": 3.0,
-      "rationale": "Fixture value."
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_ReviseProposal.duration",
+      "value": 3.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_HoldKickOff.duration",
+      "value": 1.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_SpecifyRequirements.duration",
+      "value": 10.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_DraftPlan.duration",
+      "value": 5.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_ApprovePlan.duration",
+      "value": 2.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_BuildApplication.duration",
+      "value": 30.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_ReviewSourceCode.duration",
+      "value": 3.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_RunFunctionalTests.duration",
+      "value": 5.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_RunSecurityTests.duration",
+      "value": 3.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_RunAcceptanceTests.duration",
+      "value": 5.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_FixDefects.duration",
+      "value": 4.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_ApproveRelease.duration",
+      "value": 2.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_RefineApplication.duration",
+      "value": 4.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_DeployApplication.duration",
+      "value": 1.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_StartOperation.duration",
+      "value": 1.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_MonitorOperation.duration",
+      "value": 20.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_EvaluateProject.duration",
+      "value": 2.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "gateways.Gateway_ProposalSplit.branches",
+      "value": "Flow_ProposalApproved: 0.7, Flow_ProposalChangesRequested: 0.2, Flow_ProposalRejected: 0.1",
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "gateways.Gateway_PlanSplit.branches",
+      "value": "Flow_PlanApproved: 0.8, Flow_PlanChangesRequested: 0.2",
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "gateways.Gateway_TestSplit.branches",
+      "value": "Flow_TestsPassed: 0.7, Flow_DefectsFound: 0.3",
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "gateways.Gateway_ReleaseSplit.branches",
+      "value": "Flow_ReleaseApproved: 0.9, Flow_ReleaseRejected: 0.1",
+      "rationale": "Placeholder until ticket 10."
     }
   ],
   "baseline": {
     "time_unit": "working days",
     "cycle_time": {
-      "mean": 10.5,
-      "median": 10.5,
-      "p90": 10.5
+      "mean": 93.64,
+      "median": 97.0,
+      "p90": 136.0
     },
     "processing_time": {
-      "mean": 10.5,
-      "median": 10.5,
-      "p90": 10.5
+      "mean": 93.64,
+      "median": 97.0,
+      "p90": 136.0
     },
     "waiting_time": {
       "mean": 0.0,
@@ -186,24 +286,105 @@
       "p90": 0.0
     },
     "cycle_time_efficiency": 1.0,
-    "rework": [],
+    "rework": [
+      {
+        "gateway_id": "Gateway_ReleaseSplit",
+        "rate": 0.10714285714285714
+      },
+      {
+        "gateway_id": "Gateway_TestSplit",
+        "rate": 0.34523809523809523
+      },
+      {
+        "gateway_id": "Gateway_PlanSplit",
+        "rate": 0.2261904761904762
+      },
+      {
+        "gateway_id": "Gateway_ProposalSplit",
+        "rate": 0.18
+      }
+    ],
     "waiting_by_activity": [
       {
-        "activity_id": "Task_BuildApp",
+        "activity_id": "Task_ApprovePlan",
         "mean": 0.0
       },
       {
-        "activity_id": "Task_TestApp",
+        "activity_id": "Task_ApproveProposal",
         "mean": 0.0
       },
       {
-        "activity_id": "Task_WriteSpec",
+        "activity_id": "Task_ApproveRelease",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_BuildApplication",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_DeployApplication",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_DraftPlan",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_EvaluateProject",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_FixDefects",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_HoldKickOff",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_MonitorOperation",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_RefineApplication",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_RegisterRequest",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_ReviewSourceCode",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_ReviseProposal",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_RunAcceptanceTests",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_RunFunctionalTests",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_RunSecurityTests",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_SpecifyRequirements",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_StartOperation",
         "mean": 0.0
       }
     ],
     "flow_analysis": {
-      "theoretical": 10.5,
-      "simulated": 10.5
+      "theoretical": 96.25347222222221,
+      "simulated": 93.64
     }
   },
   "models": {
