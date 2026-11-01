@@ -89,6 +89,15 @@ def test_assumptions_show_arrivals_warm_up_lanes_and_triangular_durations(fixtur
     }
 
 
+def test_assumptions_spell_out_a_scaled_duration(fixtures_dir):
+    params = load_parameters(fixtures_dir / "sequence.scaled.params.toml")
+    log = pd.DataFrame({"case_id": [1], "ready_time": [0.0], "end_time": [1.0]})
+
+    rows = {row["parameter"]: row["value"] for row in build_results(log=log, params=params, seed=1)["assumptions"]}
+
+    assert rows["tasks.Task_BuildApp.duration"] == "4 × (1 + 0.5 × complexity + 1 × [project_type = mobile])"
+
+
 def test_exported_results_carry_the_page_text(exported):
     assert exported["text"]["lang"] == "en"
     assert exported["text"]["sections"]["problem"]["paragraphs"]

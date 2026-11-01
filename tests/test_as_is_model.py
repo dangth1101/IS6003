@@ -27,7 +27,7 @@ def test_corrected_as_is_model_simulates_to_both_outcomes():
     traces = log.groupby("case_id").activity_id.agg(list)
     assert len(traces) == 200
     assert traces.str[0].eq("Start_RequestReceived").all()
-    # With the placeholder probabilities, 200 cases reach both outcomes.
+    # About 10% of proposals are rejected, so 200 cases reach both outcomes.
     assert set(traces.str[-1]) == {"End_ProjectClosed", "End_ProposalRejected"}
     # The four checks that used to be one compound "test" task are timed separately.
     tests = {"Task_ReviewSourceCode", "Task_RunFunctionalTests", "Task_RunSecurityTests", "Task_RunAcceptanceTests"}

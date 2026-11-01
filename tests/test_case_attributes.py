@@ -63,3 +63,33 @@ def test_triangular_durations_stay_in_range_and_average_to_their_mean(simulate_f
     assert theoretical_cycle_time(read_bpmn(fixtures_dir / "sequence.bpmn"), params) == pytest.approx(11.0)
     ct = cycle_times(log)
     assert abs(ct.mean() - 11.0) <= 4 * ct.std() / math.sqrt(len(ct))
+
+
+# 4 x (1 + 0.5 x complexity + 1 x [mobile]), worked out by hand.
+BUILD_DAYS = {
+    (1, "web"): 6.0,
+    (3, "web"): 10.0,
+    (1, "core"): 6.0,
+    (2, "mobile"): 12.0,
+    (3, "mobile"): 14.0,
+}
+
+
+def test_a_scaled_duration_grows_with_the_case_attributes(simulate_fixture):
+    log = simulate_fixture("sequence", n_cases=500, params="sequence.scaled")
+
+    builds = log[log.activity_id == "Task_BuildApp"]
+    for (complexity, project_type), days in BUILD_DAYS.items():
+        group = builds[(builds.complexity == complexity) & (builds.project_type == project_type)]
+        assert len(group) > 0
+        assert (group.end_time - group.start_time).to_numpy() == pytest.approx(days), (complexity, project_type)
+    # Tasks without a scale don't change.
+    specs = log[log.activity_id == "Task_WriteSpec"]
+    assert (specs.end_time - specs.start_time).to_numpy() == pytest.approx(2.0)
+
+
+def test_flow_analysis_uses_the_mean_of_a_scaled_duration_over_the_attribute_distributions(fixtures_dir):
+    params = load_parameters(fixtures_dir / "sequence.scaled.params.toml")
+
+    # 2 + 4 x (1 + 0.5 x 1.9 + 1 x 0.3) + 3 = 14 days.
+    assert theoretical_cycle_time(read_bpmn(fixtures_dir / "sequence.bpmn"), params) == pytest.approx(14.0)

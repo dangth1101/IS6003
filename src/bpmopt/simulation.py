@@ -150,7 +150,7 @@ def _move_token(case: _Case, node: Node) -> Generator[simpy.Event, object, Node 
                 return None
         elif node.element_type == "task":
             ready = env.now
-            start_time = yield from _perform_task(env, node, case.params, case.rng, case.pools.get(node.lane))
+            start_time = yield from _perform_task(env, node, case, case.pools.get(node.lane))
             case.rows.append(_row(case, node, ready, start_time, env.now))
         elif node.element_type == "exclusiveGateway" and len(outgoing) > 1:
             node = model.nodes[case.branches.choose(node.id, outgoing, case.params, case.attributes)]
@@ -207,12 +207,14 @@ class _BranchDraws:
 def _perform_task(
     env: simpy.Environment,
     node: Node,
-    params: Parameters,
-    rng: np.random.Generator,
+    case: _Case,
     pool: simpy.Resource | None,
 ) -> Generator[simpy.Event, None, float]:
-    """Wait for a resource of the task's lane (if the lane is limited), then work. Returns the start time."""
-    duration = params.task_durations[node.id].sample(rng)
+    """Wait for a resource of the task's lane (if the lane is limited), then work. Returns the start time.
+
+    The duration may scale with the case attributes (e.g. builds take longer per integration).
+    """
+    duration = case.params.task_durations[node.id].sample(case.rng, case.attributes)
     if pool is None:
         start_time = env.now
         yield env.timeout(duration)
