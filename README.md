@@ -4,6 +4,7 @@ Plan: `PLAN.md`. Spec and tickets: `.scratch/bpmn-time-optimization/`.
 
 ## Layout
 
+- `models/`: the corrected as-is model (`as_is.bpmn`, the source of truth for the process), its change log against the original `current_process.bpmn`, and its parameter file
 - `src/bpmopt/`: the Python package (BPMN reader, linter, simulator, flow analysis, log analysis, case features and ML, results export)
 - `src/bpmopt/schema/results.schema.json`: the results contract between the notebook and the page
 - `src/bpmopt/content/page.en.toml`: all page text, copied into every results file
