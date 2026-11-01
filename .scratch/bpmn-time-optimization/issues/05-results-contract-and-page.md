@@ -13,3 +13,7 @@
 - [ ] All visible text comes from the results file or the BPMN labels, so translation is a content change
 - [ ] Page works on GitHub Pages and on a local static server, with no backend
 - [ ] Page is readable at phone width
+
+## Comments
+
+- From review of 01: the page skeleton still has hardcoded text (title, captions, error message). Move it into the results file here. Also, `meta.schema_version` was added in 01 (not in the spec list), and `format: date-time` isn't enforced because `jsonschema.validate` runs without a format checker.

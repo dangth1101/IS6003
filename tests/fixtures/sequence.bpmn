@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_Sequence" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration id="Collaboration_Sequence">
+    <bpmn:participant id="Participant_Sequence" name="App development" processRef="Process_Sequence" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Sequence" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_Sequence">
+      <bpmn:lane id="Lane_Dev" name="Development team">
+        <bpmn:flowNodeRef>Start_RequestReceived</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_WriteSpec</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_BuildApp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_TestApp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_AppReleased</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_RequestReceived" name="Request received">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_WriteSpec" name="Write specification">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_BuildApp" name="Build application">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_TestApp" name="Test application">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:endEvent id="End_AppReleased" name="Application released">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_RequestReceived" targetRef="Task_WriteSpec" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_WriteSpec" targetRef="Task_BuildApp" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_BuildApp" targetRef="Task_TestApp" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_TestApp" targetRef="End_AppReleased" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_Sequence">
+    <bpmndi:BPMNPlane id="Plane_Sequence" bpmnElement="Collaboration_Sequence">
+      <bpmndi:BPMNShape id="Participant_Sequence_di" bpmnElement="Participant_Sequence" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="700" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Dev_di" bpmnElement="Lane_Dev" isHorizontal="true">
+        <dc:Bounds x="190" y="80" width="670" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_RequestReceived_di" bpmnElement="Start_RequestReceived">
+        <dc:Bounds x="252" y="162" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="228" y="205" width="84" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_WriteSpec_di" bpmnElement="Task_WriteSpec">
+        <dc:Bounds x="320" y="140" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_BuildApp_di" bpmnElement="Task_BuildApp">
+        <dc:Bounds x="470" y="140" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_TestApp_di" bpmnElement="Task_TestApp">
+        <dc:Bounds x="620" y="140" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_AppReleased_di" bpmnElement="End_AppReleased">
+        <dc:Bounds x="772" y="162" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="740" y="205" width="100" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="288" y="180" />
+        <di:waypoint x="320" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="420" y="180" />
+        <di:waypoint x="470" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="570" y="180" />
+        <di:waypoint x="620" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="720" y="180" />
+        <di:waypoint x="772" y="180" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

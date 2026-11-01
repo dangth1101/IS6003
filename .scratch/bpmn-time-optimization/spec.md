@@ -111,7 +111,7 @@ A small Python package, one notebook and one static HTML page, organised by the 
 - **Time unit:** working days on a continuous clock, with no holiday or working-hours calendar.
 - **Models in the repo:** the corrected as-is model replaces the current file's role as the source of truth. The original file is kept unchanged for reference.
 - **Language:** English for all labels, code, notebook and page text for now.
-- **Dependencies:** Python 3.11+, SimPy, pandas, NumPy, scikit-learn, SHAP, a JSON schema validator, pytest. No other ML frameworks.
+- **Dependencies:** Python 3.12+ (NumPy 2.5 needs it), SimPy, pandas, NumPy, scikit-learn, SHAP, a JSON schema validator, pytest. No other ML frameworks.
 
 ## Testing Decisions
 

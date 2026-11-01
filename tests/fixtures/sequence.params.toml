@@ -1,0 +1,16 @@
+# Parameters for the pure-sequence fixture model (sequence.bpmn).
+# Time unit: working days on a continuous clock.
+
+version = "fixture-1"
+
+[tasks.Task_WriteSpec]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[tasks.Task_BuildApp]
+duration = { fixed = 5.5 }
+rationale = "Fixture value."
+
+[tasks.Task_TestApp]
+duration = { fixed = 3.0 }
+rationale = "Fixture value."

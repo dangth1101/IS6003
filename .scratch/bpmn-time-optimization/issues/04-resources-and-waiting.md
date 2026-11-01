@@ -12,3 +12,7 @@
 - [ ] Cases that start during the warm-up are excluded from the log
 - [ ] Same seed still gives an identical log
 - [ ] Note: this ticket touches the same simulator core as ticket 03. Expect to merge with it.
+
+## Comments
+
+- From review of 01: the simulator draws from one shared RNG in event order. Once arrivals and gateways exist, give each case (or each stream: arrivals, durations, branches) its own generator, e.g. `default_rng([seed, case_id])`. Otherwise a design change shifts every later draw and weakens common random numbers (ticket 13).

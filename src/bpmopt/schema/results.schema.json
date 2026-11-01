@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dangth1101/IS6003/results.schema.json",
+  "title": "IS6003 results file",
+  "description": "Contract between the notebook (writer) and the static page (reader). Version 1: walking skeleton.",
+  "type": "object",
+  "required": ["meta", "models", "baseline"],
+  "additionalProperties": false,
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["schema_version", "seed", "case_count", "parameter_version", "generated_at"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": { "const": 1 },
+        "seed": { "type": "integer" },
+        "case_count": { "type": "integer", "minimum": 1 },
+        "parameter_version": { "type": "string" },
+        "generated_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "models": {
+      "type": "object",
+      "required": ["as_is"],
+      "additionalProperties": false,
+      "properties": {
+        "as_is": { "$ref": "#/$defs/model" },
+        "to_be": { "$ref": "#/$defs/model" }
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "required": ["time_unit", "cycle_time"],
+      "additionalProperties": false,
+      "properties": {
+        "time_unit": { "const": "working days" },
+        "cycle_time": {
+          "type": "object",
+          "required": ["mean"],
+          "additionalProperties": false,
+          "properties": {
+            "mean": { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "model": {
+      "type": "object",
+      "required": ["bpmn"],
+      "additionalProperties": false,
+      "properties": {
+        "bpmn": { "type": "string", "description": "Path to the BPMN file, relative to the results file." }
+      }
+    }
+  }
+}

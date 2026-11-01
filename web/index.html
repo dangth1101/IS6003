@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>App Development Cycle Time</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.28.0/dist/assets/diagram-js.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.28.0/dist/assets/bpmn-js.css">
+  <style>
+    :root {
+      --bg: #fafaf8;
+      --surface: #ffffff;
+      --text: #1d1d1b;
+      --muted: #6b6b66;
+      --border: #e2e1dc;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #161615;
+        --surface: #fafaf8; /* the diagram keeps a light canvas so BPMN strokes stay readable */
+        --text: #ecebe6;
+        --muted: #a3a29c;
+        --border: #34332f;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main { max-width: 960px; margin: 0 auto; padding: 32px 16px; }
+    h1 { font-size: 1.5rem; margin: 0 0 4px; }
+    .muted { color: var(--muted); margin: 0 0 24px; }
+    .stat { margin: 0 0 24px; }
+    .stat dt { color: var(--muted); font-size: 0.875rem; }
+    .stat dd { margin: 0; font-size: 2rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .stat dd span { font-size: 1rem; font-weight: 400; color: var(--muted); }
+    #diagram { height: 320px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+    #error { color: #b3261e; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>App development: cycle time</h1>
+    <p class="muted">Walking skeleton. The model is a fixture, not the real process yet.</p>
+
+    <dl class="stat">
+      <dt>Mean cycle time (simulated, <span id="cases">…</span> cases)</dt>
+      <dd id="cycle-time">…</dd>
+    </dl>
+
+    <div id="diagram" aria-label="As-is BPMN model"></div>
+    <p id="error" hidden></p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bpmn-js@18.28.0/dist/bpmn-viewer.production.min.js"></script>
+  <script>
+    async function fetchOk(url) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+      return response;
+    }
+
+    async function main() {
+      const results = await (await fetchOk("results.json")).json();
+      const { cycle_time, time_unit } = results.baseline;
+
+      document.getElementById("cases").textContent = results.meta.case_count;
+      const value = document.getElementById("cycle-time");
+      value.textContent = cycle_time.mean.toFixed(1) + " ";
+      value.append(Object.assign(document.createElement("span"), { textContent: time_unit }));
+
+      const xml = await (await fetchOk(results.models.as_is.bpmn)).text();
+      const viewer = new BpmnJS({ container: "#diagram" });
+      await viewer.importXML(xml);
+      viewer.get("canvas").zoom("fit-viewport");
+    }
+
+    main().catch((err) => {
+      const box = document.getElementById("error");
+      box.hidden = false;
+      box.textContent = `Could not load the results: ${err.message}. Serve this folder with a static server (e.g. python -m http.server); opening the file directly doesn't work.`;
+    });
+  </script>
+</body>
+</html>

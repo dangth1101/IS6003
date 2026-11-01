@@ -11,3 +11,7 @@
 - [ ] Parameter file is human-editable and validated on load, with clear errors for missing or unknown element IDs
 - [ ] A parameter entry without a rationale fails validation
 - [ ] Assumptions table in the results validates against the schema
+
+## Comments
+
+- From review of 01: `load_parameters` reads `rationale` from the file but doesn't keep or require it yet. That belongs here. The seed is also passed twice (to `simulate` and `build_results`); worth bundling the run config when the parameter file grows.
