@@ -1,0 +1,24 @@
+# rework_with_activity.bpmn where testing fails more often for complex and mobile projects.
+# Chance of failing one test round: logistic(-2 + 1 x complexity + 1.5 x [project_type = mobile]).
+
+version = "fixture-1"
+
+[attributes.complexity]
+distribution = { choice = [1, 2, 3], weights = [0.4, 0.4, 0.2] }
+rationale = "Fixture value."
+
+[attributes.project_type]
+distribution = { choice = ["web", "mobile"], weights = [0.7, 0.3] }
+rationale = "Fixture value."
+
+[tasks.Task_TestBuild]
+duration = { fixed = 4.0 }
+rationale = "Fixture value."
+
+[tasks.Task_FixDefects]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[gateways.Gateway_LoopSplit]
+branches = { Flow_Passed = "rest", Flow_Failed = { logistic = { intercept = -2.0, complexity = 1.0, project_type = { mobile = 1.5 } } } }
+rationale = "Fixture value."

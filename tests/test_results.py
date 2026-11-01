@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 
 import jsonschema
+import pandas as pd
 import pytest
 
 from bpmopt.parameters import load_parameters
@@ -40,6 +41,52 @@ def test_results_report_the_warm_up_from_the_parameter_file(simulate_fixture, fi
     results = build_results(log=log, params=params, seed=1)
 
     assert results["meta"]["warm_up"] == 50.0
+
+
+def test_assumptions_table_lists_every_parameter_with_its_rationale(tmp_path, simulate_fixture, fixtures_dir):
+    log = simulate_fixture("rework_with_activity", n_cases=10, seed=3, params="rework_with_activity.logistic")
+    params = load_parameters(fixtures_dir / "rework_with_activity.logistic.params.toml")
+    results = build_results(log=log, params=params, seed=3)
+    path = export_results(results, tmp_path, models={"as_is": fixtures_dir / "rework_with_activity.bpmn"})
+
+    assumptions = json.loads(path.read_text())["assumptions"]
+    assert assumptions == [
+        {"parameter": "attributes.complexity.distribution", "value": "choice(1: 0.4, 2: 0.4, 3: 0.2)", "rationale": "Fixture value."},
+        {"parameter": "attributes.project_type.distribution", "value": "choice(web: 0.7, mobile: 0.3)", "rationale": "Fixture value."},
+        {"parameter": "tasks.Task_TestBuild.duration", "value": 4.0, "rationale": "Fixture value."},
+        {"parameter": "tasks.Task_FixDefects.duration", "value": 2.0, "rationale": "Fixture value."},
+        {
+            "parameter": "gateways.Gateway_LoopSplit.branches",
+            "value": "Flow_Passed: rest, Flow_Failed: logistic(-2 + 1 × complexity + 1.5 × [project_type = mobile])",
+            "rationale": "Fixture value.",
+        },
+    ]
+
+
+def test_assumptions_show_arrivals_warm_up_lanes_and_triangular_durations(fixtures_dir, tmp_path):
+    path = tmp_path / "all.params.toml"
+    path.write_text(
+        'version = "x"\n'
+        '[arrivals]\nrate = 0.25\nrationale = "About one request a week."\n'
+        '[warm_up]\nlength = 100\nrationale = "Long enough to fill the queues."\n'
+        '[attributes.workload]\ndistribution = { triangular = [0.2, 0.6, 1.0] }\nrationale = "Share of the team busy."\n'
+        '[attributes.integrations]\ndistribution = { poisson = 1.5 }\nrationale = "Most apps call one or two systems."\n'
+        '[lanes.Lane_Dev]\ncapacity = 3\nrationale = "Three developers."\n'
+        '[tasks.Task_BuildApp]\nduration = { triangular = [10, 20, 45] }\nrationale = "Scales with scope."\n'
+    )
+    params = load_parameters(path)
+    log = pd.DataFrame({"case_id": [1], "ready_time": [0.0], "end_time": [1.0]})
+
+    rows = {row["parameter"]: row["value"] for row in build_results(log=log, params=params, seed=1)["assumptions"]}
+
+    assert rows == {
+        "arrivals.rate": 0.25,
+        "warm_up.length": 100.0,
+        "attributes.workload.distribution": "triangular(0.2, 0.6, 1)",
+        "attributes.integrations.distribution": "poisson(1.5)",
+        "lanes.Lane_Dev.capacity": 3,
+        "tasks.Task_BuildApp.duration": "triangular(10, 20, 45)",
+    }
 
 
 def test_exported_results_carry_the_page_text(exported):
