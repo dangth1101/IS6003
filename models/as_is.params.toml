@@ -1,0 +1,99 @@
+# Placeholder parameters for the corrected as-is model (models/as_is.bpmn).
+# Fixed durations in working days, fixed branch probabilities, unlimited lanes,
+# every case arriving at time 0. They only prove the model runs end to end.
+# Ticket 10 replaces this file with the proposed defaults (distributions,
+# attribute effects, arrivals, lane capacities, warm-up).
+
+version = "placeholder-1"
+
+[tasks.Task_RegisterRequest]
+duration = { fixed = 1.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_ApproveProposal]
+duration = { fixed = 3.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_ReviseProposal]
+duration = { fixed = 3.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_HoldKickOff]
+duration = { fixed = 1.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_SpecifyRequirements]
+duration = { fixed = 10.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_DraftPlan]
+duration = { fixed = 5.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_ApprovePlan]
+duration = { fixed = 2.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_BuildApplication]
+duration = { fixed = 30.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_ReviewSourceCode]
+duration = { fixed = 3.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_RunFunctionalTests]
+duration = { fixed = 5.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_RunSecurityTests]
+duration = { fixed = 3.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_RunAcceptanceTests]
+duration = { fixed = 5.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_FixDefects]
+duration = { fixed = 4.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_ApproveRelease]
+duration = { fixed = 2.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_RefineApplication]
+duration = { fixed = 4.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_DeployApplication]
+duration = { fixed = 1.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_StartOperation]
+duration = { fixed = 1.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_MonitorOperation]
+duration = { fixed = 20.0 }
+rationale = "Placeholder until ticket 10."
+
+[tasks.Task_EvaluateProject]
+duration = { fixed = 2.0 }
+rationale = "Placeholder until ticket 10."
+
+[gateways.Gateway_ProposalSplit]
+branches = { Flow_ProposalApproved = 0.7, Flow_ProposalChangesRequested = 0.2, Flow_ProposalRejected = 0.1 }
+rationale = "Placeholder until ticket 10."
+
+[gateways.Gateway_PlanSplit]
+branches = { Flow_PlanApproved = 0.8, Flow_PlanChangesRequested = 0.2 }
+rationale = "Placeholder until ticket 10."
+
+[gateways.Gateway_TestSplit]
+branches = { Flow_TestsPassed = 0.7, Flow_DefectsFound = 0.3 }
+rationale = "Placeholder until ticket 10."
+
+[gateways.Gateway_ReleaseSplit]
+branches = { Flow_ReleaseApproved = 0.9, Flow_ReleaseRejected = 0.1 }
+rationale = "Placeholder until ticket 10."
