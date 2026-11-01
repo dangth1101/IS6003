@@ -27,25 +27,46 @@ stays within (7.1)-(7.4). In a rework split with an extra branch to an end
 event, leaving the loop is an XOR-split of its own over the arcs that don't
 loop back, with probabilities divided by 1 - r.
 
+Branch probabilities that depend on case attributes (logistic branches) are
+our extension too. The book's probabilities are fixed. Once a case's
+attributes are known its probabilities are fixed, so the formulas hold per
+attribute vector, and the process CT is their mean over the attribute
+distributions in the parameter file. That mean is estimated from a fixed
+number of attribute draws with a fixed seed, so it is reproducible. Putting
+the mean probability into the formulas instead would be wrong: 1 / (1 - r) is
+convex, so it would underestimate rework (Jensen's inequality). Durations
+don't depend on attributes, so their means go in as they are. With only fixed
+splits nothing is drawn and the result is the plain formula.
+
 Like the book's equations, this only works for block-structured models
 (§7.1.7, p.272). Anything else raises ValueError.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
+import numpy as np
+
 from bpmopt.bpmn import Flow, Node, ProcessModel
-from bpmopt.parameters import Parameters
+from bpmopt.parameters import AttributeValue, Parameters
 
 
-def theoretical_cycle_time(model: ProcessModel, params: Parameters) -> float:
-    """Mean cycle time of a case, from task mean durations and branching probabilities."""
+def theoretical_cycle_time(model: ProcessModel, params: Parameters, *, n_draws: int = 5_000, seed: int = 0) -> float:
+    """Mean cycle time of a case, from task mean durations and branching probabilities.
+
+    With logistic branches, the mean over n_draws attribute vectors drawn with
+    `seed` (see the module docstring). With fixed branches both are ignored.
+    """
     starts = model.nodes_of_type("startEvent")
     if len(starts) != 1:
         raise ValueError(f"expected exactly one start event, found {len(starts)}")
-    ct, stop, _ = _Reducer(model, params).fragment(_single_outgoing(model, starts[0]))
-    if stop is not None and not _is_end(model, stop):
-        raise ValueError(f"{stop.target}: join without a matching split, the model is not block-structured")
-    return ct
+    reducer = _Reducer(model, params)
+    first = _single_outgoing(model, starts[0])
+    if not any(branches.depends_on_attributes for branches in params.branch_probabilities.values()):
+        return reducer.cycle_time(first, {})
+    rng = np.random.default_rng(seed)
+    draws = [{name: d.sample(rng) for name, d in params.attributes.items()} for _ in range(n_draws)]
+    return float(np.mean([reducer.cycle_time(first, attributes) for attributes in draws]))
 
 
 class _Reducer:
@@ -60,6 +81,18 @@ class _Reducer:
         self.params = params
         self.loops = _find_loops(model)  # loop split ID -> loop
         self.loop_joins = {loop.join for loop in self.loops.values()}
+        self.attributes: Mapping[str, AttributeValue] = {}
+
+    def cycle_time(self, first: Flow, attributes: Mapping[str, AttributeValue]) -> float:
+        """CT of a case with these attributes, from the start event's outgoing flow."""
+        self.attributes = attributes
+        ct, stop, _ = self.fragment(first)
+        if stop is not None and not _is_end(self.model, stop):
+            raise ValueError(f"{stop.target}: join without a matching split, the model is not block-structured")
+        return ct
+
+    def probabilities(self, split_id: str) -> dict[str, float]:
+        return self.params.branch_probabilities[split_id].probabilities(self.attributes)
 
     def fragment(self, flow: Flow) -> tuple[float, Flow | None, float]:
         """The fragment entered by `flow`, up to the first join or end event."""
@@ -73,7 +106,7 @@ class _Reducer:
             elif node.element_type == "task":
                 part_ct, flow, part_p = self.params.task_durations[node.id].mean, _single_outgoing(self.model, node), 1.0
             elif _is_split(self.model, node):
-                probabilities = self.params.branch_probabilities.get(node.id)
+                probabilities = self.probabilities(node.id) if node.element_type == "exclusiveGateway" else None
                 part_ct, flow, part_p = self.block(node, self.model.outgoing(node.id), probabilities)
             else:
                 raise ValueError(f"{node.id}: element type {node.element_type!r} is not supported by flow analysis")
@@ -122,7 +155,7 @@ class _Reducer:
         loop = self.loops.get(into_split.target) if into_split is not None else None
         if loop is None or loop.join != join.id:
             raise ValueError(f"{join.id}: loop body doesn't end at the split that loops back to it")
-        probabilities = self.params.branch_probabilities[loop.split]
+        probabilities = self.probabilities(loop.split)
         r = probabilities[loop.back.id]
         if r >= 1:
             raise ValueError(f"{loop.split}: rework probability {r} never leaves the loop")

@@ -104,3 +104,45 @@ def test_a_branch_that_ends_at_its_own_end_event_weights_the_rest_of_the_process
     # as the XOR formula (7.2): a case that has ended spends no more time, so everything after
     # an early exit counts with the probability of not having ended.
     assert flow_analysis(model) == pytest.approx(expected)
+
+
+# rework_with_activity.logistic: P(fail) = logistic(-2 + complexity + 1.5 x [mobile]).
+# Attribute weights from the params file, P(fail) worked by hand per group.
+LOGISTIC_GROUPS = [
+    # (weight, P(fail))
+    (0.4 * 0.7, 0.268941),  # complexity 1, web: logistic(-1)
+    (0.4 * 0.7, 0.5),  # complexity 2, web: logistic(0)
+    (0.2 * 0.7, 0.731059),  # complexity 3, web: logistic(1)
+    (0.4 * 0.3, 0.622459),  # complexity 1, mobile: logistic(0.5)
+    (0.4 * 0.3, 0.817574),  # complexity 2, mobile: logistic(1.5)
+    (0.2 * 0.3, 0.924142),  # complexity 3, mobile: logistic(2.5)
+]
+
+
+def test_logistic_splits_average_the_formula_over_cases_not_the_probability(flow_analysis):
+    # Not in the book, which only has fixed probabilities. Once a case's attributes are known
+    # its probabilities are fixed, so the book's formula holds per case: (4 + r x 2) / (1 - r),
+    # with T = 4 and R = 2 from rework_with_activity. The process CT is its mean over cases.
+    # Putting the mean r into the formula instead would come out far lower, since 1 / (1 - r)
+    # is convex.
+    exact = sum(w * (4 + r * 2) / (1 - r) for w, r in LOGISTIC_GROUPS)
+    mean_r = sum(w * r for w, r in LOGISTIC_GROUPS)
+    plugged_in = (4 + mean_r * 2) / (1 - mean_r)
+
+    ct = flow_analysis("rework_with_activity", "rework_with_activity.logistic")
+
+    assert ct == pytest.approx(exact, rel=0.02)  # sampled attributes, so not exact
+    assert ct > 1.3 * plugged_in
+
+
+def test_a_logistic_split_without_attribute_effects_gives_the_plain_formula(fixtures_dir, tmp_path):
+    # logistic(0 + 0 x complexity) = 0.5 for every case, so the average over cases must equal
+    # the book's formula with r = 0.5: (4 + 0.5 x 2) / 0.5 = 10, with no sampling error.
+    params = (fixtures_dir / "rework_with_activity.logistic.params.toml").read_text()
+    params = params.replace("intercept = -2.0, complexity = 1.0, project_type = { mobile = 1.5 }", "intercept = 0.0, complexity = 0.0")
+    path = tmp_path / "flat.params.toml"
+    path.write_text(params)
+
+    ct = theoretical_cycle_time(read_bpmn(fixtures_dir / "rework_with_activity.bpmn"), load_parameters(path))
+
+    assert ct == pytest.approx(10.0, abs=1e-9)

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lint fixture: breaks only G1. A gateway with one arc in and one out does nothing. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_Redundant" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_1" name="App development" processRef="Process_Redundant" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Redundant" isExecutable="false">
+    <bpmn:startEvent id="Start_RequestReceived" name="Request received" />
+    <bpmn:task id="Task_WriteSpec" name="Write specification" />
+    <bpmn:exclusiveGateway id="Gateway_PassThrough" />
+    <bpmn:task id="Task_BuildApp" name="Build application" />
+    <bpmn:endEvent id="End_AppBuilt" name="Application built" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_RequestReceived" targetRef="Task_WriteSpec" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_WriteSpec" targetRef="Gateway_PassThrough" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Gateway_PassThrough" targetRef="Task_BuildApp" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_BuildApp" targetRef="End_AppBuilt" />
+  </bpmn:process>
+</bpmn:definitions>

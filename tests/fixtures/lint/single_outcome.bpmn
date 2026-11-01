@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lint fixture: breaks only G3 (heuristic). An XOR decision but one end event:
+     a rejected proposal loops back for revision and can never end as rejected. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_SingleOutcome" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_1" name="App development" processRef="Process_SingleOutcome" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_SingleOutcome" isExecutable="false">
+    <bpmn:startEvent id="Start_ProposalReceived" name="Proposal received" />
+    <bpmn:exclusiveGateway id="Gateway_Merge" />
+    <bpmn:task id="Task_ApproveProposal" name="Approve proposal" />
+    <bpmn:exclusiveGateway id="Gateway_Approved" />
+    <bpmn:task id="Task_ReviseProposal" name="Revise proposal" />
+    <bpmn:endEvent id="End_ProposalApproved" name="Proposal approved" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_ProposalReceived" targetRef="Gateway_Merge" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Gateway_Merge" targetRef="Task_ApproveProposal" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_ApproveProposal" targetRef="Gateway_Approved" />
+    <bpmn:sequenceFlow id="Flow_4" name="proposal approved" sourceRef="Gateway_Approved" targetRef="End_ProposalApproved" />
+    <bpmn:sequenceFlow id="Flow_5" name="proposal rejected" sourceRef="Gateway_Approved" targetRef="Task_ReviseProposal" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_ReviseProposal" targetRef="Gateway_Merge" />
+  </bpmn:process>
+</bpmn:definitions>

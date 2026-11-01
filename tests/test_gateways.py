@@ -69,11 +69,21 @@ def test_a_task_on_the_loop_back_arc_runs_once_per_rework(simulate_fixture):
 
 
 @pytest.mark.parametrize(
-    "name", ["book_fig7_2", "book_fig7_4", "book_fig7_7", "book_fig7_10", "rework_with_activity", "proposal_rejected", "early_exit_in_block"]
+    ("name", "params"),
+    [
+        ("book_fig7_2", None),
+        ("book_fig7_4", None),
+        ("book_fig7_7", None),
+        ("book_fig7_10", None),
+        ("rework_with_activity", None),
+        ("rework_with_activity", "rework_with_activity.logistic"),  # flow analysis averages over attributes
+        ("proposal_rejected", None),
+        ("early_exit_in_block", None),
+    ],
 )
-def test_mean_cycle_time_matches_flow_analysis_with_unlimited_capacity(simulate_fixture, fixtures_dir, name):
-    expected = theoretical_cycle_time(read_bpmn(fixtures_dir / f"{name}.bpmn"), load_parameters(fixtures_dir / f"{name}.params.toml"))
-    log = simulate_fixture(name, n_cases=N_CASES)
+def test_mean_cycle_time_matches_flow_analysis_with_unlimited_capacity(simulate_fixture, fixtures_dir, name, params):
+    expected = theoretical_cycle_time(read_bpmn(fixtures_dir / f"{name}.bpmn"), load_parameters(fixtures_dir / f"{params or name}.params.toml"))
+    log = simulate_fixture(name, n_cases=N_CASES, params=params)
 
     _assert_mean_within_four_standard_errors(cycle_times(log), expected)
 

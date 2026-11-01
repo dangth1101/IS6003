@@ -14,6 +14,10 @@ the log. XOR-joins, AND gateways and other rows leave flow_id empty.
 Lanes with a capacity in the parameter file are resource pools: a task waits
 for a free resource of its lane, so ready_time -> start_time is waiting time
 and start_time -> end_time is processing time. Lanes without one are unlimited.
+
+Each case draws its attributes (project type, complexity, ...) once when it
+arrives. They are repeated on every log row of the case, as extra columns after
+LOG_COLUMNS, and XOR-splits with logistic branches read them.
 """
 
 import zlib
@@ -25,7 +29,7 @@ import pandas as pd
 import simpy
 
 from bpmopt.bpmn import Flow, Node, ProcessModel
-from bpmopt.parameters import Parameters
+from bpmopt.parameters import AttributeValue, Parameters, check_parameters
 
 LOG_COLUMNS = [
     "case_id",
@@ -53,6 +57,7 @@ def simulate(model: ProcessModel, params: Parameters, *, n_cases: int, seed: int
     starts = model.nodes_of_type("startEvent")
     if len(starts) != 1:
         raise ValueError(f"expected exactly one start event, found {len(starts)}")
+    check_parameters(params, model)
 
     env = simpy.Environment()
     rows: list[dict] = []
@@ -60,7 +65,7 @@ def simulate(model: ProcessModel, params: Parameters, *, n_cases: int, seed: int
     arrivals = env.process(_arrivals(env, model, params, pools, n_cases, seed, starts[0], rows))
     env.run()
 
-    log = pd.DataFrame(rows, columns=LOG_COLUMNS)
+    log = pd.DataFrame(rows, columns=[*LOG_COLUMNS, *params.attributes])
     log = log[log.case_id > arrivals.value]
     return log.sort_values(["case_id", "start_time"], kind="stable").reset_index(drop=True)
 
@@ -79,8 +84,8 @@ def _arrivals(
 
     Random streams are separate so a design change in one case doesn't shift the
     draws of the others (common random numbers): one generator for interarrival
-    times, one per case for task durations, and one per case and XOR-split for
-    branch choices (see _BranchDraws).
+    times, one per case for task durations, one per case and XOR-split for
+    branch choices (see _BranchDraws), and one per case and attribute.
 
     Returns the number of warm-up cases. Arrival times only grow, so those are
     the cases with the lowest IDs.
@@ -99,6 +104,7 @@ def _arrivals(
             case_id,
             rng=np.random.default_rng([seed, 1, case_id]),
             branches=_BranchDraws(seed, case_id),
+            attributes=_draw_attributes(params, seed, case_id),
             rows=rows,
             pools=pools,
         )
@@ -119,6 +125,7 @@ class _Case:
     case_id: int
     rng: np.random.Generator  # durations
     branches: "_BranchDraws"
+    attributes: dict[str, AttributeValue]  # drawn at arrival, repeated on every log row
     rows: list[dict]
     pools: dict[str, simpy.Resource]
 
@@ -141,16 +148,16 @@ def _move_token(case: _Case, node: Node) -> Generator[simpy.Event, object, Node 
     while True:
         incoming, outgoing = model.incoming(node.id), model.outgoing(node.id)
         if node.element_type in ("startEvent", "endEvent"):
-            case.rows.append(_row(model, case.case_id, node, env.now, env.now, env.now))
+            case.rows.append(_row(case, node, env.now, env.now, env.now))
             if node.element_type == "endEvent":
                 return None
         elif node.element_type == "task":
             ready = env.now
             start_time = yield from _perform_task(env, node, case.params, case.rng, case.pools.get(node.lane))
-            case.rows.append(_row(model, case.case_id, node, ready, start_time, env.now))
+            case.rows.append(_row(case, node, ready, start_time, env.now))
         elif node.element_type == "exclusiveGateway" and len(outgoing) > 1:
-            flow = case.branches.choose(node.id, outgoing, case.params)
-            case.rows.append(_row(model, case.case_id, node, env.now, env.now, env.now, flow_id=flow.id))
+            flow = case.branches.choose(node.id, outgoing, case.params, case.attributes)
+            case.rows.append(_row(case, node, env.now, env.now, env.now, flow_id=flow.id))
             node = model.nodes[flow.target]
             continue
         elif node.element_type == "parallelGateway" and len(incoming) > 1 and len(outgoing) == 1:
@@ -185,14 +192,12 @@ class _BranchDraws:
         self._key = [seed, 2, case_id]
         self._rngs: dict[str, np.random.Generator] = {}
 
-    def choose(self, gateway_id: str, outgoing: list[Flow], params: Parameters) -> Flow:
-        """Pick an outgoing flow of the XOR-split."""
-        probabilities = params.branch_probabilities.get(gateway_id)
-        if probabilities is None or set(probabilities) != {flow.id for flow in outgoing}:
-            raise ValueError(
-                f"gateways.{gateway_id}.branches must give a probability for each outgoing flow: "
-                f"{sorted(flow.id for flow in outgoing)}"
-            )
+    def choose(self, gateway_id: str, outgoing: list[Flow], params: Parameters, attributes: dict[str, AttributeValue]) -> Flow:
+        """Pick an outgoing flow of the XOR-split.
+
+        Probabilities can depend on the case attributes (logistic branches).
+        """
+        probabilities = params.branch_probabilities[gateway_id].probabilities(attributes)
         if gateway_id not in self._rngs:
             self._rngs[gateway_id] = np.random.default_rng([*self._key, zlib.crc32(gateway_id.encode())])
         u = self._rngs[gateway_id].random()
@@ -224,11 +229,18 @@ def _perform_task(
     return start_time
 
 
-def _row(
-    model: ProcessModel, case_id: int, node: Node, ready: float, start: float, end: float, flow_id: str | None = None
-) -> dict:
+def _draw_attributes(params: Parameters, seed: int, case_id: int) -> dict[str, AttributeValue]:
+    """One stream per case and attribute, keyed by name, so adding an attribute doesn't change the others."""
     return {
-        "case_id": case_id,
+        name: distribution.sample(np.random.default_rng([seed, 3, case_id, zlib.crc32(name.encode())]))
+        for name, distribution in params.attributes.items()
+    }
+
+
+def _row(case: _Case, node: Node, ready: float, start: float, end: float, flow_id: str | None = None) -> dict:
+    model = case.model
+    return {
+        "case_id": case.case_id,
         "activity_id": node.id,
         "activity_label": node.label,
         "element_type": node.element_type,
@@ -238,4 +250,5 @@ def _row(
         "start_time": start,
         "end_time": end,
         "flow_id": flow_id,
+        **case.attributes,
     }
