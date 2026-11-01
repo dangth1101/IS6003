@@ -171,10 +171,11 @@ def _models(path: Path, raw: dict[str, str], ids: list[str]) -> dict[frozenset[s
 
 
 def _check_overrides(where: str, changes: tuple[Change, ...], models: list[ProcessModel]) -> None:
-    """Each override names an element of some model, and no two changes override the same entry."""
+    """Each override names an element of some model (a gateway must be an XOR-split), and no two changes override the same entry."""
+    what = {"tasks": "task", "gateways": "XOR-split", "lanes": "lane"}
     known = {
         "tasks": {node.id for m in models for node in m.nodes_of_type("task")},
-        "gateways": {node.id for m in models for node in m.nodes_of_type("exclusiveGateway")},
+        "gateways": {node.id for m in models for node in m.xor_splits()},
         "lanes": {lane_id for m in models for lane_id in m.lanes},
     }
     owner: dict[str, str] = {}
@@ -183,7 +184,7 @@ def _check_overrides(where: str, changes: tuple[Change, ...], models: list[Proce
             for element_id in entries if section in known else ():
                 entry = f"{section}.{element_id}"
                 if element_id not in known[section]:
-                    raise ValueError(f"{where}: changes.{change.id}.overrides.{entry}: no model in the catalog has this ID")
+                    raise ValueError(f"{where}: changes.{change.id}.overrides.{entry}: no model in the catalog has a {what[section]} with this ID")
                 if entry in owner:
                     raise ValueError(f"{where}: {owner[entry]} and {change.id} both override {entry}, so their combination is ambiguous")
                 owner[entry] = change.id
@@ -197,7 +198,7 @@ def _combinations(ids: list[str]) -> list[tuple[str, ...]]:
 def _restrict(params: Parameters, model: ProcessModel) -> Parameters:
     """Drop the task, gateway and lane entries the model doesn't have."""
     tasks = {node.id for node in model.nodes_of_type("task")}
-    gateways = {node.id for node in model.nodes_of_type("exclusiveGateway") if len(model.outgoing(node.id)) > 1}
+    gateways = {node.id for node in model.xor_splits()}
     keep = {f"tasks.{i}" for i in tasks} | {f"gateways.{i}" for i in gateways} | {f"lanes.{i}" for i in model.lanes}
     return replace(
         params,

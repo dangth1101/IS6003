@@ -240,3 +240,18 @@ def test_a_change_needs_every_catalog_field(write_catalog):
 
     with pytest.raises(ValueError, match="expected_effect"):
         write_catalog(text)
+
+
+def test_a_gateway_override_on_an_xor_join_is_an_error(tmp_path, fixtures_dir):
+    # Only XOR-splits have branches. An override on a join would be dropped without a word.
+    body = (
+        "[changes.C1.overrides.gateways.Gateway_LoopJoin]\n"
+        "branches = { Flow_Passed = 0.9, Flow_Failed = 0.1 }\n"
+        'rationale = "Wrong gateway."\n'
+    )
+    (tmp_path / "catalog.toml").write_text('version = "test"\n' + _change("C1", body))
+    model = read_bpmn(fixtures_dir / "rework_with_activity.bpmn")
+    params = load_parameters(fixtures_dir / "rework_with_activity.params.toml")
+
+    with pytest.raises(ValueError, match="Gateway_LoopJoin"):
+        load_catalog(tmp_path / "catalog.toml", model=model, params=params)

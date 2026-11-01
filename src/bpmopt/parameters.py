@@ -360,8 +360,7 @@ def check_parameters(params: Parameters, model: ProcessModel) -> None:
     errors too, since they are usually typos.
     """
     tasks = {node.id for node in model.nodes_of_type("task")}
-    splits = {node.id: {f.id for f in model.outgoing(node.id)} for node in model.nodes_of_type("exclusiveGateway")}
-    splits = {gateway_id: flows for gateway_id, flows in splits.items() if len(flows) > 1}
+    splits = {node.id: {f.id for f in model.outgoing(node.id)} for node in model.xor_splits()}
     problems = [f"tasks.{task_id}: task has no duration" for task_id in sorted(tasks - set(params.task_durations))]
     problems += [f"gateways.{gateway_id}: XOR-split has no branches" for gateway_id in sorted(set(splits) - set(params.branch_probabilities))]
     problems += [f"tasks.{task_id}: no task with this ID in the model" for task_id in params.task_durations if task_id not in tasks]
