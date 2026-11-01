@@ -37,7 +37,7 @@ attribute takes a table of label -> coefficient, unlisted labels count 0.
 import math
 import tomllib
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import numpy as np
@@ -193,6 +193,37 @@ def load_parameters(path: str | Path, model: ProcessModel | None = None) -> Para
     if model is not None:
         check_parameters(params, model)
     return params
+
+
+# What a redesign may change. Arrivals, attributes and the warm-up describe the demand and the
+# run, not the design, so they stay the same in every scenario.
+_OVERRIDABLE = ("lanes", "tasks", "gateways")
+
+
+def apply_overrides(params: Parameters, overrides: dict) -> Parameters:
+    """Return params with the entries in overrides added or replaced.
+
+    overrides uses the parameter file layout, e.g. {"tasks": {"Task_X": {"duration":
+    {"fixed": 3}, "rationale": "..."}}}. Only lanes, tasks and gateways can be
+    overridden. Every entry needs its own rationale, which replaces the old one in
+    the assumptions table. IDs aren't checked against a model here.
+    """
+    unknown = set(overrides) - set(_OVERRIDABLE)
+    if unknown:
+        raise ValueError(f"can't override {', '.join(sorted(unknown))}: only {', '.join(_OVERRIDABLE)} can change between scenarios")
+    rationales = _check_layout({"version": params.version, **overrides})
+    durations = {task_id: _duration(task_id, entry["duration"]) for task_id, entry in overrides.get("tasks", {}).items()}
+    capacities = {lane_id: _capacity(lane_id, entry["capacity"]) for lane_id, entry in overrides.get("lanes", {}).items()}
+    branches = {
+        gateway_id: _branches(gateway_id, entry["branches"], params.attributes) for gateway_id, entry in overrides.get("gateways", {}).items()
+    }
+    return replace(
+        params,
+        task_durations=params.task_durations | durations,
+        lane_capacities=params.lane_capacities | capacities,
+        branch_probabilities=params.branch_probabilities | branches,
+        rationales=params.rationales | rationales,
+    )
 
 
 def assumptions(params: Parameters) -> list[dict]:
