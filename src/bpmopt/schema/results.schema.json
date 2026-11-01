@@ -184,8 +184,8 @@
             "required": ["rule", "element_id", "severity", "message"],
             "additionalProperties": false,
             "properties": {
-              "rule": { "type": "string", "description": "e.g. 7PMG-G3" },
-              "element_id": { "type": ["string", "null"], "description": "Null for rules about the whole model." },
+              "rule": { "type": "string", "description": "Bare rule ID, e.g. G3 or ARC-LABEL." },
+              "element_id": { "type": "string", "minLength": 1, "description": "The element the violation is about. Rules about the whole model (POOL, G7) give the process ID." },
               "severity": { "enum": ["error", "warning"] },
               "message": { "type": "string" }
             }
@@ -205,7 +205,9 @@
         "skipped": { "type": "string", "minLength": 1, "description": "Why the task wasn't fitted. Classification only." },
         "models": {
           "type": "array",
+          "description": "Every fitted task reports the reference model, so the others can be read against it.",
           "minItems": 1,
+          "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "reference" } } },
           "items": {
             "type": "object",
             "required": ["id", "metrics"],

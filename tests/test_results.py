@@ -231,3 +231,40 @@ def test_a_baseline_missing_any_measure_is_rejected(exported, field):
 
     with pytest.raises(jsonschema.ValidationError):
         validate_results(exported)
+
+
+def _fitted_task(fake, kind):
+    return next(t for t in fake["ml"]["tasks"] if t["kind"] == kind and "skipped" not in t)
+
+
+@pytest.mark.parametrize("kind", ["regression", "classification"])
+def test_an_ml_task_without_its_reference_model_is_rejected(fake, kind):
+    task = _fitted_task(fake, kind)
+    task["models"] = [m for m in task["models"] if m["id"] != "reference"]
+
+    with pytest.raises(jsonschema.ValidationError):
+        validate_results(fake)
+
+
+@pytest.mark.parametrize(
+    ("kind", "metrics"),
+    [
+        ("regression", {"roc_auc": 0.7, "f1": 0.5}),
+        ("regression", {"mae": 10.0}),
+        ("classification", {"mae": 10.0, "r2": 0.2}),
+        ("classification", {"roc_auc": 0.7, "f1": 0.5, "r2": 0.2}),
+    ],
+)
+def test_ml_metrics_must_match_the_task_kind(fake, kind, metrics):
+    _fitted_task(fake, kind)["models"][0]["metrics"] = metrics
+
+    with pytest.raises(jsonschema.ValidationError):
+        validate_results(fake)
+
+
+def test_a_lint_violation_names_an_element_even_for_model_level_rules(fake):
+    # Model-level rules (POOL, G7) name the process ID, never null.
+    fake["models"]["as_is"]["lint"] = [{"rule": "G7", "element_id": None, "severity": "warning", "message": "Too big."}]
+
+    with pytest.raises(jsonschema.ValidationError):
+        validate_results(fake)
