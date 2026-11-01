@@ -12,7 +12,7 @@ import pytest
 from bpmopt.analysis import mean_cycle_time
 from bpmopt.bpmn import read_bpmn
 from bpmopt.parameters import load_parameters
-from bpmopt.results import build_results, validate_results
+from bpmopt.results import build_results, element_names, validate_results
 from bpmopt.scenarios import ablation, load_catalog, replication_seeds, run_scenarios
 from bpmopt.simulation import simulate
 
@@ -93,7 +93,8 @@ def test_every_combination_of_changes_is_simulated_and_the_results_validate(load
         frozenset(c) for c in [(), ("C1",), ("C2",), ("C3",), ("C1", "C2"), ("C1", "C3"), ("C2", "C3"), ("C1", "C2", "C3")]
     }
     results = build_results(log=log, model=model, params=params, seed=5)
-    results |= {"models": {"as_is": {"bpmn": "models/as_is.bpmn"}}, "changes": catalog.entries(), "scenarios": scenarios}
+    as_is = {"bpmn": "models/as_is.bpmn", "names": element_names(model)}
+    results |= {"models": {"as_is": as_is}, "changes": catalog.entries(), "scenarios": scenarios}
     validate_results(results)
 
 

@@ -172,10 +172,15 @@
     },
     "model": {
       "type": "object",
-      "required": ["bpmn"],
+      "required": ["bpmn", "names"],
       "additionalProperties": false,
       "properties": {
         "bpmn": { "type": "string", "description": "Path to the BPMN file, relative to the results file." },
+        "names": {
+          "type": "object",
+          "description": "Element ID -> display name. An unnamed XOR gateway with one incoming flow is named after the element before it. Written by export_results; the page labels tables with it.",
+          "additionalProperties": { "type": "string" }
+        },
         "lint": {
           "type": "array",
           "description": "Linter violations. Empty means clean. Missing means not checked yet.",
@@ -362,7 +367,7 @@
         "lint", "lint_clean", "lint_not_checked", "lint_rule", "lint_element", "lint_message", "severity_error", "severity_warning",
         "mean", "median", "p90", "ci",
         "cycle_time", "processing_time", "waiting_time", "cycle_time_efficiency", "days",
-        "rework", "gateway", "gateway_after", "rework_rate", "waiting_by_activity", "activity", "mean_waiting",
+        "rework", "gateway", "rework_rate", "waiting_by_activity", "activity", "mean_waiting",
         "flow_analysis", "flow_theoretical", "flow_simulated", "flow_difference",
         "value_added", "va_class", "va_reason", "va_VA", "va_BVA", "va_NVA",
         "ml_split", "ml_task_cycle_time", "ml_task_rework", "ml_model", "model_reference_regression", "model_reference_classification",

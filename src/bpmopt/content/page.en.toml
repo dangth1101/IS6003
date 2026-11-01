@@ -79,6 +79,7 @@ cycle_time_efficiency = "Cycle time efficiency"
 days = "days"
 rework = "Rework"
 gateway = "Gateway"
+# Not read by the page: export_results uses it to name unnamed gateways in models.*.names.
 gateway_after = "Decision after {task}"
 rework_rate = "Cases that loop back"
 waiting_by_activity = "Waiting time per activity"

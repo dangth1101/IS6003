@@ -209,6 +209,42 @@
   "models": {
     "as_is": {
       "bpmn": "models/as_is.bpmn",
+      "names": {
+        "lane_ops": "IT operations",
+        "lane_qa": "QA and acceptance",
+        "lane_dev": "Development",
+        "lane_ld": "IT management",
+        "lane_bu": "Business unit",
+        "Flow_4": "approved",
+        "Flow_5": "not approved",
+        "Flow_11": "approved",
+        "Flow_12": "not approved",
+        "Flow_15": "accepted",
+        "Flow_16": "defects found",
+        "Flow_19": "approved",
+        "Flow_20": "not approved",
+        "start": "Development request received",
+        "request": "Register request",
+        "approve": "Approve project",
+        "g1": "Project approved?",
+        "revise": "Revise proposal",
+        "kick": "Hold kick-off meeting",
+        "spec": "Specify requirements",
+        "plan": "Draft project plan",
+        "planapprove": "Approve plan",
+        "g2": "Plan approved?",
+        "build": "Build application",
+        "test": "Review, test and accept application",
+        "g3": "Application accepted?",
+        "fix": "Fix defects",
+        "appapprove": "Approve application",
+        "g4": "Application approved?",
+        "deploy": "Deploy to live",
+        "operate": "Start live operation",
+        "monitor": "Monitor operation",
+        "review": "Archive records and review results",
+        "end": "Application in operation"
+      },
       "lint": [
         {
           "rule": "7PMG-G6",
@@ -220,6 +256,14 @@
     },
     "to_be": {
       "bpmn": "models/to_be.bpmn",
+      "names": {
+        "lane_team": "Development team",
+        "start": "Development request received",
+        "triage": "Triage request",
+        "functional_test": "Test functions",
+        "security_test": "Test security",
+        "end": "Application in operation"
+      },
       "lint": []
     }
   },
