@@ -47,6 +47,7 @@ dependencies = [
     { name = "pandas" },
     { name = "rfc3339-validator" },
     { name = "scikit-learn" },
+    { name = "scipy" },
     { name = "shap" },
     { name = "simpy" },
 ]
@@ -70,6 +71,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = "==9.2.0" },
     { name = "rfc3339-validator", specifier = "==0.1.4" },
     { name = "scikit-learn", specifier = "==1.9.1" },
+    { name = "scipy", specifier = "==1.18.1" },
     { name = "shap", specifier = "==0.54.1" },
     { name = "simpy", specifier = "==4.1.2" },
 ]

@@ -13,7 +13,7 @@ from bpmopt.analysis import mean_cycle_time
 from bpmopt.bpmn import read_bpmn
 from bpmopt.parameters import load_parameters
 from bpmopt.results import build_results, validate_results
-from bpmopt.scenarios import ablation, load_catalog, replication_seeds, run_scenarios, t_quantile_975
+from bpmopt.scenarios import ablation, load_catalog, replication_seeds, run_scenarios
 from bpmopt.simulation import simulate
 
 
@@ -44,11 +44,6 @@ def test_a_change_that_removes_a_fixed_amount_of_work_saves_exactly_that_much(lo
     assert saving["value"] == pytest.approx(2.0)
     assert saving["ci_low"] == pytest.approx(2.0)
     assert saving["ci_high"] == pytest.approx(2.0)
-
-
-def test_the_ci_uses_the_t_quantile_from_the_usual_table():
-    # Two-sided 95% t values from any statistics table.
-    assert [round(t_quantile_975(df), 3) for df in (1, 2, 5, 10, 29, 100)] == [12.706, 4.303, 2.571, 2.228, 2.045, 1.984]
 
 
 def test_the_empty_scenario_reproduces_the_as_is_run_exactly(load, fixtures_dir):
