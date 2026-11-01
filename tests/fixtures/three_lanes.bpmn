@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Not from the book: a sequence of three tasks, each in its own lane, so each lane can get its own capacity. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_three_lanes" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration>
+    <bpmn:participant id="Participant_three_lanes" name="App development" processRef="Process_ThreeLanes" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_ThreeLanes" isExecutable="false">
+    <bpmn:laneSet>
+      <bpmn:lane id="Lane_Analysts" name="Analysts">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_WriteSpec</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Developers" name="Developers">
+        <bpmn:flowNodeRef>Task_BuildApp</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Testers" name="Testers">
+        <bpmn:flowNodeRef>Task_TestApp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Request received" />
+    <bpmn:task id="Task_WriteSpec" name="Write specification" />
+    <bpmn:task id="Task_BuildApp" name="Build application" />
+    <bpmn:task id="Task_TestApp" name="Test application" />
+    <bpmn:endEvent id="End" name="Application released" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start" targetRef="Task_WriteSpec" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_WriteSpec" targetRef="Task_BuildApp" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_BuildApp" targetRef="Task_TestApp" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_TestApp" targetRef="End" />
+  </bpmn:process>
+</bpmn:definitions>

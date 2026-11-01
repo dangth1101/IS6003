@@ -18,14 +18,19 @@ from pathlib import Path
 import jsonschema
 import pandas as pd
 
-from bpmopt.analysis import cycle_time_stats
+from bpmopt.analysis import baseline_metrics, flow_analysis_check
+from bpmopt.bpmn import ProcessModel
 from bpmopt.parameters import Parameters, assumptions
 
 SCHEMA_VERSION = 2
 
 
-def build_results(*, log: pd.DataFrame, params: Parameters, seed: int, lang: str = "en") -> dict:
+def build_results(*, log: pd.DataFrame, model: ProcessModel, params: Parameters, seed: int, lang: str = "en") -> dict:
     """Results without the `models` section, which export_results fills in.
+
+    `log` is the simulation of `model` with `params` and `seed`. The flow
+    analysis check simulates the model once more with unlimited capacity, with
+    the same seed and case count.
 
     Later tickets add their own sections (value_added, ml, changes,
     scenarios, threats) to this dict before export.
@@ -44,7 +49,8 @@ def build_results(*, log: pd.DataFrame, params: Parameters, seed: int, lang: str
         "assumptions": assumptions(params),
         "baseline": {
             "time_unit": "working days",
-            "cycle_time": cycle_time_stats(log),
+            **baseline_metrics(log, model),
+            "flow_analysis": flow_analysis_check(model, params, n_cases=int(log.case_id.nunique()), seed=seed),
         },
     }
 
@@ -106,6 +112,18 @@ def _cross_field_errors(results: dict) -> Iterator[str]:
         for name, e in estimates.items():
             if not e["ci_low"] <= e["value"] <= e["ci_high"]:
                 yield f"scenarios[{i}].{name}: interval [{e['ci_low']}, {e['ci_high']}] doesn't contain {e['value']}"
+
+
+def validate_changes(changes: list[dict]) -> None:
+    """Raise jsonschema.ValidationError if a change catalog breaks the contract's `changes` section.
+
+    Lets the catalog loader catch a bad entry before any simulation runs.
+    """
+    validator = _validator()
+    section = validator.schema["properties"]["changes"]
+    error = jsonschema.exceptions.best_match(validator.evolve(schema={**section, "$defs": validator.schema["$defs"]}).iter_errors(changes))
+    if error is not None:
+        raise error
 
 
 @cache

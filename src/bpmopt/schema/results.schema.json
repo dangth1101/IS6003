@@ -61,8 +61,8 @@
     },
     "baseline": {
       "type": "object",
-      "description": "As-is performance measures from the event log (book §7.1). Only cycle_time is required until ticket 08.",
-      "required": ["time_unit", "cycle_time"],
+      "description": "As-is performance measures from the event log (book §7.1).",
+      "required": ["time_unit", "cycle_time", "processing_time", "waiting_time", "cycle_time_efficiency", "rework", "waiting_by_activity", "flow_analysis"],
       "additionalProperties": false,
       "properties": {
         "time_unit": { "const": "working days" },

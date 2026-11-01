@@ -28,8 +28,9 @@ def test_the_csv_reads_back_as_the_same_log(log, tmp_path):
     csv = pd.read_csv(export_csv(log, tmp_path / "log.csv"))
 
     back = csv.drop(columns="event_id")[log.columns]
+    # CSV has no None vs "" (e.g. unlabeled gateways), so both read back as empty.
     # Times are rounded to 1e-4 working days, a few seconds, to keep the file readable.
-    pd.testing.assert_frame_equal(back, log, check_dtype=False, atol=1e-4)
+    pd.testing.assert_frame_equal(back.fillna(""), log.fillna(""), check_dtype=False, atol=1e-4)
 
 
 def test_times_are_written_with_four_decimals(simulate_fixture, tmp_path):

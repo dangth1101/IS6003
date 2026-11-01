@@ -7,7 +7,9 @@ runs one token per branch at the same time and continues once all of them
 reach the AND-join. A rework loop is just an XOR-split whose branch leads back
 to an earlier XOR-join. The log has one row per element execution:
 start and end events appear as zero-duration rows so every trace shows where
-it began and how it ended.
+it began and how it ended. Each XOR-split decision is a zero-duration row too,
+with the outgoing flow taken in flow_id, so rework can be read straight from
+the log. XOR-joins, AND gateways and other rows leave flow_id empty.
 
 Lanes with a capacity in the parameter file are resource pools: a task waits
 for a free resource of its lane, so ready_time -> start_time is waiting time
@@ -39,6 +41,7 @@ LOG_COLUMNS = [
     "ready_time",
     "start_time",
     "end_time",
+    "flow_id",
 ]
 
 
@@ -81,8 +84,8 @@ def _arrivals(
 
     Random streams are separate so a design change in one case doesn't shift the
     draws of the others (common random numbers): one generator for interarrival
-    times, one per case for task durations, one per case and XOR-split for
-    branch choices (see _BranchDraws), and one per case and attribute.
+    times, one per case and task for durations, one per case and XOR-split
+    for branch choices (see _Streams), and one per case and attribute.
 
     Returns the number of warm-up cases. Arrival times only grow, so those are
     the cases with the lowest IDs.
@@ -99,7 +102,7 @@ def _arrivals(
             model,
             params,
             case_id,
-            rng=np.random.default_rng([seed, 1, case_id]),
+            durations=_Streams(seed, 1, case_id),
             branches=_BranchDraws(seed, case_id),
             attributes=_draw_attributes(params, seed, case_id),
             rows=rows,
@@ -120,7 +123,7 @@ class _Case:
     model: ProcessModel
     params: Parameters
     case_id: int
-    rng: np.random.Generator  # durations
+    durations: "_Streams"  # one stream per task
     branches: "_BranchDraws"
     attributes: dict[str, AttributeValue]  # drawn at arrival, repeated on every log row
     rows: list[dict]
@@ -153,7 +156,9 @@ def _move_token(case: _Case, node: Node) -> Generator[simpy.Event, object, Node 
             start_time = yield from _perform_task(env, node, case, case.pools.get(node.lane))
             case.rows.append(_row(case, node, ready, start_time, env.now))
         elif node.element_type == "exclusiveGateway" and len(outgoing) > 1:
-            node = model.nodes[case.branches.choose(node.id, outgoing, case.params, case.attributes)]
+            flow = case.branches.choose(node.id, outgoing, case.params, case.attributes)
+            case.rows.append(_row(case, node, env.now, env.now, env.now, flow_id=flow.id))
+            node = model.nodes[flow.target]
             continue
         elif node.element_type == "parallelGateway" and len(incoming) > 1 and len(outgoing) == 1:
             return node
@@ -173,35 +178,48 @@ def _move_token(case: _Case, node: Node) -> Generator[simpy.Event, object, Node 
         node = model.nodes[outgoing[0].target]
 
 
+class _Streams:
+    """Random streams of one case, one per element (task or XOR-split), made on first use.
+
+    Keyed by element ID, not by draw order, so adding or removing a task or a
+    gateway elsewhere doesn't change what this case draws for the others. That
+    keeps common random numbers between designs (ticket 13). A task that runs
+    again in a rework loop takes the next draw from its own stream.
+    """
+
+    def __init__(self, seed: int, kind: int, case_id: int):
+        self._key = [seed, kind, case_id]
+        self._rngs: dict[str, np.random.Generator] = {}
+
+    def __getitem__(self, element_id: str) -> np.random.Generator:
+        if element_id not in self._rngs:
+            self._rngs[element_id] = np.random.default_rng([*self._key, zlib.crc32(element_id.encode())])
+        return self._rngs[element_id]
+
+
 class _BranchDraws:
     """Branch choices of one case, with one random stream per XOR-split.
 
-    Keyed by gateway ID, not by draw order, so adding or removing a task or a
-    gateway elsewhere doesn't change which branch this case takes here. That
-    keeps common random numbers between designs (ticket 13). Each choice uses one
-    uniform draw against the cumulative probabilities, so a small change in a
-    probability only flips the cases near the boundary.
+    Each choice uses one uniform draw against the cumulative probabilities, so a
+    small change in a probability only flips the cases near the boundary.
     """
 
     def __init__(self, seed: int, case_id: int):
-        self._key = [seed, 2, case_id]
-        self._rngs: dict[str, np.random.Generator] = {}
+        self._streams = _Streams(seed, 2, case_id)
 
-    def choose(self, gateway_id: str, outgoing: list[Flow], params: Parameters, attributes: dict[str, AttributeValue]) -> str:
-        """Pick an outgoing flow of the XOR-split and return its target node ID.
+    def choose(self, gateway_id: str, outgoing: list[Flow], params: Parameters, attributes: dict[str, AttributeValue]) -> Flow:
+        """Pick an outgoing flow of the XOR-split.
 
         Probabilities can depend on the case attributes (logistic branches).
         """
         probabilities = params.branch_probabilities[gateway_id].probabilities(attributes)
-        if gateway_id not in self._rngs:
-            self._rngs[gateway_id] = np.random.default_rng([*self._key, zlib.crc32(gateway_id.encode())])
-        u = self._rngs[gateway_id].random()
+        u = self._streams[gateway_id].random()
         cumulative = 0.0
         for flow in outgoing:
             cumulative += probabilities[flow.id]
             if u < cumulative:
-                return flow.target
-        return outgoing[-1].target  # u fell in the rounding gap just below 1
+                return flow
+        return outgoing[-1]  # u fell in the rounding gap just below 1
 
 
 def _perform_task(
@@ -212,9 +230,10 @@ def _perform_task(
 ) -> Generator[simpy.Event, None, float]:
     """Wait for a resource of the task's lane (if the lane is limited), then work. Returns the start time.
 
-    The duration may scale with the case attributes (e.g. builds take longer per integration).
+    The duration comes from the task's own stream and may scale with the case
+    attributes (e.g. builds take longer per integration).
     """
-    duration = case.params.task_durations[node.id].sample(case.rng, case.attributes)
+    duration = case.params.task_durations[node.id].sample(case.durations[node.id], case.attributes)
     if pool is None:
         start_time = env.now
         yield env.timeout(duration)
@@ -234,7 +253,7 @@ def _draw_attributes(params: Parameters, seed: int, case_id: int) -> dict[str, A
     }
 
 
-def _row(case: _Case, node: Node, ready: float, start: float, end: float) -> dict:
+def _row(case: _Case, node: Node, ready: float, start: float, end: float, flow_id: str | None = None) -> dict:
     model = case.model
     return {
         "case_id": case.case_id,
@@ -246,5 +265,6 @@ def _row(case: _Case, node: Node, ready: float, start: float, end: float) -> dic
         "ready_time": ready,
         "start_time": start,
         "end_time": end,
+        "flow_id": flow_id,
         **case.attributes,
     }

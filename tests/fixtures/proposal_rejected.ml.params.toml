@@ -1,0 +1,58 @@
+# proposal_rejected.bpmn with one planted rework driver at one gateway.
+# Only complexity changes the chance of failing a test round:
+# logistic(-4.5 + 1.2 x complexity), so 0.04, 0.12 and 0.29 for complexity 1, 2 and 3.
+# About 1 in 9 cases that reach testing fail it at least once, so the classes are imbalanced,
+# and no complexity level fails more often than not: an unweighted model never predicts rework.
+# The proposal decision is fixed (25% revise), so no attribute drives that rework gateway.
+# 15% of the cases are rejected and never reach testing.
+# The other attributes are noise. Lanes are unlimited, so arrivals don't add waiting time.
+
+version = "fixture-1"
+
+[arrivals]
+rate = 2.0
+rationale = "Fixture value."
+
+[attributes.complexity]
+distribution = { choice = [1, 2, 3], weights = [0.5, 0.3, 0.2] }
+rationale = "Fixture value."
+
+[attributes.project_type]
+distribution = { choice = ["web", "mobile", "core"], weights = [0.5, 0.3, 0.2] }
+rationale = "Fixture value."
+
+[attributes.integrations]
+distribution = { poisson = 1.5 }
+rationale = "Fixture value."
+
+[attributes.workload]
+distribution = { triangular = [0.2, 0.6, 1.0] }
+rationale = "Fixture value."
+
+[tasks.Task_ReviewProposal]
+duration = { fixed = 1.0 }
+rationale = "Fixture value."
+
+[tasks.Task_ReviseProposal]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[tasks.Task_BuildApp]
+duration = { fixed = 5.0 }
+rationale = "Fixture value."
+
+[tasks.Task_TestApp]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[tasks.Task_FixDefects]
+duration = { fixed = 1.0 }
+rationale = "Fixture value."
+
+[gateways.Gateway_ReviewSplit]
+branches = { Flow_Approved = 0.6, Flow_Revise = 0.25, Flow_Rejected = 0.15 }
+rationale = "Fixture value."
+
+[gateways.Gateway_TestSplit]
+branches = { Flow_Passed = "rest", Flow_Failed = { logistic = { intercept = -4.5, complexity = 1.2 } } }
+rationale = "Fixture value."

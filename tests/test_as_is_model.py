@@ -1,10 +1,14 @@
 """The corrected as-is model (ticket 06): the project's source of truth for the as-is process."""
 
+import math
 import re
+from dataclasses import replace
 from pathlib import Path
 from xml.etree import ElementTree
 
+from bpmopt.analysis import cycle_times
 from bpmopt.bpmn import read_bpmn
+from bpmopt.flow_analysis import theoretical_cycle_time
 from bpmopt.lint import lint
 from bpmopt.parameters import load_parameters
 from bpmopt.simulation import simulate
@@ -50,3 +54,16 @@ def test_change_log_accounts_for_every_element_of_the_original_model():
     missing = (set(original.nodes) | set(original.flows) | set(original.lanes)) - mentioned
     assert not missing, f"change log doesn't mention: {sorted(missing)}"
 
+
+
+def test_flow_analysis_of_the_as_is_model_agrees_with_its_simulation():
+    # Ticket 08: the as-is model has a "Proposal rejected" end event on a rework split and
+    # several rework loops. The cross-check must work on it, not only on fixtures.
+    # Flow analysis has no waiting (§7.1), so the lanes are unlimited here.
+    model = read_bpmn(MODEL)
+    params = replace(load_parameters(PARAMETERS), lane_capacities={})
+    log = simulate(model, params, n_cases=10_000, seed=1)
+
+    ct = cycle_times(log)
+    sem = ct.std() / math.sqrt(len(ct))
+    assert abs(ct.mean() - theoretical_cycle_time(model, params)) <= 4 * sem
