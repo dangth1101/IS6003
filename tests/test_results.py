@@ -3,10 +3,10 @@ import re
 from pathlib import Path
 
 import jsonschema
-import pandas as pd
 import pytest
 
-from bpmopt.parameters import load_parameters
+from bpmopt.bpmn import read_bpmn
+from bpmopt.parameters import assumptions, load_parameters
 from bpmopt.results import build_results, export_results, validate_results
 
 
@@ -14,7 +14,7 @@ from bpmopt.results import build_results, export_results, validate_results
 def exported(tmp_path, simulate_fixture, fixtures_dir):
     log = simulate_fixture("sequence", n_cases=10, seed=3)
     params = load_parameters(fixtures_dir / "sequence.params.toml")
-    results = build_results(log=log, params=params, seed=3)
+    results = build_results(log=log, model=read_bpmn(fixtures_dir / "sequence.bpmn"), params=params, seed=3)
     path = export_results(results, tmp_path, models={"as_is": fixtures_dir / "sequence.bpmn"})
     return json.loads(path.read_text())
 
@@ -38,7 +38,7 @@ def test_results_report_the_warm_up_from_the_parameter_file(simulate_fixture, fi
     log = simulate_fixture("single_task", n_cases=60, seed=1, params="single_task.warmup")
     params = load_parameters(fixtures_dir / "single_task.warmup.params.toml")
 
-    results = build_results(log=log, params=params, seed=1)
+    results = build_results(log=log, model=read_bpmn(fixtures_dir / "single_task.bpmn"), params=params, seed=1)
 
     assert results["meta"]["warm_up"] == 50.0
 
@@ -46,7 +46,7 @@ def test_results_report_the_warm_up_from_the_parameter_file(simulate_fixture, fi
 def test_assumptions_table_lists_every_parameter_with_its_rationale(tmp_path, simulate_fixture, fixtures_dir):
     log = simulate_fixture("rework_with_activity", n_cases=10, seed=3, params="rework_with_activity.logistic")
     params = load_parameters(fixtures_dir / "rework_with_activity.logistic.params.toml")
-    results = build_results(log=log, params=params, seed=3)
+    results = build_results(log=log, model=read_bpmn(fixtures_dir / "rework_with_activity.bpmn"), params=params, seed=3)
     path = export_results(results, tmp_path, models={"as_is": fixtures_dir / "rework_with_activity.bpmn"})
 
     assumptions = json.loads(path.read_text())["assumptions"]
@@ -75,9 +75,8 @@ def test_assumptions_show_arrivals_warm_up_lanes_and_triangular_durations(fixtur
         '[tasks.Task_BuildApp]\nduration = { triangular = [10, 20, 45] }\nrationale = "Scales with scope."\n'
     )
     params = load_parameters(path)
-    log = pd.DataFrame({"case_id": [1], "ready_time": [0.0], "end_time": [1.0]})
 
-    rows = {row["parameter"]: row["value"] for row in build_results(log=log, params=params, seed=1)["assumptions"]}
+    rows = {row["parameter"]: row["value"] for row in assumptions(params)}
 
     assert rows == {
         "arrivals.rate": 0.25,
@@ -168,3 +167,37 @@ def test_the_page_uses_exactly_the_labels_the_schema_requires():
     schema = json.loads((Path(__file__).parents[1] / "src/bpmopt/schema/results.schema.json").read_text())
 
     assert used == set(schema["$defs"]["labels"]["required"])
+
+
+BASELINE_FIELDS = {
+    "time_unit",
+    "cycle_time",
+    "processing_time",
+    "waiting_time",
+    "cycle_time_efficiency",
+    "rework",
+    "waiting_by_activity",
+    "flow_analysis",
+}
+
+
+def test_exported_baseline_has_every_measure(tmp_path, simulate_fixture, fixtures_dir):
+    log = simulate_fixture("proposal_rejected", n_cases=300, seed=3)
+    model = read_bpmn(fixtures_dir / "proposal_rejected.bpmn")
+    params = load_parameters(fixtures_dir / "proposal_rejected.params.toml")
+
+    results = build_results(log=log, model=model, params=params, seed=3)
+    path = export_results(results, tmp_path, models={"as_is": fixtures_dir / "proposal_rejected.bpmn"})
+
+    baseline = json.loads(path.read_text())["baseline"]
+    assert set(baseline) == BASELINE_FIELDS
+    assert baseline["flow_analysis"]["theoretical"] == pytest.approx(8.4)  # worked by hand in the params file
+    assert {row["gateway_id"] for row in baseline["rework"]} == {"Gateway_ReviewSplit", "Gateway_TestSplit"}
+
+
+@pytest.mark.parametrize("field", sorted(BASELINE_FIELDS))
+def test_a_baseline_missing_any_measure_is_rejected(exported, field):
+    del exported["baseline"][field]
+
+    with pytest.raises(jsonschema.ValidationError):
+        validate_results(exported)

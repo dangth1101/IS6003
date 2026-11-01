@@ -6,7 +6,7 @@
     "case_count": 100,
     "warm_up": 0.0,
     "parameter_version": "placeholder-1",
-    "generated_at": "2026-11-01T06:43:54+00:00"
+    "generated_at": "2026-11-01T06:46:51+00:00"
   },
   "text": {
     "lang": "en",
@@ -274,6 +274,117 @@
       "mean": 93.64,
       "median": 97.0,
       "p90": 136.0
+    },
+    "processing_time": {
+      "mean": 93.64,
+      "median": 97.0,
+      "p90": 136.0
+    },
+    "waiting_time": {
+      "mean": 0.0,
+      "median": 0.0,
+      "p90": 0.0
+    },
+    "cycle_time_efficiency": 1.0,
+    "rework": [
+      {
+        "gateway_id": "Gateway_ReleaseSplit",
+        "rate": 0.10714285714285714
+      },
+      {
+        "gateway_id": "Gateway_TestSplit",
+        "rate": 0.34523809523809523
+      },
+      {
+        "gateway_id": "Gateway_PlanSplit",
+        "rate": 0.2261904761904762
+      },
+      {
+        "gateway_id": "Gateway_ProposalSplit",
+        "rate": 0.18
+      }
+    ],
+    "waiting_by_activity": [
+      {
+        "activity_id": "Task_ApprovePlan",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_ApproveProposal",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_ApproveRelease",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_BuildApplication",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_DeployApplication",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_DraftPlan",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_EvaluateProject",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_FixDefects",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_HoldKickOff",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_MonitorOperation",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_RefineApplication",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_RegisterRequest",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_ReviewSourceCode",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_ReviseProposal",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_RunAcceptanceTests",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_RunFunctionalTests",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_RunSecurityTests",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_SpecifyRequirements",
+        "mean": 0.0
+      },
+      {
+        "activity_id": "Task_StartOperation",
+        "mean": 0.0
+      }
+    ],
+    "flow_analysis": {
+      "theoretical": 96.25347222222221,
+      "simulated": 93.64
     }
   },
   "value_added": {

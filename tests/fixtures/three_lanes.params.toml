@@ -1,0 +1,34 @@
+# three_lanes.bpmn with one tight lane. Working days.
+# Utilisation = rate x duration / capacity (book p.270, 7.8):
+# analysts 0.5 x 2 / 2 = 0.5, developers 0.5 x 4 / 4 = 0.5, testers 0.5 x 1.7 / 1 = 0.85.
+# Testers are the bottleneck, so Test application should wait the longest.
+
+version = "fixture-1"
+
+[arrivals]
+rate = 0.5
+rationale = "Fixture value."
+
+[lanes.Lane_Analysts]
+capacity = 2
+rationale = "Fixture value."
+
+[lanes.Lane_Developers]
+capacity = 4
+rationale = "Fixture value."
+
+[lanes.Lane_Testers]
+capacity = 1
+rationale = "Fixture value."
+
+[tasks.Task_WriteSpec]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[tasks.Task_BuildApp]
+duration = { fixed = 4.0 }
+rationale = "Fixture value."
+
+[tasks.Task_TestApp]
+duration = { fixed = 1.7 }
+rationale = "Fixture value."

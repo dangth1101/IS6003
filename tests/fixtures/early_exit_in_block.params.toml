@@ -1,0 +1,26 @@
+# Not from the book: early_exit_in_block.bpmn. Working days.
+# Expected CT, worked by hand: x is taken half the time and B runs only if the case isn't
+# rejected (0.8). E runs for every case that isn't rejected: 1 - 0.5 x 0.2 = 0.9.
+# CT = 0.5 x 0.8 x B + 0.5 x D + 0.9 x E = 0.5 x 0.8 x 2 + 0.5 x 4 + 0.9 x 10 = 11.8
+
+version = "fixture-1"
+
+[tasks.Task_B]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[tasks.Task_D]
+duration = { fixed = 4.0 }
+rationale = "Fixture value."
+
+[tasks.Task_E]
+duration = { fixed = 10.0 }
+rationale = "Fixture value."
+
+[gateways.Gateway_Outer]
+branches = { Flow_X = 0.5, Flow_Y = 0.5 }
+rationale = "Fixture value."
+
+[gateways.Gateway_Inner]
+branches = { Flow_Ok = 0.8, Flow_No = 0.2 }
+rationale = "Fixture value."

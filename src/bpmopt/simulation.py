@@ -7,7 +7,9 @@ runs one token per branch at the same time and continues once all of them
 reach the AND-join. A rework loop is just an XOR-split whose branch leads back
 to an earlier XOR-join. The log has one row per element execution:
 start and end events appear as zero-duration rows so every trace shows where
-it began and how it ended.
+it began and how it ended. Each XOR-split decision is a zero-duration row too,
+with the outgoing flow taken in flow_id, so rework can be read straight from
+the log. XOR-joins, AND gateways and other rows leave flow_id empty.
 
 Lanes with a capacity in the parameter file are resource pools: a task waits
 for a free resource of its lane, so ready_time -> start_time is waiting time
@@ -39,6 +41,7 @@ LOG_COLUMNS = [
     "ready_time",
     "start_time",
     "end_time",
+    "flow_id",
 ]
 
 
@@ -153,7 +156,9 @@ def _move_token(case: _Case, node: Node) -> Generator[simpy.Event, object, Node 
             start_time = yield from _perform_task(env, node, case.params, case.rng, case.pools.get(node.lane))
             case.rows.append(_row(case, node, ready, start_time, env.now))
         elif node.element_type == "exclusiveGateway" and len(outgoing) > 1:
-            node = model.nodes[case.branches.choose(node.id, outgoing, case.params, case.attributes)]
+            flow = case.branches.choose(node.id, outgoing, case.params, case.attributes)
+            case.rows.append(_row(case, node, env.now, env.now, env.now, flow_id=flow.id))
+            node = model.nodes[flow.target]
             continue
         elif node.element_type == "parallelGateway" and len(incoming) > 1 and len(outgoing) == 1:
             return node
@@ -187,8 +192,8 @@ class _BranchDraws:
         self._key = [seed, 2, case_id]
         self._rngs: dict[str, np.random.Generator] = {}
 
-    def choose(self, gateway_id: str, outgoing: list[Flow], params: Parameters, attributes: dict[str, AttributeValue]) -> str:
-        """Pick an outgoing flow of the XOR-split and return its target node ID.
+    def choose(self, gateway_id: str, outgoing: list[Flow], params: Parameters, attributes: dict[str, AttributeValue]) -> Flow:
+        """Pick an outgoing flow of the XOR-split.
 
         Probabilities can depend on the case attributes (logistic branches).
         """
@@ -200,8 +205,8 @@ class _BranchDraws:
         for flow in outgoing:
             cumulative += probabilities[flow.id]
             if u < cumulative:
-                return flow.target
-        return outgoing[-1].target  # u fell in the rounding gap just below 1
+                return flow
+        return outgoing[-1]  # u fell in the rounding gap just below 1
 
 
 def _perform_task(
@@ -232,7 +237,7 @@ def _draw_attributes(params: Parameters, seed: int, case_id: int) -> dict[str, A
     }
 
 
-def _row(case: _Case, node: Node, ready: float, start: float, end: float) -> dict:
+def _row(case: _Case, node: Node, ready: float, start: float, end: float, flow_id: str | None = None) -> dict:
     model = case.model
     return {
         "case_id": case.case_id,
@@ -244,5 +249,6 @@ def _row(case: _Case, node: Node, ready: float, start: float, end: float) -> dic
         "ready_time": ready,
         "start_time": start,
         "end_time": end,
+        "flow_id": flow_id,
         **case.attributes,
     }
