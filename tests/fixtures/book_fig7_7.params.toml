@@ -1,0 +1,15 @@
+# Book Fig. 7.7 (p.259-260): B is reworked with probability 0.2.
+
+version = "fixture-1"
+
+[tasks.Task_A]
+duration = { fixed = 10.0 }
+rationale = "Book Fig. 7.7."
+
+[tasks.Task_B]
+duration = { fixed = 20.0 }
+rationale = "Book Fig. 7.7."
+
+[gateways.Gateway_LoopSplit]
+branches = { Flow_Done = 0.8, Flow_Rework = 0.2 }
+rationale = "Book Fig. 7.7."

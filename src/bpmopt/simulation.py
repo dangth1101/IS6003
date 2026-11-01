@@ -1,18 +1,28 @@
 """Discrete-event simulation of a process model, producing an event log.
 
 Each case is a SimPy process that walks the model token by token from its
-start event to an end event. The log has one row per element execution:
+start event to an end event. An XOR-split sends the token down one branch,
+drawn with the branching probabilities from the parameter file. An AND-split
+runs one token per branch at the same time and continues once all of them
+reach the AND-join. A rework loop is just an XOR-split whose branch leads back
+to an earlier XOR-join. The log has one row per element execution:
 start and end events appear as zero-duration rows so every trace shows where
 it began and how it ended.
+
+Lanes with a capacity in the parameter file are resource pools: a task waits
+for a free resource of its lane, so ready_time -> start_time is waiting time
+and start_time -> end_time is processing time. Lanes without one are unlimited.
 """
 
+import zlib
 from collections.abc import Generator
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 import simpy
 
-from bpmopt.bpmn import Node, ProcessModel
+from bpmopt.bpmn import Flow, Node, ProcessModel
 from bpmopt.parameters import Parameters
 
 LOG_COLUMNS = [
@@ -29,49 +39,184 @@ LOG_COLUMNS = [
 
 
 def simulate(model: ProcessModel, params: Parameters, *, n_cases: int, seed: int) -> pd.DataFrame:
-    """Simulate n_cases cases and return the event log. Same seed, same log."""
+    """Simulate until n_cases cases have arrived after the warm-up and return their event log.
+
+    Cases that arrive during the warm-up still run and hold resources, but are
+    left out of the log. Case IDs count from the first case, warm-up included.
+    Same seed, same log.
+    """
+    if n_cases < 1:
+        raise ValueError(f"n_cases must be at least 1, got {n_cases}")
     starts = model.nodes_of_type("startEvent")
     if len(starts) != 1:
         raise ValueError(f"expected exactly one start event, found {len(starts)}")
 
-    rng = np.random.default_rng(seed)
     env = simpy.Environment()
     rows: list[dict] = []
-    # No arrival process yet: every case starts at time 0.
-    for case_id in range(1, n_cases + 1):
-        env.process(_run_case(env, model, params, rng, case_id, starts[0], rows))
+    pools = {lane_id: simpy.Resource(env, capacity) for lane_id, capacity in params.lane_capacities.items()}
+    arrivals = env.process(_arrivals(env, model, params, pools, n_cases, seed, starts[0], rows))
     env.run()
 
     log = pd.DataFrame(rows, columns=LOG_COLUMNS)
+    log = log[log.case_id > arrivals.value]
     return log.sort_values(["case_id", "start_time"], kind="stable").reset_index(drop=True)
 
 
-def _run_case(
+def _arrivals(
     env: simpy.Environment,
     model: ProcessModel,
     params: Parameters,
-    rng: np.random.Generator,
-    case_id: int,
+    pools: dict[str, simpy.Resource],
+    n_cases: int,
+    seed: int,
     start: Node,
     rows: list[dict],
-) -> Generator[simpy.Event, None, None]:
-    node = start
+) -> Generator[simpy.Event, None, int]:
+    """Start one case per arrival: Poisson arrivals, or all at time 0 without a rate.
+
+    Random streams are separate so a design change in one case doesn't shift the
+    draws of the others (common random numbers): one generator for interarrival
+    times, one per case for task durations, and one per case and XOR-split for
+    branch choices (see _BranchDraws).
+
+    Returns the number of warm-up cases. Arrival times only grow, so those are
+    the cases with the lowest IDs.
+    """
+    arrival_rng = np.random.default_rng([seed, 0])
+    case_id = 0
+    n_warm_up = 0
     while True:
+        case_id += 1
+        if env.now < params.warm_up:
+            n_warm_up += 1
+        case = _Case(
+            env,
+            model,
+            params,
+            case_id,
+            rng=np.random.default_rng([seed, 1, case_id]),
+            branches=_BranchDraws(seed, case_id),
+            rows=rows,
+            pools=pools,
+        )
+        env.process(_run_case(case, start))
+        if case_id - n_warm_up == n_cases:
+            return n_warm_up
+        if params.arrival_rate is not None:
+            yield env.timeout(arrival_rng.exponential(1 / params.arrival_rate))
+
+
+@dataclass
+class _Case:
+    """One case in flight: what its tokens need to move through the model."""
+
+    env: simpy.Environment
+    model: ProcessModel
+    params: Parameters
+    case_id: int
+    rng: np.random.Generator  # durations
+    branches: "_BranchDraws"
+    rows: list[dict]
+    pools: dict[str, simpy.Resource]
+
+
+def _run_case(case: _Case, start: Node) -> Generator[simpy.Event, None, None]:
+    join = yield from _move_token(case, start)
+    if join is not None:
+        raise ValueError(f"{join.id}: AND-join reached without a matching AND-split")
+
+
+def _move_token(case: _Case, node: Node) -> Generator[simpy.Event, object, Node | None]:
+    """Move one token from node until it reaches an end event or an AND-join.
+
+    Returns None at an end event, or the AND-join, where the AND-split that
+    created this token picks it up. XOR-joins just pass the token on, which is
+    all a rework loop needs. AND-blocks must be structured: the branches of one
+    AND-split all end at the same AND-join (7PMG G4).
+    """
+    env, model = case.env, case.model
+    while True:
+        incoming, outgoing = model.incoming(node.id), model.outgoing(node.id)
         if node.element_type in ("startEvent", "endEvent"):
-            rows.append(_row(model, case_id, node, env.now, env.now, env.now))
+            case.rows.append(_row(model, case.case_id, node, env.now, env.now, env.now))
+            if node.element_type == "endEvent":
+                return None
         elif node.element_type == "task":
             ready = env.now
-            yield env.timeout(params.task_durations[node.id].sample(rng))
-            rows.append(_row(model, case_id, node, ready, ready, env.now))
-        else:
-            raise NotImplementedError(f"{node.id}: element type {node.element_type!r} is not supported by the simulator yet")
+            start_time = yield from _perform_task(env, node, case.params, case.rng, case.pools.get(node.lane))
+            case.rows.append(_row(model, case.case_id, node, ready, start_time, env.now))
+        elif node.element_type == "exclusiveGateway" and len(outgoing) > 1:
+            node = model.nodes[case.branches.choose(node.id, outgoing, case.params)]
+            continue
+        elif node.element_type == "parallelGateway" and len(incoming) > 1 and len(outgoing) == 1:
+            return node
+        elif node.element_type == "parallelGateway" and len(outgoing) > 1 and len(incoming) == 1:
+            branches = [env.process(_move_token(case, model.nodes[flow.target])) for flow in outgoing]
+            yield env.all_of(branches)
+            joins = {branch.value for branch in branches}
+            if len(joins) != 1 or None in joins:
+                raise ValueError(f"{node.id}: branches of an AND-split must all end at one AND-join")
+            node = joins.pop()
+            outgoing = model.outgoing(node.id)
+        elif node.element_type not in ("exclusiveGateway", "parallelGateway"):
+            raise NotImplementedError(f"{node.id}: element type {node.element_type!r} is not supported by the simulator")
 
-        if node.element_type == "endEvent":
-            return
-        outgoing = model.outgoing(node.id)
         if len(outgoing) != 1:
-            raise NotImplementedError(f"{node.id}: {len(outgoing)} outgoing flows, only sequences are supported yet")
+            raise ValueError(f"{node.id}: expected one outgoing flow, found {len(outgoing)}")
         node = model.nodes[outgoing[0].target]
+
+
+class _BranchDraws:
+    """Branch choices of one case, with one random stream per XOR-split.
+
+    Keyed by gateway ID, not by draw order, so adding or removing a task or a
+    gateway elsewhere doesn't change which branch this case takes here. That
+    keeps common random numbers between designs (ticket 13). Each choice uses one
+    uniform draw against the cumulative probabilities, so a small change in a
+    probability only flips the cases near the boundary.
+    """
+
+    def __init__(self, seed: int, case_id: int):
+        self._key = [seed, 2, case_id]
+        self._rngs: dict[str, np.random.Generator] = {}
+
+    def choose(self, gateway_id: str, outgoing: list[Flow], params: Parameters) -> str:
+        """Pick an outgoing flow of the XOR-split and return its target node ID."""
+        probabilities = params.branch_probabilities.get(gateway_id)
+        if probabilities is None or set(probabilities) != {flow.id for flow in outgoing}:
+            raise ValueError(
+                f"gateways.{gateway_id}.branches must give a probability for each outgoing flow: "
+                f"{sorted(flow.id for flow in outgoing)}"
+            )
+        if gateway_id not in self._rngs:
+            self._rngs[gateway_id] = np.random.default_rng([*self._key, zlib.crc32(gateway_id.encode())])
+        u = self._rngs[gateway_id].random()
+        cumulative = 0.0
+        for flow in outgoing:
+            cumulative += probabilities[flow.id]
+            if u < cumulative:
+                return flow.target
+        return outgoing[-1].target  # u fell in the rounding gap just below 1
+
+
+def _perform_task(
+    env: simpy.Environment,
+    node: Node,
+    params: Parameters,
+    rng: np.random.Generator,
+    pool: simpy.Resource | None,
+) -> Generator[simpy.Event, None, float]:
+    """Wait for a resource of the task's lane (if the lane is limited), then work. Returns the start time."""
+    duration = params.task_durations[node.id].sample(rng)
+    if pool is None:
+        start_time = env.now
+        yield env.timeout(duration)
+        return start_time
+    with pool.request() as request:
+        yield request
+        start_time = env.now
+        yield env.timeout(duration)
+    return start_time
 
 
 def _row(model: ProcessModel, case_id: int, node: Node, ready: float, start: float, end: float) -> dict:

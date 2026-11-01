@@ -14,7 +14,7 @@
 
 ## Comments
 
-- Done. `bpmopt.lint.lint(path) -> list[Violation]`. `Violation` has `rule`, `element_id`, `message`, `severity` ("error" or "warning"). It's a frozen dataclass, so `dataclasses.asdict` gives the JSON row for the results file.
+- Done. `bpmopt.lint.lint(path) -> list[Violation]`. `Violation` has `rule`, `element_id`, `message`, `severity` ("error" or "warning"). It's a frozen dataclass, so `[asdict(v) for v in lint(path)]` is the `models.*.lint` array of the results file; a test checks it against the schema. Rule IDs are bare ("G3"), not "7PMG-G3" as the schema's example says. Model-level rules (POOL, G7) use the process ID as `element_id`, never null.
 - Rule IDs: POOL, EVENT-LABEL, ARC-LABEL, REACH, SUBSET (errors), G1, G2, G3, G6, G7 (warnings), G4, G5 (errors). The 7PMG are guidelines, i.e. suggestions (p.192), hence warnings. G4 is an error because a mismatched split/join is always a behavioral anomaly (p.185). G5 is an error because OR gateways are also outside the subset.
 - Our interpretations, all marked in the code:
   - G7 "element" = flow node (events, tasks, gateways). Arcs, lanes and the pool don't count. The book doesn't define it (p.193).

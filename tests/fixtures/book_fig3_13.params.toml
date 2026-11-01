@@ -1,0 +1,24 @@
+# Book Fig. 3.13 (p.91) with the cycle times of Table 7.3 (p.263) and r = 0.2,
+# as used in Solution 7.2 (p.288). Days.
+
+version = "fixture-1"
+
+[tasks.Task_Register]
+duration = { fixed = 2.0 }
+rationale = "Book Table 7.3."
+
+[tasks.Task_Investigate]
+duration = { fixed = 8.0 }
+rationale = "Book Table 7.3."
+
+[tasks.Task_Prepare]
+duration = { fixed = 4.0 }
+rationale = "Book Table 7.3."
+
+[tasks.Task_Review]
+duration = { fixed = 4.0 }
+rationale = "Book Table 7.3."
+
+[gateways.Gateway_LoopSplit]
+branches = { Flow_Approved = 0.8, Flow_Rework = 0.2 }
+rationale = "Book Solution 7.2."

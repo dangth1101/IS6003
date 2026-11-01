@@ -1,3 +1,8 @@
+import json
+from dataclasses import asdict
+from importlib import resources
+
+import jsonschema
 import pytest
 
 from bpmopt.lint import lint
@@ -74,6 +79,14 @@ def test_original_as_is_model_has_the_known_violations(fixtures_dir):
         + [("G6", task) for task in as_is_tasks]
     )
     assert found(violations) == sorted(expected)
+
+
+def test_lint_report_fits_the_results_contract(fixtures_dir):
+    schema = json.loads((resources.files("bpmopt") / "schema" / "results.schema.json").read_text(encoding="utf-8"))
+    lint_schema = {"$defs": schema["$defs"], **schema["$defs"]["model"]["properties"]["lint"]}
+    report = [asdict(v) for v in lint(fixtures_dir.parents[1] / "current_process.bpmn")]
+
+    jsonschema.validate(report, lint_schema)
 
 
 def test_verb_object_check_is_a_warning_not_an_error(fixtures_dir):

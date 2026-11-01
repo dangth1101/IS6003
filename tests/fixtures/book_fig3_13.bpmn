@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Book Fig. 3.13 (p.91), used in Solution 7.2 (p.288): ministerial enquiry with a two-task rework body. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_book_fig3_13" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration>
+    <bpmn:participant id="Participant_book_fig3_13" name="Ministerial enquiry" processRef="Process_BookFig313" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_BookFig313" isExecutable="false">
+    <bpmn:laneSet>
+      <bpmn:lane id="Lane_Ministry" name="Ministry">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Register</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Investigate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_LoopJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Prepare</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Review</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_LoopSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Ministerial enquiry received" />
+    <bpmn:task id="Task_Register" name="Register ministerial enquiry" />
+    <bpmn:task id="Task_Investigate" name="Investigate ministerial enquiry" />
+    <bpmn:exclusiveGateway id="Gateway_LoopJoin" />
+    <bpmn:task id="Task_Prepare" name="Prepare ministerial response" />
+    <bpmn:task id="Task_Review" name="Review ministerial response" />
+    <bpmn:exclusiveGateway id="Gateway_LoopSplit" />
+    <bpmn:endEvent id="End" name="Ministerial enquiry answered" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start" targetRef="Task_Register" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_Register" targetRef="Task_Investigate" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_Investigate" targetRef="Gateway_LoopJoin" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Gateway_LoopJoin" targetRef="Task_Prepare" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_Prepare" targetRef="Task_Review" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_Review" targetRef="Gateway_LoopSplit" />
+    <bpmn:sequenceFlow id="Flow_Approved" sourceRef="Gateway_LoopSplit" targetRef="End" name="response approved" />
+    <bpmn:sequenceFlow id="Flow_Rework" sourceRef="Gateway_LoopSplit" targetRef="Gateway_LoopJoin" name="response not approved" />
+  </bpmn:process>
+</bpmn:definitions>

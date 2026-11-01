@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Book Fig. 7.9 (p.260): B reworked at most once, as an XOR-block with an empty branch. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_book_fig7_9" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration>
+    <bpmn:participant id="Participant_book_fig7_9" name="Fig. 7.9" processRef="Process_BookFig79" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_BookFig79" isExecutable="false">
+    <bpmn:laneSet>
+      <bpmn:lane id="Lane_Worker" name="Worker">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_A</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_B</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Split</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_BAgain</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Join</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Case started" />
+    <bpmn:task id="Task_A" name="A" />
+    <bpmn:task id="Task_B" name="B" />
+    <bpmn:exclusiveGateway id="Gateway_Split" />
+    <bpmn:task id="Task_BAgain" name="B" />
+    <bpmn:exclusiveGateway id="Gateway_Join" />
+    <bpmn:endEvent id="End" name="Case completed" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start" targetRef="Task_A" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_A" targetRef="Task_B" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_B" targetRef="Gateway_Split" />
+    <bpmn:sequenceFlow id="Flow_Again" sourceRef="Gateway_Split" targetRef="Task_BAgain" name="B to be reworked" />
+    <bpmn:sequenceFlow id="Flow_Skip" sourceRef="Gateway_Split" targetRef="Gateway_Join" name="B acceptable" />
+    <bpmn:sequenceFlow id="Flow_FromBAgain" sourceRef="Task_BAgain" targetRef="Gateway_Join" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Gateway_Join" targetRef="End" />
+  </bpmn:process>
+</bpmn:definitions>

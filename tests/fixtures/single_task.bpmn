@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- One task in one lane: the smallest model that can queue. No diagram, the page never shows it. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_SingleTask" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration id="Collaboration_SingleTask">
+    <bpmn:participant id="Participant_SingleTask" name="App development" processRef="Process_SingleTask" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_SingleTask" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_SingleTask">
+      <bpmn:lane id="Lane_Review" name="Review board">
+        <bpmn:flowNodeRef>Start_RequestReceived</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReviewRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_RequestReviewed</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_RequestReceived" name="Request received" />
+    <bpmn:task id="Task_ReviewRequest" name="Review request" />
+    <bpmn:endEvent id="End_RequestReviewed" name="Request reviewed" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_RequestReceived" targetRef="Task_ReviewRequest" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_ReviewRequest" targetRef="End_RequestReviewed" />
+  </bpmn:process>
+</bpmn:definitions>

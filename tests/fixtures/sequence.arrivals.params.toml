@@ -1,0 +1,20 @@
+# sequence.bpmn with Poisson arrivals and no lane capacity (unlimited).
+# Mean interarrival 1 day against a 10.5-day cycle, so about ten cases overlap.
+
+version = "fixture-1"
+
+[arrivals]
+rate = 1.0
+rationale = "Fixture value."
+
+[tasks.Task_WriteSpec]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[tasks.Task_BuildApp]
+duration = { fixed = 5.5 }
+rationale = "Fixture value."
+
+[tasks.Task_TestApp]
+duration = { fixed = 3.0 }
+rationale = "Fixture value."

@@ -1,0 +1,20 @@
+# single_task.bpmn as an M/D/1 queue: Poisson arrivals, fixed 1-day service, one reviewer.
+# Utilisation 0.9, and the first 50 days are a warm-up.
+
+version = "fixture-1"
+
+[arrivals]
+rate = 0.9
+rationale = "Fixture value."
+
+[warm_up]
+length = 50.0
+rationale = "Fixture value."
+
+[lanes.Lane_Review]
+capacity = 1
+rationale = "Fixture value."
+
+[tasks.Task_ReviewRequest]
+duration = { fixed = 1.0 }
+rationale = "Fixture value."
