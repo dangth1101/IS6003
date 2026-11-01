@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Placeholder to-be model for the fake results page. Ticket 15 replaces it with the real redesign. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_ToBePlaceholder" targetNamespace="https://example.org/bpm">
+  <bpmn:collaboration id="Collaboration_ToBe">
+    <bpmn:participant id="Pool_ToBe" name="App development (placeholder to-be)" processRef="Process_ToBe" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_ToBe" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_ToBe">
+      <bpmn:lane id="lane_team" name="Development team">
+        <bpmn:flowNodeRef>start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>triage</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>split</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>functional_test</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>security_test</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>join</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>end</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="start" name="Development request received" />
+    <bpmn:task id="triage" name="Triage request" />
+    <bpmn:parallelGateway id="split" />
+    <bpmn:task id="functional_test" name="Test functions" />
+    <bpmn:task id="security_test" name="Test security" />
+    <bpmn:parallelGateway id="join" />
+    <bpmn:endEvent id="end" name="Application in operation" />
+    <bpmn:sequenceFlow id="f1" sourceRef="start" targetRef="triage" />
+    <bpmn:sequenceFlow id="f2" sourceRef="triage" targetRef="split" />
+    <bpmn:sequenceFlow id="f3" sourceRef="split" targetRef="functional_test" />
+    <bpmn:sequenceFlow id="f4" sourceRef="split" targetRef="security_test" />
+    <bpmn:sequenceFlow id="f5" sourceRef="functional_test" targetRef="join" />
+    <bpmn:sequenceFlow id="f6" sourceRef="security_test" targetRef="join" />
+    <bpmn:sequenceFlow id="f7" sourceRef="join" targetRef="end" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_ToBe">
+    <bpmndi:BPMNPlane id="Plane_ToBe" bpmnElement="Collaboration_ToBe">
+      <bpmndi:BPMNShape id="Pool_ToBe_di" bpmnElement="Pool_ToBe" isHorizontal="true">
+        <dc:Bounds x="100" y="60" width="760" height="260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_team_di" bpmnElement="lane_team" isHorizontal="true">
+        <dc:Bounds x="130" y="60" width="730" height="260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="start_di" bpmnElement="start">
+        <dc:Bounds x="172" y="172" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="150" y="215" width="80" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="triage_di" bpmnElement="triage">
+        <dc:Bounds x="260" y="150" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="split_di" bpmnElement="split">
+        <dc:Bounds x="405" y="165" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="functional_test_di" bpmnElement="functional_test">
+        <dc:Bounds x="500" y="90" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="security_test_di" bpmnElement="security_test">
+        <dc:Bounds x="500" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="join_di" bpmnElement="join">
+        <dc:Bounds x="645" y="165" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end_di" bpmnElement="end">
+        <dc:Bounds x="752" y="172" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="730" y="215" width="80" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="f1_di" bpmnElement="f1">
+        <di:waypoint x="208" y="190" /><di:waypoint x="260" y="190" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f2_di" bpmnElement="f2">
+        <di:waypoint x="360" y="190" /><di:waypoint x="405" y="190" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f3_di" bpmnElement="f3">
+        <di:waypoint x="430" y="165" /><di:waypoint x="430" y="130" /><di:waypoint x="500" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f4_di" bpmnElement="f4">
+        <di:waypoint x="430" y="215" /><di:waypoint x="430" y="250" /><di:waypoint x="500" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f5_di" bpmnElement="f5">
+        <di:waypoint x="600" y="130" /><di:waypoint x="670" y="130" /><di:waypoint x="670" y="165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f6_di" bpmnElement="f6">
+        <di:waypoint x="600" y="250" /><di:waypoint x="670" y="250" /><di:waypoint x="670" y="215" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f7_di" bpmnElement="f7">
+        <di:waypoint x="695" y="190" /><di:waypoint x="752" y="190" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
