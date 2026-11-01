@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Not from the book: the shape of the corrected as-is model's approval step (ticket 06).
+     The approval split has three branches: go ahead, revise and resubmit (rework), or reject,
+     which ends the case at its own end event. A second rework loop follows on the approved path. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_proposal_rejected" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration>
+    <bpmn:participant id="Participant_proposal_rejected" name="App development" processRef="Process_ProposalRejected" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_ProposalRejected" isExecutable="false">
+    <bpmn:laneSet>
+      <bpmn:lane id="Lane_Business" name="Business unit">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ReviewJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReviewProposal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ReviewSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReviseProposal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_ProposalRejected</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Dev" name="Development team">
+        <bpmn:flowNodeRef>Task_BuildApp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_TestJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_TestApp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_TestSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_FixDefects</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_AppReleased</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Proposal received" />
+    <bpmn:exclusiveGateway id="Gateway_ReviewJoin" />
+    <bpmn:task id="Task_ReviewProposal" name="Review proposal" />
+    <bpmn:exclusiveGateway id="Gateway_ReviewSplit" name="Proposal decision?" />
+    <bpmn:task id="Task_ReviseProposal" name="Revise proposal" />
+    <bpmn:endEvent id="End_ProposalRejected" name="Proposal rejected" />
+    <bpmn:task id="Task_BuildApp" name="Build application" />
+    <bpmn:exclusiveGateway id="Gateway_TestJoin" />
+    <bpmn:task id="Task_TestApp" name="Test application" />
+    <bpmn:exclusiveGateway id="Gateway_TestSplit" name="Tests passed?" />
+    <bpmn:task id="Task_FixDefects" name="Fix defects" />
+    <bpmn:endEvent id="End_AppReleased" name="Application released" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start" targetRef="Gateway_ReviewJoin" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Gateway_ReviewJoin" targetRef="Task_ReviewProposal" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_ReviewProposal" targetRef="Gateway_ReviewSplit" />
+    <bpmn:sequenceFlow id="Flow_Approved" sourceRef="Gateway_ReviewSplit" targetRef="Task_BuildApp" name="proposal approved" />
+    <bpmn:sequenceFlow id="Flow_Revise" sourceRef="Gateway_ReviewSplit" targetRef="Task_ReviseProposal" name="revision needed" />
+    <bpmn:sequenceFlow id="Flow_Rejected" sourceRef="Gateway_ReviewSplit" targetRef="End_ProposalRejected" name="proposal rejected" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_ReviseProposal" targetRef="Gateway_ReviewJoin" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_BuildApp" targetRef="Gateway_TestJoin" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Gateway_TestJoin" targetRef="Task_TestApp" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_TestApp" targetRef="Gateway_TestSplit" />
+    <bpmn:sequenceFlow id="Flow_Passed" sourceRef="Gateway_TestSplit" targetRef="End_AppReleased" name="tests passed" />
+    <bpmn:sequenceFlow id="Flow_Failed" sourceRef="Gateway_TestSplit" targetRef="Task_FixDefects" name="tests failed" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Task_FixDefects" targetRef="Gateway_TestJoin" />
+  </bpmn:process>
+</bpmn:definitions>

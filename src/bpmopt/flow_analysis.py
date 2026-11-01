@@ -14,6 +14,19 @@ the book's: from the same geometric series (p.259) the body runs 1/(1 - r)
 times and the loop-back tasks r/(1 - r) times, so CT = (T + r x R) / (1 - r),
 with R the summed CT of the loop-back tasks. R = 0 gives the book's formula.
 
+Early end events are also our own derivation. In the book every block ends in
+a join, but a model with one end event per outcome (7PMG G3) has XOR branches
+that end the case, such as "Proposal rejected". The CT stays the mean over all
+cases, the book's definition (p.256), so a case that ends early counts with
+the time it took up to its end. A case that has ended spends no more time, so
+every fragment after a possible early end is weighted by the probability that
+the case is still running, the same weighting as the XOR formula (7.2). A
+model with several end events on exclusive paths has the same CT as the model
+with those paths merged by an XOR-join in front of one end event, so this
+stays within (7.1)-(7.4). In a rework split with an extra branch to an end
+event, leaving the loop is an XOR-split of its own over the arcs that don't
+loop back, with probabilities divided by 1 - r.
+
 Like the book's equations, this only works for block-structured models
 (§7.1.7, p.272). Anything else raises ValueError.
 """
@@ -29,72 +42,109 @@ def theoretical_cycle_time(model: ProcessModel, params: Parameters) -> float:
     starts = model.nodes_of_type("startEvent")
     if len(starts) != 1:
         raise ValueError(f"expected exactly one start event, found {len(starts)}")
-    ct, stop = _Reducer(model, params).fragment(_single_outgoing(model, starts[0]))
-    if model.nodes[stop.target].element_type != "endEvent":
+    ct, stop, _ = _Reducer(model, params).fragment(_single_outgoing(model, starts[0]))
+    if stop is not None and not _is_end(model, stop):
         raise ValueError(f"{stop.target}: join without a matching split, the model is not block-structured")
     return ct
 
 
 class _Reducer:
+    """Each step returns (CT, exit flow, probability of reaching the exit flow).
+
+    The CT counts cases that end early only up to their end event. The exit flow
+    is None when every case ends inside the fragment.
+    """
+
     def __init__(self, model: ProcessModel, params: Parameters):
         self.model = model
         self.params = params
         self.loops = _find_loops(model)  # loop split ID -> loop
         self.loop_joins = {loop.join for loop in self.loops.values()}
 
-    def fragment(self, flow: Flow) -> tuple[float, Flow]:
-        """CT of the fragment entered by `flow`, up to the first join or end event.
-
-        Returns the CT and the flow that leaves the fragment (into that join or end event).
-        """
-        ct = 0.0
+    def fragment(self, flow: Flow) -> tuple[float, Flow | None, float]:
+        """The fragment entered by `flow`, up to the first join or end event."""
+        ct, p = 0.0, 1.0
         while True:
             node = self.model.nodes[flow.target]
             if node.id in self.loop_joins:
-                loop_ct, flow = self.rework(node)
-                ct += loop_ct
-                continue
-            if node.element_type == "endEvent" or _is_join(self.model, node) or node.id in self.loops:
-                return ct, flow
-            if node.element_type == "task":
-                ct += self.params.task_durations[node.id].mean
-                flow = _single_outgoing(self.model, node)
+                part_ct, flow, part_p = self.rework(node)
+            elif node.element_type == "endEvent" or _is_join(self.model, node) or node.id in self.loops:
+                return ct, flow, p
+            elif node.element_type == "task":
+                part_ct, flow, part_p = self.params.task_durations[node.id].mean, _single_outgoing(self.model, node), 1.0
             elif _is_split(self.model, node):
-                block_ct, flow = self.block(node)
-                ct += block_ct
+                probabilities = self.params.branch_probabilities.get(node.id)
+                part_ct, flow, part_p = self.block(node, self.model.outgoing(node.id), probabilities)
             else:
                 raise ValueError(f"{node.id}: element type {node.element_type!r} is not supported by flow analysis")
+            ct += p * part_ct
+            p *= part_p
+            if flow is None:
+                return ct, None, 0.0
 
-    def block(self, split: Node) -> tuple[float, Flow]:
-        """CT of the block opened by `split`, and the flow that leaves its join."""
-        branches = [(flow, *self.fragment(flow)) for flow in self.model.outgoing(split.id)]
-        joins = {exit_flow.target for _, _, exit_flow in branches}
-        join = self.model.nodes[joins.pop()] if len(joins) == 1 else None
-        if join is None or join.element_type != split.element_type or not _is_join(self.model, join):
-            raise ValueError(f"{split.id}: branches don't meet at one join of the same type, the model is not block-structured")
-        if split.element_type == "exclusiveGateway":
-            probabilities = self.params.branch_probabilities[split.id]
-            ct = sum(probabilities[flow.id] * branch_ct for flow, branch_ct, _ in branches)
-        elif split.element_type == "parallelGateway":
-            ct = max(branch_ct for _, branch_ct, _ in branches)
-        else:
+    def block(self, split: Node, flows: list[Flow], probabilities: dict[str, float] | None) -> tuple[float, Flow | None, float]:
+        """The block opened by `split` over `flows`, up to and including its join."""
+        branches = [(flow, *self.fragment(flow)) for flow in flows]
+        going_on = [b for b in branches if b[2] is not None and not _is_end(self.model, b[2])]
+        if split.element_type == "parallelGateway":
+            if len(going_on) < len(branches) or any(p < 1 for *_, p in branches):
+                raise ValueError(f"{split.id}: a branch of an AND-block can't end the case on its own")
+            join = self._join(split, going_on)
+            return max(ct for _, ct, _, _ in branches), _single_outgoing(self.model, join), 1.0
+        if split.element_type != "exclusiveGateway":
             raise ValueError(f"{split.id}: gateway type {split.element_type!r} is not supported by flow analysis")
-        return ct, _single_outgoing(self.model, join)
 
-    def rework(self, join: Node) -> tuple[float, Flow]:
-        """CT of the rework block entered at `join`, and its exit flow."""
-        body_ct, into_split = self.fragment(_single_outgoing(self.model, join))
-        loop = self.loops.get(into_split.target)
+        ct = sum(probabilities[flow.id] * branch_ct for flow, branch_ct, _, _ in branches)
+        p = sum(probabilities[flow.id] * branch_p for flow, _, _, branch_p in going_on)
+        if not going_on:
+            return ct, None, 0.0
+        if len(going_on) == 1:
+            # The other branches all end the case, so this split has no join of its own.
+            # Its one remaining branch runs on into a join of an enclosing block.
+            return ct, going_on[0][2], p
+        return ct, _single_outgoing(self.model, self._join(split, going_on)), p
+
+    def _join(self, split: Node, going_on: list[tuple]) -> Node:
+        """The join where the branches of `split` that don't end the case meet. They must be all its inputs."""
+        joins = {exit_flow.target for _, _, exit_flow, _ in going_on}
+        join = self.model.nodes[joins.pop()] if len(joins) == 1 else None
+        if (
+            join is None
+            or join.element_type != split.element_type
+            or len(self.model.incoming(join.id)) != len(going_on)
+        ):
+            raise ValueError(f"{split.id}: branches don't meet at one join of the same type, the model is not block-structured")
+        return join
+
+    def rework(self, join: Node) -> tuple[float, Flow | None, float]:
+        """The rework block entered at `join`, up to its exit."""
+        body_ct, into_split, body_p = self.fragment(_single_outgoing(self.model, join))
+        loop = self.loops.get(into_split.target) if into_split is not None else None
         if loop is None or loop.join != join.id:
             raise ValueError(f"{join.id}: loop body doesn't end at the split that loops back to it")
-        exits = [f for f in self.model.outgoing(loop.split) if f.id != loop.back.id]
-        if len(exits) != 1:
-            raise ValueError(f"{loop.split}: a rework split needs exactly one exit arc, found {len(exits)}")
-        r = self.params.branch_probabilities[loop.split][loop.back.id]
+        probabilities = self.params.branch_probabilities[loop.split]
+        r = probabilities[loop.back.id]
         if r >= 1:
             raise ValueError(f"{loop.split}: rework probability {r} never leaves the loop")
+        exits = [f for f in self.model.outgoing(loop.split) if f.id != loop.back.id]
+        if not exits:
+            raise ValueError(f"{loop.split}: a rework split needs an exit arc")
+        # With body_p = 1 this is (T + r x R) / (1 - r), see the module docstring.
+        loops_back = body_p * r
         back_ct = sum(self.params.task_durations[task].mean for task in loop.back_tasks)
-        return (body_ct + r * back_ct) / (1 - r), exits[0]
+        ct = (body_ct + loops_back * back_ct) / (1 - loops_back)
+        leaves = body_p * (1 - r) / (1 - loops_back)
+        if len(exits) == 1:
+            return ct, exits[0], leaves
+        exit_ct, exit_flow, exit_p = self.block(
+            self.model.nodes[loop.split], exits, {f.id: probabilities[f.id] / (1 - r) for f in exits}
+        )
+        return ct + leaves * exit_ct, exit_flow, leaves * exit_p
+
+
+def loop_back_flows(model: ProcessModel) -> dict[str, str]:
+    """Rework XOR-splits of the model: split ID -> ID of its outgoing flow that loops back."""
+    return {split: loop.back.id for split, loop in _find_loops(model).items()}
 
 
 @dataclass(frozen=True)
@@ -151,3 +201,7 @@ def _single_outgoing(model: ProcessModel, node: Node) -> Flow:
     if len(outgoing) != 1:
         raise ValueError(f"{node.id}: expected one outgoing flow, found {len(outgoing)}")
     return outgoing[0]
+
+
+def _is_end(model: ProcessModel, flow: Flow) -> bool:
+    return model.nodes[flow.target].element_type == "endEvent"

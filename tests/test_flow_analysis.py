@@ -86,3 +86,21 @@ def test_a_task_on_the_loop_back_arc_runs_r_over_one_minus_r_times(flow_analysis
 )
 def test_credit_application_examples_nest_all_four_blocks(flow_analysis, model, params, expected):
     assert flow_analysis(model, params) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    ("model", "expected"),
+    [
+        # A rework split with a third branch to its own end event, the corrected as-is model's
+        # approval step. Worked by hand in the params file: 2 + 0.8 x 8 = 8.4.
+        ("proposal_rejected", 8.4),
+        # An early exit inside an XOR-block, whose other branch runs on to the outer join:
+        # 0.5 x 0.8 x 2 + 0.5 x 4 + 0.9 x 10 = 11.8.
+        ("early_exit_in_block", 11.8),
+    ],
+)
+def test_a_branch_that_ends_at_its_own_end_event_weights_the_rest_of_the_process(flow_analysis, model, expected):
+    # Not in the book: its blocks all end in a join. Our derivation, with the same weighting
+    # as the XOR formula (7.2): a case that has ended spends no more time, so everything after
+    # an early exit counts with the probability of not having ended.
+    assert flow_analysis(model) == pytest.approx(expected)
