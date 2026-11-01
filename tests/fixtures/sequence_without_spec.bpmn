@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- sequence.bpmn without Write specification: the structural variant for change C2 in sequence.catalog.toml. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_SequenceWithoutSpec" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration id="Collaboration_SequenceWithoutSpec">
+    <bpmn:participant id="Participant_SequenceWithoutSpec" name="App development" processRef="Process_SequenceWithoutSpec" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_SequenceWithoutSpec" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_SequenceWithoutSpec">
+      <bpmn:lane id="Lane_Dev" name="Development team">
+        <bpmn:flowNodeRef>Start_RequestReceived</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_BuildApp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_TestApp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_AppReleased</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_RequestReceived" name="Request received" />
+    <bpmn:task id="Task_BuildApp" name="Build application" />
+    <bpmn:task id="Task_TestApp" name="Test application" />
+    <bpmn:endEvent id="End_AppReleased" name="Application released" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_RequestReceived" targetRef="Task_BuildApp" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_BuildApp" targetRef="Task_TestApp" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_TestApp" targetRef="End_AppReleased" />
+  </bpmn:process>
+</bpmn:definitions>

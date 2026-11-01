@@ -114,6 +114,18 @@ def _cross_field_errors(results: dict) -> Iterator[str]:
                 yield f"scenarios[{i}].{name}: interval [{e['ci_low']}, {e['ci_high']}] doesn't contain {e['value']}"
 
 
+def validate_changes(changes: list[dict]) -> None:
+    """Raise jsonschema.ValidationError if a change catalog breaks the contract's `changes` section.
+
+    Lets the catalog loader catch a bad entry before any simulation runs.
+    """
+    validator = _validator()
+    section = validator.schema["properties"]["changes"]
+    error = jsonschema.exceptions.best_match(validator.evolve(schema={**section, "$defs": validator.schema["$defs"]}).iter_errors(changes))
+    if error is not None:
+        raise error
+
+
 @cache
 def _validator() -> jsonschema.Draft202012Validator:
     schema = json.loads(resources.files("bpmopt").joinpath("schema/results.schema.json").read_text())
