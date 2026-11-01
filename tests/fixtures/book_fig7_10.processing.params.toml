@@ -1,0 +1,36 @@
+# Book Example 7.3 (p.262): credit application with rework (Fig. 7.10), processing times of Table 7.2. Hours.
+# Flow analysis on processing times gives the theoretical cycle time (TCT).
+
+version = "fixture-1"
+
+[tasks.Task_CheckCompleteness]
+duration = { fixed = 2.0 }
+rationale = "Book Table 7.2."
+
+[tasks.Task_CheckCreditHistory]
+duration = { fixed = 0.5 }
+rationale = "Book Table 7.2."
+
+[tasks.Task_CheckIncomeSources]
+duration = { fixed = 3.0 }
+rationale = "Book Table 7.2."
+
+[tasks.Task_AssessApplication]
+duration = { fixed = 2.0 }
+rationale = "Book Table 7.2."
+
+[tasks.Task_MakeCreditOffer]
+duration = { fixed = 2.0 }
+rationale = "Book Table 7.2."
+
+[tasks.Task_NotifyRejection]
+duration = { fixed = 0.5 }
+rationale = "Book Table 7.2."
+
+[gateways.Gateway_CompletenessSplit]
+branches = { Flow_Complete = 0.8, Flow_Incomplete = 0.2 }
+rationale = "Book Fig. 7.10."
+
+[gateways.Gateway_Decision]
+branches = { Flow_Granted = 0.6, Flow_Denied = 0.4 }
+rationale = "Book Fig. 7.10."

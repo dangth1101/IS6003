@@ -42,6 +42,9 @@ class ProcessModel:
     def outgoing(self, node_id: str) -> list[Flow]:
         return [f for f in self.flows.values() if f.source == node_id]
 
+    def incoming(self, node_id: str) -> list[Flow]:
+        return [f for f in self.flows.values() if f.target == node_id]
+
     def nodes_of_type(self, element_type: str) -> list[Node]:
         return [n for n in self.nodes.values() if n.element_type == element_type]
 

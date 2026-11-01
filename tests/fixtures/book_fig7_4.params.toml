@@ -1,0 +1,15 @@
+# Book Fig. 7.4 (p.257-258). Hours.
+
+version = "fixture-1"
+
+[tasks.Task_A]
+duration = { fixed = 10.0 }
+rationale = "Book Fig. 7.4."
+
+[tasks.Task_B]
+duration = { fixed = 20.0 }
+rationale = "Book Fig. 7.4."
+
+[tasks.Task_C]
+duration = { fixed = 10.0 }
+rationale = "Book Fig. 7.4."

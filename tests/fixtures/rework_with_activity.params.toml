@@ -1,0 +1,16 @@
+# Not from the book: rework block with a task on the loop-back arc. Working days.
+# Expected CT by our derivation: (T + r x R) / (1 - r) = (4 + 0.25 x 2) / 0.75 = 6.
+
+version = "fixture-1"
+
+[tasks.Task_TestBuild]
+duration = { fixed = 4.0 }
+rationale = "Fixture value."
+
+[tasks.Task_FixDefects]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[gateways.Gateway_LoopSplit]
+branches = { Flow_Passed = 0.75, Flow_Failed = 0.25 }
+rationale = "Fixture value."
