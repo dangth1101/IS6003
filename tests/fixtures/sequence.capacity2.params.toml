@@ -1,0 +1,24 @@
+# sequence.bpmn with two developers doing all three tasks.
+# Work per case is 10.5 days, so utilisation = 0.15 x 10.5 / 2, about 0.79.
+
+version = "fixture-1"
+
+[arrivals]
+rate = 0.15
+rationale = "Fixture value."
+
+[lanes.Lane_Dev]
+capacity = 2
+rationale = "Fixture value."
+
+[tasks.Task_WriteSpec]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[tasks.Task_BuildApp]
+duration = { fixed = 5.5 }
+rationale = "Fixture value."
+
+[tasks.Task_TestApp]
+duration = { fixed = 3.0 }
+rationale = "Fixture value."
