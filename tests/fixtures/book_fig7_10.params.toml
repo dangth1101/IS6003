@@ -1,0 +1,35 @@
+# Book Example 7.2 (p.261): credit application with rework (Fig. 7.10), cycle times of Table 7.1. Days.
+
+version = "fixture-1"
+
+[tasks.Task_CheckCompleteness]
+duration = { fixed = 1.0 }
+rationale = "Book Table 7.1."
+
+[tasks.Task_CheckCreditHistory]
+duration = { fixed = 1.0 }
+rationale = "Book Table 7.1."
+
+[tasks.Task_CheckIncomeSources]
+duration = { fixed = 3.0 }
+rationale = "Book Table 7.1."
+
+[tasks.Task_AssessApplication]
+duration = { fixed = 3.0 }
+rationale = "Book Table 7.1."
+
+[tasks.Task_MakeCreditOffer]
+duration = { fixed = 1.0 }
+rationale = "Book Table 7.1."
+
+[tasks.Task_NotifyRejection]
+duration = { fixed = 2.0 }
+rationale = "Book Table 7.1."
+
+[gateways.Gateway_CompletenessSplit]
+branches = { Flow_Complete = 0.8, Flow_Incomplete = 0.2 }
+rationale = "Book Fig. 7.10: 20% of applications are incomplete."
+
+[gateways.Gateway_Decision]
+branches = { Flow_Granted = 0.6, Flow_Denied = 0.4 }
+rationale = "Book Fig. 7.10: 60% of applications are granted."

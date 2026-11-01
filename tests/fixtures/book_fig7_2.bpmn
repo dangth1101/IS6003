@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Book Fig. 7.2 (p.256): task A, then an XOR-block with B or C. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_book_fig7_2" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration>
+    <bpmn:participant id="Participant_book_fig7_2" name="Fig. 7.2" processRef="Process_BookFig72" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_BookFig72" isExecutable="false">
+    <bpmn:laneSet>
+      <bpmn:lane id="Lane_Worker" name="Worker">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_A</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Split</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_B</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_C</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Join</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Case started" />
+    <bpmn:task id="Task_A" name="A" />
+    <bpmn:exclusiveGateway id="Gateway_Split" />
+    <bpmn:task id="Task_B" name="B" />
+    <bpmn:task id="Task_C" name="C" />
+    <bpmn:exclusiveGateway id="Gateway_Join" />
+    <bpmn:endEvent id="End" name="Case completed" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start" targetRef="Task_A" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_A" targetRef="Gateway_Split" />
+    <bpmn:sequenceFlow id="Flow_ToB" sourceRef="Gateway_Split" targetRef="Task_B" name="upper branch" />
+    <bpmn:sequenceFlow id="Flow_ToC" sourceRef="Gateway_Split" targetRef="Task_C" name="lower branch" />
+    <bpmn:sequenceFlow id="Flow_FromB" sourceRef="Task_B" targetRef="Gateway_Join" />
+    <bpmn:sequenceFlow id="Flow_FromC" sourceRef="Task_C" targetRef="Gateway_Join" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Gateway_Join" targetRef="End" />
+  </bpmn:process>
+</bpmn:definitions>

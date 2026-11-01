@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Not from the book: a rework block whose loop-back arc carries its own task (Fix defects). -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_rework_with_activity" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration>
+    <bpmn:participant id="Participant_rework_with_activity" name="Rework with an activity on the loop-back arc" processRef="Process_ReworkWithActivity" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_ReworkWithActivity" isExecutable="false">
+    <bpmn:laneSet>
+      <bpmn:lane id="Lane_Dev" name="Development team">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_LoopJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_TestBuild</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_LoopSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_FixDefects</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Build delivered" />
+    <bpmn:exclusiveGateway id="Gateway_LoopJoin" />
+    <bpmn:task id="Task_TestBuild" name="Test build" />
+    <bpmn:exclusiveGateway id="Gateway_LoopSplit" />
+    <bpmn:task id="Task_FixDefects" name="Fix defects" />
+    <bpmn:endEvent id="End" name="Build accepted" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start" targetRef="Gateway_LoopJoin" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Gateway_LoopJoin" targetRef="Task_TestBuild" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_TestBuild" targetRef="Gateway_LoopSplit" />
+    <bpmn:sequenceFlow id="Flow_Passed" sourceRef="Gateway_LoopSplit" targetRef="End" name="tests passed" />
+    <bpmn:sequenceFlow id="Flow_Failed" sourceRef="Gateway_LoopSplit" targetRef="Task_FixDefects" name="tests failed" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_FixDefects" targetRef="Gateway_LoopJoin" />
+  </bpmn:process>
+</bpmn:definitions>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Book Fig. 7.1 (p.256): sequence of two tasks. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_book_fig7_1" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration>
+    <bpmn:participant id="Participant_book_fig7_1" name="Fig. 7.1" processRef="Process_BookFig71" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_BookFig71" isExecutable="false">
+    <bpmn:laneSet>
+      <bpmn:lane id="Lane_Worker" name="Worker">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_A</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_B</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Case started" />
+    <bpmn:task id="Task_A" name="A" />
+    <bpmn:task id="Task_B" name="B" />
+    <bpmn:endEvent id="End" name="Case completed" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start" targetRef="Task_A" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_A" targetRef="Task_B" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_B" targetRef="End" />
+  </bpmn:process>
+</bpmn:definitions>
