@@ -18,6 +18,7 @@ classifier per rework gateway. ml_section wraps tasks into the `ml` section of
 the results file.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -31,10 +32,9 @@ from sklearn.metrics import f1_score, mean_absolute_error, r2_score, roc_auc_sco
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
-from bpmopt.analysis import cycle_times
+from bpmopt.analysis import cycle_times, rework_flags
 from bpmopt.bpmn import ProcessModel
 from bpmopt.features import case_features, chronological_split
-from bpmopt.flow_analysis import loop_back_flows
 
 TRAIN_SHARE = 0.8
 
@@ -65,18 +65,7 @@ def cycle_time_task(log: pd.DataFrame, *, seed: int) -> dict:
             [("encode", encoder(data.x_train)), ("model", HistGradientBoostingRegressor(**GRADIENT_BOOSTING, random_state=seed))]
         ),
     }
-    reported = []
-    for model_id, model in models.items():
-        model.fit(data.x_train, data.y_train)
-        predicted = model.predict(data.x_test)
-        metrics = {"mae": float(mean_absolute_error(data.y_test, predicted)), "r2": float(r2_score(data.y_test, predicted))}
-        reported.append({"id": model_id, "metrics": metrics})
-    return {
-        "id": "cycle_time",
-        "kind": "regression",
-        "models": reported,
-        "drivers": shap_drivers(models["gradient_boosting"], data.x_test),
-    }
+    return {"id": "cycle_time", "kind": "regression", **_fit_and_score(models, data, _regression_metrics)}
 
 
 def rework_tasks(log: pd.DataFrame, model: ProcessModel, *, seed: int) -> list[dict]:
@@ -101,7 +90,7 @@ def rework_tasks(log: pd.DataFrame, model: ProcessModel, *, seed: int) -> list[d
     doesn't stop the run.
     """
     tasks = []
-    for gateway_id, target in rework_targets(log, model).items():
+    for gateway_id, target in rework_flags(log, model).items():
         data = training_data(log, target)
         reason = _single_class_reason(data)
         if reason:
@@ -119,24 +108,40 @@ def rework_tasks(log: pd.DataFrame, model: ProcessModel, *, seed: int) -> list[d
                 ]
             ),
         }
-        reported = []
-        for model_id, classifier in models.items():
-            classifier.fit(data.x_train, data.y_train)
-            metrics = {
-                "roc_auc": float(roc_auc_score(data.y_test, classifier.predict_proba(data.x_test)[:, 1])),
-                "f1": float(f1_score(data.y_test, classifier.predict(data.x_test), zero_division=0)),
-            }
-            reported.append({"id": model_id, "metrics": metrics})
         tasks.append(
             {
                 "id": f"rework_{gateway_id}",
                 "kind": "classification",
                 "gateway_id": gateway_id,
-                "models": reported,
-                "drivers": shap_drivers(models["gradient_boosting"], data.x_test),
+                **_fit_and_score(models, data, _classification_metrics),
             }
         )
     return tasks
+
+
+def _fit_and_score(models: dict[str, Pipeline], data: "TrainingData", metrics: Callable) -> dict:
+    """Fit each model on the training cases and score it on the test cases.
+
+    Returns the task's `models` (in the order given) and the SHAP `drivers` of
+    the gradient boosting model.
+    """
+    reported = []
+    for model_id, model in models.items():
+        model.fit(data.x_train, data.y_train)
+        reported.append({"id": model_id, "metrics": metrics(model, data.x_test, data.y_test)})
+    return {"models": reported, "drivers": shap_drivers(models["gradient_boosting"], data.x_test)}
+
+
+def _regression_metrics(model, x: pd.DataFrame, y: pd.Series) -> dict[str, float]:
+    predicted = model.predict(x)
+    return {"mae": float(mean_absolute_error(y, predicted)), "r2": float(r2_score(y, predicted))}
+
+
+def _classification_metrics(model, x: pd.DataFrame, y: pd.Series) -> dict[str, float]:
+    return {
+        "roc_auc": float(roc_auc_score(y, model.predict_proba(x)[:, 1])),
+        "f1": float(f1_score(y, model.predict(x), zero_division=0)),
+    }
 
 
 def _single_class_reason(data: "TrainingData") -> str | None:
@@ -151,20 +156,6 @@ def _single_class_reason(data: "TrainingData") -> str | None:
     if not parts:
         return None
     return f"Not fitted: {' and '.join(parts)}, so there is nothing to tell apart."
-
-
-def rework_targets(log: pd.DataFrame, model: ProcessModel) -> dict[str, pd.Series]:
-    """Per rework gateway: True for each case that reached it and looped back at least once.
-
-    Indexed by case_id, with only the cases that have a decision row at the
-    gateway. Same reading of the log as analysis.rework_rates.
-    """
-    decisions = log[log.element_type == "exclusiveGateway"]
-    targets = {}
-    for gateway_id, back_flow in loop_back_flows(model).items():
-        at_gateway = decisions[decisions.activity_id == gateway_id]
-        targets[gateway_id] = (at_gateway.flow_id == back_flow).groupby(at_gateway.case_id).any()
-    return targets
 
 
 @dataclass(frozen=True)

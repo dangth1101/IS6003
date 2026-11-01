@@ -29,20 +29,8 @@ import pandas as pd
 import simpy
 
 from bpmopt.bpmn import Flow, Node, ProcessModel
+from bpmopt.event_log import LOG_COLUMNS
 from bpmopt.parameters import AttributeValue, Parameters, check_parameters
-
-LOG_COLUMNS = [
-    "case_id",
-    "activity_id",
-    "activity_label",
-    "element_type",
-    "lane_id",
-    "lane_label",
-    "ready_time",
-    "start_time",
-    "end_time",
-    "flow_id",
-]
 
 
 def simulate(model: ProcessModel, params: Parameters, *, n_cases: int, seed: int) -> pd.DataFrame:

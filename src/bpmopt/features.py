@@ -9,7 +9,7 @@ case_id.
 
 import pandas as pd
 
-from bpmopt.simulation import LOG_COLUMNS
+from bpmopt.event_log import LOG_COLUMNS
 
 
 def attribute_names(log: pd.DataFrame) -> list[str]:
