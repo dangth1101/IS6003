@@ -1,4 +1,4 @@
-"""Loading and validating the parameter file (ticket 07)."""
+"""Loading and validating the parameter file."""
 
 import pytest
 

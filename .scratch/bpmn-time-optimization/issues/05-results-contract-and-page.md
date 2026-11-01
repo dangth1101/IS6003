@@ -11,7 +11,7 @@
 - [x] Page renders both BPMN models with bpmn-js, using pinned CDN versions
 - [x] Toggling any combination of changes shows that scenario's cycle time mean, median and P90 with CI
 - [x] All visible text comes from the results file or the BPMN labels, so translation is a content change
-- [x] Page works on GitHub Pages and on a local static server, with no backend
+- [ ] Page works on GitHub Pages and on a local static server, with no backend
 - [x] Page is readable at phone width
 
 ## Comments
@@ -22,7 +22,9 @@
 - New `text` section holds every page string. Its source is `src/bpmopt/content/page.en.toml`, which `build_results` copies in. A Vietnamese page is a `page.vi.toml` plus `build_results(..., lang="vi")`. A test checks that the keys the page reads with `t("...")` are exactly the labels the schema requires, so a new label needs both.
 - Only the load error when `results.json` itself fails has no wording. It shows the raw error, because there is no text to show yet. The serving hint lives in the README.
 - `validate_results` now runs a format checker (`date-time` enforced, `rfc3339-validator` added as a pinned dependency) and rules a schema can't express: scenarios must be the full factorial of the change catalog, each combination exactly once, and every CI must contain its estimate.
-- For tickets that fill sections: `scenarios[].saving` is the paired (common random numbers) difference in mean cycle time vs the empty scenario, with CI. The page derives the ablation from it. `baseline.rework[].rate` is the share of cases that loop back at least once. ML model ids are `reference`, `linear`, `gradient_boosting`. Lint `element_id` is null for whole-model rules. Activity and gateway names come from the BPMN, so results only carry IDs.
+- For tickets that fill sections: `scenarios[].saving` is the paired (common random numbers) difference in mean cycle time vs the empty scenario, with CI. The page derives the ablation from it. `baseline.rework[].rate` is the share of cases that loop back at least once. ML model ids are `reference`, `linear`, `gradient_boosting`. Lint `element_id` is the process ID for whole-model rules, never null, as ticket 02 says (corrected after review; the schema now requires a string). Activity and gateway names come from the BPMN, so results only carry IDs.
 - `meta` gained `replications` and `warm_up` (spec list) and an optional `fake` flag that shows a notice. `warm_up` comes from the parameter file (ticket 04, after the merge). `replications` is 1 until ticket 13 writes R. `schema_version` kept and added to the spec. `baseline.cycle_time` now has median and P90 too.
 - Fake as-is model is an English copy of `current_process.bpmn` with the same element IDs. The to-be model is a small placeholder until ticket 15. The fake page text is a copy of the content file; regenerate or edit it by hand if the content changes.
 - Checked in headless Chrome on a local static server: both diagrams draw, value-added colors apply, toggles show the right scenario (C1+C2 gives 95.6 days, 22.8 saved), no console errors, no horizontal scroll at 390px wide, dark mode readable. Not tried on GitHub Pages itself, but every path is relative and there is no backend.
+- From review: unticked "Page works on GitHub Pages". It's only been checked on a local static server. Publishing to GitHub Pages is part of ticket 16.
+- From review, a spec deviation for the student to decide on: the page draws its bar charts with plain CSS (`div` widths), not a chart library from a pinned CDN. The charts are simple bars, and this keeps one dependency fewer. If the report needs axes, tooltips or other chart types, switching to a pinned library is a small change.

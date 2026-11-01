@@ -103,11 +103,8 @@ YES_NO_LABELS = {"yes", "no", "y", "n", "true", "false", "có", "không"}
 def _check_arc_labels(model: ProcessModel) -> list[Violation]:
     """XOR split arcs carry explicit conditions, not yes/no (§5.4.3 p.190)."""
     violations = []
-    for gateway in model.nodes_of_type("exclusiveGateway"):
-        arcs = model.outgoing(gateway.id)
-        if len(arcs) < 2:
-            continue
-        for arc in arcs:
+    for gateway in model.xor_splits():
+        for arc in model.outgoing(gateway.id):
             if arc.label.strip(" ?!.").lower() in YES_NO_LABELS:
                 violations.append(
                     Violation(
@@ -240,9 +237,8 @@ def _check_g3_one_event_per_outcome(model: ProcessModel) -> list[Violation]:
         ipdom = _immediate_post_dominators(model)
         open_splits = [
             g.id
-            for g in model.nodes_of_type("exclusiveGateway")
-            if len(model.outgoing(g.id)) > 1
-            and not (ipdom.get(g.id) in model.nodes and model.nodes[ipdom[g.id]].element_type == "exclusiveGateway")
+            for g in model.xor_splits()
+            if not (ipdom.get(g.id) in model.nodes and model.nodes[ipdom[g.id]].element_type == "exclusiveGateway")
         ]
         if open_splits:
             violations.append(

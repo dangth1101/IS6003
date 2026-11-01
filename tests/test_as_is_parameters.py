@@ -1,4 +1,4 @@
-"""Proposed default parameters for the as-is model and the synthetic log they give (ticket 10).
+"""Proposed default parameters for the as-is model and the synthetic log they give.
 
 The ranges below are the targets stated at the top of models/as_is.params.toml.
 """
@@ -14,7 +14,8 @@ import pytest
 from bpmopt.analysis import cycle_times
 from bpmopt.bpmn import read_bpmn
 from bpmopt.ml import cycle_time_task, ml_section, rework_tasks
-from bpmopt.parameters import Logistic, ScaledDuration, load_parameters
+from bpmopt.parameters import load_parameters
+from bpmopt.planted import load_planted_effects
 from bpmopt.results import build_results, export_results, validate_results
 from bpmopt.simulation import simulate
 from bpmopt.value_added import load_value_added
@@ -23,6 +24,7 @@ ROOT = Path(__file__).parents[1]
 MODEL = ROOT / "models" / "as_is.bpmn"
 PARAMETERS = ROOT / "models" / "as_is.params.toml"
 PLANTED_EFFECTS = ROOT / "models" / "as_is_planted_effects.md"
+PLANTED_DATA = ROOT / "models" / "as_is.planted_effects.toml"
 VALUE_ADDED = ROOT / "models" / "as_is.value_added.toml"
 N_CASES = 2_000
 NEGATIVE_CONTROL = "requesting_unit"
@@ -126,40 +128,65 @@ def test_waiting_is_a_real_but_minor_part_of_the_cycle_time(log):
     assert 0.10 <= waiting / cycle_times(log).sum() <= 0.40
 
 
-def _planted(params) -> set[tuple[str, str]]:
-    """(element ID, attribute) for every attribute term in the parameters."""
-    terms = {(task_id, name) for task_id, d in params.task_durations.items() if isinstance(d, ScaledDuration) for name in d.coefficients}
-    for gateway_id, branches in params.branch_probabilities.items():
-        for p in branches.flows.values():
-            if isinstance(p, Logistic):
-                terms |= {(gateway_id, name) for name in p.coefficients}
-    return terms
+@pytest.fixture(scope="module")
+def planted(params):
+    return load_planted_effects(PLANTED_DATA, params)
 
 
-def test_every_planted_effect_is_listed_in_the_planted_effects_doc(params):
-    rows = [line for line in PLANTED_EFFECTS.read_text(encoding="utf-8").splitlines() if line.startswith("|")]
+def test_the_planted_effects_doc_lists_exactly_the_effects_in_the_data_file(planted):
+    # load_planted_effects already checks the data file against the parameters, both ways.
+    rows = [line for line in PLANTED_EFFECTS.read_text(encoding="utf-8").splitlines() if re.match(r"\| \d+ \|", line)]
+    in_doc = [tuple(cell.strip().strip("`") for cell in row.split("|")[2:5]) for row in rows]
 
-    def listed(element_id: str, attribute: str) -> bool:
-        return any(re.search(rf"`{element_id}`", row) and re.search(rf"`{attribute}`", row) for row in rows)
-
-    missing = [term for term in _planted(params) if not listed(*term)]
-    assert not missing
-    # And nothing in the doc that the parameters don't plant.
-    for row in rows:
-        ids = re.findall(r"`((?:Task|Gateway)_\w+)`", row)
-        names = [n for n in re.findall(r"`(\w+)`", row) if n in params.attributes]
-        assert all((i, n) in _planted(params) for i in ids for n in names), row
+    assert sorted(in_doc) == sorted(planted.effects)
 
 
-def test_the_negative_control_has_no_effect_and_is_listed_as_such(params):
-    assert NEGATIVE_CONTROL in params.attributes
-    assert all(name != NEGATIVE_CONTROL for _, name in _planted(params))
+def test_the_negative_control_has_no_effect_and_is_listed_as_such(planted):
+    assert planted.negative_control == NEGATIVE_CONTROL
     text = PLANTED_EFFECTS.read_text(encoding="utf-8")
     assert re.search(rf"`{NEGATIVE_CONTROL}`.*negative control", text, re.IGNORECASE)
 
 
+def test_the_ml_should_find_every_planted_attribute_in_the_cycle_time_and_each_gateways_own_in_its_rework(model, planted):
+    assert planted.expected_drivers(model) == {
+        "cycle_time": ["complexity", "integrations", "team_workload", "security_level", "project_type"],
+        "rework_Gateway_ProposalSplit": [],
+        "rework_Gateway_PlanSplit": ["project_type"],
+        "rework_Gateway_TestSplit": ["complexity", "integrations", "security_level"],
+        "rework_Gateway_ReleaseSplit": ["project_type"],
+    }
+
+
+def test_a_planted_effects_file_missing_an_effect_of_the_parameters_is_rejected(tmp_path, params):
+    text = PLANTED_DATA.read_text(encoding="utf-8")
+    path = tmp_path / "planted.toml"
+    path.write_text(text[: text.rindex("[[effects]]")])
+
+    with pytest.raises(ValueError, match="Gateway_ReleaseSplit"):
+        load_planted_effects(path, params)
+
+
+def test_a_planted_effect_the_parameters_do_not_have_is_rejected(tmp_path, params):
+    path = tmp_path / "planted.toml"
+    path.write_text(
+        PLANTED_DATA.read_text(encoding="utf-8")
+        + '\n[[effects]]\nelement = "Task_DeployApplication"\nattribute = "complexity"\nkind = "duration"\n'
+    )
+
+    with pytest.raises(ValueError, match="Task_DeployApplication"):
+        load_planted_effects(path, params)
+
+
+def test_a_negative_control_with_an_effect_is_rejected(tmp_path, params):
+    path = tmp_path / "planted.toml"
+    path.write_text(PLANTED_DATA.read_text(encoding="utf-8").replace('"requesting_unit"', '"complexity"', 1))
+
+    with pytest.raises(ValueError, match="negative control"):
+        load_planted_effects(path, params)
+
+
 def test_the_as_is_pipeline_writes_results_that_validate(tmp_path, model, params, log):
-    # The notebook's path on the real model, parameters and seed (ticket 14).
+    # The notebook's path on the real model, parameters and seed.
     results = build_results(log=log, model=model, params=params, seed=42)
     results["value_added"] = load_value_added(VALUE_ADDED, model)
     results["ml"] = ml_section([cycle_time_task(log, seed=42), *rework_tasks(log, model, seed=42)])

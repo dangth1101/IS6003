@@ -51,6 +51,7 @@ from pathlib import Path
 import numpy as np
 
 from bpmopt.bpmn import ProcessModel
+from bpmopt.event_log import LOG_COLUMNS
 
 
 @dataclass(frozen=True)
@@ -64,6 +65,9 @@ class FixedDuration:
     def sample(self, rng: np.random.Generator, attributes: Mapping[str, "AttributeValue"] | None = None) -> float:
         return self.value
 
+    def describe(self) -> float:
+        return self.value
+
 
 AttributeValue = str | int | float
 
@@ -75,8 +79,17 @@ class Choice:
     values: tuple[AttributeValue, ...]
     weights: tuple[float, ...]
 
+    @property
+    def mean(self) -> float:
+        if not all(isinstance(v, int | float) for v in self.values):
+            raise TypeError(f"no mean for a choice of labels {list(self.values)}")
+        return sum(w * v for v, w in zip(self.values, self.weights))
+
     def sample(self, rng: np.random.Generator) -> AttributeValue:
         return self.values[rng.choice(len(self.values), p=self.weights)]
+
+    def describe(self) -> str:
+        return "choice(" + ", ".join(f"{_n(v)}: {_n(w)}" for v, w in zip(self.values, self.weights)) + ")"
 
 
 @dataclass(frozen=True)
@@ -85,6 +98,9 @@ class Poisson:
 
     def sample(self, rng: np.random.Generator) -> int:
         return int(rng.poisson(self.mean))
+
+    def describe(self) -> str:
+        return f"poisson({_n(self.mean)})"
 
 
 @dataclass(frozen=True)
@@ -99,6 +115,9 @@ class Triangular:
 
     def sample(self, rng: np.random.Generator, attributes: Mapping[str, AttributeValue] | None = None) -> float:
         return float(rng.triangular(self.low, self.mode, self.high))
+
+    def describe(self) -> str:
+        return f"triangular({_n(self.low)}, {_n(self.mode)}, {_n(self.high)})"
 
 
 Distribution = Choice | Poisson | Triangular
@@ -143,6 +162,9 @@ class ScaledDuration:
             raise ValueError(f"duration scale factor {factor:g} isn't positive for attributes {dict(attributes)}")
         return self.base.sample(rng) * factor
 
+    def describe(self) -> str:
+        return f"{_n(self.base.describe())} × ({_terms(1.0, self.coefficients)})"
+
 
 Duration = FixedDuration | Triangular | ScaledDuration
 
@@ -161,6 +183,9 @@ class Logistic:
     def probability(self, attributes: Mapping[str, AttributeValue]) -> float:
         z = self.intercept + _linear(self.coefficients, attributes)
         return 1 / (1 + math.exp(-z))
+
+    def describe(self) -> str:
+        return f"logistic({_terms(self.intercept, self.coefficients)})"
 
 
 REST = "rest"  # the branch that gets whatever probability the other branches leave
@@ -189,6 +214,9 @@ class Branches:
             if p == REST:
                 probabilities[flow_id] = 1 - sum(probabilities.values())
         return probabilities
+
+    def describe(self) -> str:
+        return ", ".join(f"{flow_id}: {p.describe() if isinstance(p, Logistic) else _n(p)}" for flow_id, p in self.flows.items())
 
 
 @dataclass(frozen=True)
@@ -284,33 +312,14 @@ def assumptions(params: Parameters) -> list[dict]:
         values["arrivals"] = ("rate", params.arrival_rate)
     if params.warm_up:
         values["warm_up"] = ("length", params.warm_up)
-    values |= {f"attributes.{name}": ("distribution", _describe(d)) for name, d in params.attributes.items()}
+    values |= {f"attributes.{name}": ("distribution", d.describe()) for name, d in params.attributes.items()}
     values |= {f"lanes.{lane_id}": ("capacity", capacity) for lane_id, capacity in params.lane_capacities.items()}
-    values |= {f"tasks.{task_id}": ("duration", _describe(d)) for task_id, d in params.task_durations.items()}
-    values |= {f"gateways.{gateway_id}": ("branches", _describe(b)) for gateway_id, b in params.branch_probabilities.items()}
+    values |= {f"tasks.{task_id}": ("duration", d.describe()) for task_id, d in params.task_durations.items()}
+    values |= {f"gateways.{gateway_id}": ("branches", b.describe()) for gateway_id, b in params.branch_probabilities.items()}
     missing = [entry for entry in values if not params.rationales.get(entry)]
     if missing:
         raise ValueError(f"no rationale for {', '.join(missing)}")
     return [{"parameter": f"{entry}.{key}", "value": value, "rationale": params.rationales[entry]} for entry, (key, value) in values.items()]
-
-
-def _describe(value: object) -> AttributeValue:
-    match value:
-        case FixedDuration(v):
-            return v
-        case Triangular(low, mode, high):
-            return f"triangular({_n(low)}, {_n(mode)}, {_n(high)})"
-        case Poisson(mean):
-            return f"poisson({_n(mean)})"
-        case Choice(choices, weights):
-            return "choice(" + ", ".join(f"{_n(v)}: {_n(w)}" for v, w in zip(choices, weights)) + ")"
-        case Branches(flows):
-            return ", ".join(f"{flow_id}: {_describe(p) if isinstance(p, Logistic) else _n(p)}" for flow_id, p in flows.items())
-        case ScaledDuration(base, coefficients):
-            return f"{_n(_describe(base))} × ({_terms(1.0, coefficients)})"
-        case Logistic(intercept, coefficients):
-            return f"logistic({_terms(intercept, coefficients)})"
-    raise TypeError(f"can't describe {value!r}")
 
 
 def _terms(constant: float, coefficients: Coefficients) -> str:
@@ -360,8 +369,7 @@ def check_parameters(params: Parameters, model: ProcessModel) -> None:
     errors too, since they are usually typos.
     """
     tasks = {node.id for node in model.nodes_of_type("task")}
-    splits = {node.id: {f.id for f in model.outgoing(node.id)} for node in model.nodes_of_type("exclusiveGateway")}
-    splits = {gateway_id: flows for gateway_id, flows in splits.items() if len(flows) > 1}
+    splits = {node.id: {f.id for f in model.outgoing(node.id)} for node in model.xor_splits()}
     problems = [f"tasks.{task_id}: task has no duration" for task_id in sorted(tasks - set(params.task_durations))]
     problems += [f"gateways.{gateway_id}: XOR-split has no branches" for gateway_id in sorted(set(splits) - set(params.branch_probabilities))]
     problems += [f"tasks.{task_id}: no task with this ID in the model" for task_id in params.task_durations if task_id not in tasks]
@@ -376,8 +384,6 @@ def check_parameters(params: Parameters, model: ProcessModel) -> None:
 
 
 def _distribution(name: str, spec: dict) -> Distribution:
-    from bpmopt.simulation import LOG_COLUMNS  # here, not at the top: simulation imports this module
-
     if name in LOG_COLUMNS:
         raise ValueError(f"attributes.{name}: the name is taken by a log column, pick another")
     where = f"attributes.{name}.distribution"
@@ -482,9 +488,4 @@ def _mean_term(coefficient: float | dict[str, float], attribute: Distribution) -
     """Mean of one attribute term over the attribute's distribution."""
     if isinstance(coefficient, dict):
         return sum(w * coefficient.get(v, 0.0) for v, w in zip(attribute.values, attribute.weights))
-    match attribute:
-        case Choice(values, weights):
-            return coefficient * sum(w * v for v, w in zip(values, weights))
-        case Poisson() | Triangular():
-            return coefficient * attribute.mean
-    raise TypeError(f"no mean for {attribute!r}")
+    return coefficient * attribute.mean

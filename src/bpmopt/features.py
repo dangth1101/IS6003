@@ -1,4 +1,4 @@
-"""Case-level feature table for the ML tasks (tickets 11 and 12).
+"""Case-level feature table for the ML tasks.
 
 One row per case with what is known the moment it starts: its start time and
 the attributes drawn at arrival. Nothing that happens later (durations,
@@ -9,7 +9,7 @@ case_id.
 
 import pandas as pd
 
-from bpmopt.simulation import LOG_COLUMNS
+from bpmopt.event_log import LOG_COLUMNS
 
 
 def attribute_names(log: pd.DataFrame) -> list[str]:

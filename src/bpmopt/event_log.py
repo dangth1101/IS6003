@@ -18,6 +18,20 @@ from pathlib import Path
 
 import pandas as pd
 
+# The fixed columns of a simulated log, in order. Case attributes follow them.
+LOG_COLUMNS = [
+    "case_id",
+    "activity_id",
+    "activity_label",
+    "element_type",
+    "lane_id",
+    "lane_label",
+    "ready_time",
+    "start_time",
+    "end_time",
+    "flow_id",
+]
+
 
 def export_csv(log: pd.DataFrame, path: str | Path) -> Path:
     """Write the log to path as CSV, with an event ID per row. Returns the path."""

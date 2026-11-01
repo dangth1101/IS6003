@@ -29,20 +29,8 @@ import pandas as pd
 import simpy
 
 from bpmopt.bpmn import Flow, Node, ProcessModel
+from bpmopt.event_log import LOG_COLUMNS
 from bpmopt.parameters import AttributeValue, Parameters, check_parameters
-
-LOG_COLUMNS = [
-    "case_id",
-    "activity_id",
-    "activity_label",
-    "element_type",
-    "lane_id",
-    "lane_label",
-    "ready_time",
-    "start_time",
-    "end_time",
-    "flow_id",
-]
 
 
 def simulate(model: ProcessModel, params: Parameters, *, n_cases: int, seed: int) -> pd.DataFrame:
@@ -54,15 +42,13 @@ def simulate(model: ProcessModel, params: Parameters, *, n_cases: int, seed: int
     """
     if n_cases < 1:
         raise ValueError(f"n_cases must be at least 1, got {n_cases}")
-    starts = model.nodes_of_type("startEvent")
-    if len(starts) != 1:
-        raise ValueError(f"expected exactly one start event, found {len(starts)}")
+    start = model.single_start()
     check_parameters(params, model)
 
     env = simpy.Environment()
     rows: list[dict] = []
     pools = {lane_id: simpy.Resource(env, capacity) for lane_id, capacity in params.lane_capacities.items()}
-    arrivals = env.process(_arrivals(env, model, params, pools, n_cases, seed, starts[0], rows))
+    arrivals = env.process(_arrivals(env, model, params, pools, n_cases, seed, start, rows))
     env.run()
 
     log = pd.DataFrame(rows, columns=[*LOG_COLUMNS, *params.attributes])
@@ -155,7 +141,7 @@ def _move_token(case: _Case, node: Node) -> Generator[simpy.Event, object, Node 
             ready = env.now
             start_time = yield from _perform_task(env, node, case, case.pools.get(node.lane))
             case.rows.append(_row(case, node, ready, start_time, env.now))
-        elif node.element_type == "exclusiveGateway" and len(outgoing) > 1:
+        elif node.element_type == "exclusiveGateway" and model.is_split(node.id):
             flow = case.branches.choose(node.id, outgoing, case.params, case.attributes)
             case.rows.append(_row(case, node, env.now, env.now, env.now, flow_id=flow.id))
             node = model.nodes[flow.target]
@@ -183,7 +169,7 @@ class _Streams:
 
     Keyed by element ID, not by draw order, so adding or removing a task or a
     gateway elsewhere doesn't change what this case draws for the others. That
-    keeps common random numbers between designs (ticket 13). A task that runs
+    keeps common random numbers between designs. A task that runs
     again in a rework loop takes the next draw from its own stream.
     """
 

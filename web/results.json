@@ -6,7 +6,7 @@
     "case_count": 2000,
     "warm_up": 250.0,
     "parameter_version": "proposed-1",
-    "generated_at": "2026-11-01T07:08:20+00:00"
+    "generated_at": "2026-11-01T07:32:59+00:00"
   },
   "text": {
     "lang": "en",
@@ -102,7 +102,7 @@
       "va_VA": "Value-adding",
       "va_BVA": "Business value-adding",
       "va_NVA": "Non-value-adding",
-      "ml_split": "Trained on the first {train}% of cases by start date, tested on the rest.",
+      "ml_split": "Split by start date: tested on the last cases, trained on the first {train}% minus any case still open when the test cases began.",
       "ml_task_cycle_time": "Predicting cycle time",
       "ml_task_rework": "Predicting a loop back at: {gateway}",
       "ml_model": "Model",
@@ -545,49 +545,49 @@
           {
             "id": "reference",
             "metrics": {
-              "mae": 42.54868971194718,
-              "r2": -0.007139928631750614
+              "mae": 42.54057420656067,
+              "r2": -0.00687487343899984
             }
           },
           {
             "id": "linear",
             "metrics": {
-              "mae": 42.371224538887894,
-              "r2": 0.017258877713532628
+              "mae": 42.353488258322265,
+              "r2": 0.017074540571119123
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "mae": 42.72457273255728,
-              "r2": -0.007720612774653635
+              "mae": 42.67627680872214,
+              "r2": -0.00785512837644875
             }
           }
         ],
         "drivers": [
           {
             "feature": "complexity",
-            "mean_abs_shap": 9.728781468632668
+            "mean_abs_shap": 9.837050267474027
           },
           {
             "feature": "security_level",
-            "mean_abs_shap": 7.1692056919001494
-          },
-          {
-            "feature": "integrations",
-            "mean_abs_shap": 3.5447118652309886
+            "mean_abs_shap": 7.126918207492215
           },
           {
             "feature": "team_workload",
-            "mean_abs_shap": 3.493589279219647
+            "mean_abs_shap": 3.525394441381295
           },
           {
             "feature": "requesting_unit",
-            "mean_abs_shap": 3.439962621773394
+            "mean_abs_shap": 3.47366955360107
+          },
+          {
+            "feature": "integrations",
+            "mean_abs_shap": 3.282274222668036
           },
           {
             "feature": "project_type",
-            "mean_abs_shap": 3.391423087844492
+            "mean_abs_shap": 3.1293211427982275
           }
         ]
       },
@@ -606,42 +606,42 @@
           {
             "id": "linear",
             "metrics": {
-              "roc_auc": 0.7089607733779513,
-              "f1": 0.2692307692307692
+              "roc_auc": 0.6999442275515896,
+              "f1": 0.27450980392156865
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "roc_auc": 0.5653002416806098,
-              "f1": 0.1830065359477124
+              "roc_auc": 0.5223089793641942,
+              "f1": 0.13333333333333333
             }
           }
         ],
         "drivers": [
           {
             "feature": "team_workload",
-            "mean_abs_shap": 0.3175634207425985
+            "mean_abs_shap": 0.32593091069194324
           },
           {
             "feature": "project_type",
-            "mean_abs_shap": 0.2509244331384135
+            "mean_abs_shap": 0.2543005991364055
           },
           {
             "feature": "complexity",
-            "mean_abs_shap": 0.19623095179195382
+            "mean_abs_shap": 0.1880632475721589
           },
           {
             "feature": "requesting_unit",
-            "mean_abs_shap": 0.08448493114110801
+            "mean_abs_shap": 0.09075777660835345
           },
           {
             "feature": "integrations",
-            "mean_abs_shap": 0.07234574727691302
+            "mean_abs_shap": 0.07196155580691639
           },
           {
             "feature": "security_level",
-            "mean_abs_shap": 0.016774776837066144
+            "mean_abs_shap": 0.012689811114368198
           }
         ]
       },
@@ -660,42 +660,42 @@
           {
             "id": "linear",
             "metrics": {
-              "roc_auc": 0.6407526449712067,
-              "f1": 0.5187713310580204
+              "roc_auc": 0.6403843578411677,
+              "f1": 0.5185185185185185
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "roc_auc": 0.6283145841703496,
-              "f1": 0.5068493150684932
+              "roc_auc": 0.6355464041783849,
+              "f1": 0.49324324324324326
             }
           }
         ],
         "drivers": [
           {
             "feature": "complexity",
-            "mean_abs_shap": 0.3507325869246218
+            "mean_abs_shap": 0.3432788178646652
           },
           {
             "feature": "security_level",
-            "mean_abs_shap": 0.2652810077682811
+            "mean_abs_shap": 0.26196234233830185
           },
           {
             "feature": "integrations",
-            "mean_abs_shap": 0.22963438971659714
+            "mean_abs_shap": 0.23149863765408876
           },
           {
             "feature": "team_workload",
-            "mean_abs_shap": 0.10897927853583861
-          },
-          {
-            "feature": "requesting_unit",
-            "mean_abs_shap": 0.05577842202935315
+            "mean_abs_shap": 0.10580905322433239
           },
           {
             "feature": "project_type",
-            "mean_abs_shap": 0.04906166228787944
+            "mean_abs_shap": 0.05886192399986784
+          },
+          {
+            "feature": "requesting_unit",
+            "mean_abs_shap": 0.05250583232369902
           }
         ]
       },
@@ -714,42 +714,42 @@
           {
             "id": "linear",
             "metrics": {
-              "roc_auc": 0.5430893477816398,
-              "f1": 0.27906976744186046
+              "roc_auc": 0.5390513187487221,
+              "f1": 0.28901734104046245
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "roc_auc": 0.5627683500306686,
-              "f1": 0.3225806451612903
+              "roc_auc": 0.5661930075649151,
+              "f1": 0.3384615384615385
             }
           }
         ],
         "drivers": [
           {
             "feature": "project_type",
-            "mean_abs_shap": 0.29034980241055824
+            "mean_abs_shap": 0.283645159346617
           },
           {
             "feature": "team_workload",
-            "mean_abs_shap": 0.20922358090503262
-          },
-          {
-            "feature": "requesting_unit",
-            "mean_abs_shap": 0.06262644586612169
-          },
-          {
-            "feature": "integrations",
-            "mean_abs_shap": 0.06164404184989194
-          },
-          {
-            "feature": "security_level",
-            "mean_abs_shap": 0.05845175424810236
+            "mean_abs_shap": 0.2087140371237583
           },
           {
             "feature": "complexity",
-            "mean_abs_shap": 0.053141083292805084
+            "mean_abs_shap": 0.06249924468917134
+          },
+          {
+            "feature": "security_level",
+            "mean_abs_shap": 0.05811891249310305
+          },
+          {
+            "feature": "requesting_unit",
+            "mean_abs_shap": 0.05496914918307755
+          },
+          {
+            "feature": "integrations",
+            "mean_abs_shap": 0.05388881721609021
           }
         ]
       },
@@ -768,42 +768,42 @@
           {
             "id": "linear",
             "metrics": {
-              "roc_auc": 0.5370995670995671,
-              "f1": 0.2888086642599278
+              "roc_auc": 0.5302597402597402,
+              "f1": 0.26714801444043323
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "roc_auc": 0.5431601731601732,
-              "f1": 0.2833333333333333
+              "roc_auc": 0.548051948051948,
+              "f1": 0.2943722943722944
             }
           }
         ],
         "drivers": [
           {
             "feature": "team_workload",
-            "mean_abs_shap": 0.1741028450320078
+            "mean_abs_shap": 0.1741362496629675
           },
           {
             "feature": "requesting_unit",
-            "mean_abs_shap": 0.11537507713269703
+            "mean_abs_shap": 0.11665331707595125
           },
           {
             "feature": "security_level",
-            "mean_abs_shap": 0.08986304320389761
+            "mean_abs_shap": 0.09571042852368343
           },
           {
             "feature": "integrations",
-            "mean_abs_shap": 0.069258756400274
+            "mean_abs_shap": 0.07356160928349392
           },
           {
             "feature": "complexity",
-            "mean_abs_shap": 0.029538728796148436
+            "mean_abs_shap": 0.04092528947872794
           },
           {
             "feature": "project_type",
-            "mean_abs_shap": 0.018439440114772342
+            "mean_abs_shap": 0.02394122503970637
           }
         ]
       }
@@ -812,6 +812,48 @@
   "models": {
     "as_is": {
       "bpmn": "models/as_is.bpmn",
+      "names": {
+        "Lane_BusinessUnit": "Business unit / PMO",
+        "Lane_ITManagement": "IT management",
+        "Lane_Development": "Application development",
+        "Lane_QualityControl": "QC / Acceptance unit",
+        "Lane_ITOperations": "IT operations / App support / PMO",
+        "Flow_ProposalApproved": "proposal approved",
+        "Flow_ProposalChangesRequested": "changes requested",
+        "Flow_ProposalRejected": "proposal rejected",
+        "Flow_PlanApproved": "plan approved",
+        "Flow_PlanChangesRequested": "plan needs changes",
+        "Flow_TestsPassed": "all tests passed",
+        "Flow_DefectsFound": "defects found",
+        "Flow_ReleaseApproved": "release approved",
+        "Flow_ReleaseRejected": "release rejected",
+        "Start_RequestReceived": "Development request received",
+        "Task_RegisterRequest": "Register development request",
+        "Task_ApproveProposal": "Approve project proposal",
+        "Task_ReviseProposal": "Revise project proposal",
+        "End_ProposalRejected": "Proposal rejected",
+        "Task_HoldKickOff": "Hold project kick-off",
+        "Task_SpecifyRequirements": "Specify business and technical requirements",
+        "Task_DraftPlan": "Draft detailed project plan",
+        "Task_ApprovePlan": "Approve project plan",
+        "Task_BuildApplication": "Build application",
+        "Task_ReviewSourceCode": "Review source code",
+        "Task_RunFunctionalTests": "Run functional tests",
+        "Task_RunSecurityTests": "Run security tests",
+        "Task_RunAcceptanceTests": "Run acceptance tests",
+        "Task_FixDefects": "Fix defects",
+        "Task_ApproveRelease": "Approve application release",
+        "Task_RefineApplication": "Refine application",
+        "Task_DeployApplication": "Deploy application to production",
+        "Task_StartOperation": "Start live operation",
+        "Task_MonitorOperation": "Monitor live operation",
+        "Task_EvaluateProject": "Evaluate project results",
+        "End_ProjectClosed": "Project closed",
+        "Gateway_ProposalSplit": "Decision after Approve project proposal",
+        "Gateway_PlanSplit": "Decision after Approve project plan",
+        "Gateway_TestSplit": "Decision after Run acceptance tests",
+        "Gateway_ReleaseSplit": "Decision after Approve application release"
+      },
       "lint": []
     }
   }

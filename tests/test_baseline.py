@@ -1,4 +1,4 @@
-"""Baseline metrics from the event log (ticket 08), tested on simulator logs with known parameters."""
+"""Baseline metrics from the event log, tested on simulator logs with known parameters."""
 
 import math
 

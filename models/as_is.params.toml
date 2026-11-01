@@ -8,7 +8,8 @@
 #
 # Every value is a proposed default, an estimate for the student to correct. None
 # of it is measured. The planted attribute effects, and what the ML should find,
-# are listed in models/as_is_planted_effects.md.
+# are listed in models/as_is.planted_effects.toml and explained in
+# models/as_is_planted_effects.md.
 #
 # Targets these defaults aim for (checked in tests/test_as_is_parameters.py on a
 # 2,000-case log, seed 42):

@@ -75,17 +75,27 @@ def rework_rates(log: pd.DataFrame, model: ProcessModel) -> list[dict]:
 
     Cases that never reach the gateway (e.g. a proposal rejected earlier) are left
     out, so the rate estimates the configured loop-back probability r: a case loops
-    back at least once exactly when its first pass does. Read from the XOR decision
-    rows of the log.
+    back at least once exactly when its first pass does.
+    """
+    return [
+        {"gateway_id": gateway_id, "rate": float(looped.mean())}
+        for gateway_id, looped in rework_flags(log, model).items()
+        if len(looped)
+    ]
+
+
+def rework_flags(log: pd.DataFrame, model: ProcessModel) -> dict[str, pd.Series]:
+    """Per rework gateway, in model order: True for each case that reached it and looped back at least once.
+
+    Indexed by case_id, with only the cases that have a decision row at the
+    gateway. Read from the XOR decision rows of the log.
     """
     decisions = log[log.element_type == "exclusiveGateway"]
-    rates = []
+    flags = {}
     for gateway_id, back_flow in loop_back_flows(model).items():
         at_gateway = decisions[decisions.activity_id == gateway_id]
-        looped = (at_gateway.flow_id == back_flow).groupby(at_gateway.case_id).any()
-        if len(looped):
-            rates.append({"gateway_id": gateway_id, "rate": float(looped.mean())})
-    return rates
+        flags[gateway_id] = (at_gateway.flow_id == back_flow).groupby(at_gateway.case_id).any()
+    return flags
 
 
 def waiting_by_activity(log: pd.DataFrame) -> list[dict]:

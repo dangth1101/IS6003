@@ -1,4 +1,4 @@
-"""ML task A: cycle time from case-start attributes, with SHAP drivers (ticket 11).
+"""ML task A: cycle time from case-start attributes, with SHAP drivers.
 
 The fixture plants one driver: only project_type changes how often a case
 fails testing and loops back, so it should explain most of the cycle time.
@@ -9,8 +9,10 @@ from pathlib import Path
 
 import pytest
 
+from bpmopt.analysis import cycle_times
 from bpmopt.bpmn import read_bpmn
-from bpmopt.ml import cycle_time_task, ml_section
+from bpmopt.features import case_features
+from bpmopt.ml import cycle_time_task, ml_section, training_data
 from bpmopt.parameters import load_parameters
 from bpmopt.results import build_results, export_results, validate_results
 from bpmopt.simulation import simulate
@@ -31,6 +33,18 @@ def planted_log():
 @pytest.fixture(scope="module")
 def task(planted_log):
     return cycle_time_task(planted_log, seed=7)
+
+
+def test_every_training_case_ends_before_the_first_test_case_starts(planted_log):
+    # A case still running when the test period starts has an outcome from the
+    # test period. Training on it would let the model learn from the future.
+    data = training_data(planted_log, cycle_times(planted_log))
+
+    ends = planted_log.groupby("case_id").end_time.max()
+    starts = case_features(planted_log).start_time
+    assert ends.loc[data.x_train.index].max() < starts.loc[data.x_test.index].min()
+    # The test cases are still the last 20% by start time.
+    assert len(data.x_test) == 200
 
 
 def test_planted_driver_ranks_first(task):

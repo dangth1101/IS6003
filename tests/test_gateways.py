@@ -1,4 +1,4 @@
-"""XOR and AND gateways and rework loops in the simulator (ticket 03).
+"""XOR and AND gateways and rework loops in the simulator.
 
 Every case starts at time 0 and no lane has a capacity, so there is no waiting
 and the simulated mean should match flow analysis (book §7.1.7, p.273).
@@ -98,7 +98,7 @@ def test_same_seed_gives_the_same_branch_choices(simulate_fixture):
 
 
 def test_adding_a_gateway_does_not_change_the_choices_at_other_gateways(simulate_fixture):
-    # Common random numbers (ticket 13): book_fig7_10 is book_fig7_6 plus a rework gateway
+    # Common random numbers: book_fig7_10 is book_fig7_6 plus a rework gateway
     # in front of the credit decision. Each case should still get the same decision.
     def granted(log):
         return _executions(log, "Task_MakeCreditOffer")
@@ -119,7 +119,7 @@ def test_branch_probabilities_that_do_not_sum_to_one_are_rejected(tmp_path):
 
 
 def test_each_xor_split_decision_is_logged_with_the_flow_taken(simulate_fixture):
-    # Ticket 08: rework rates (and ticket 12's labels) come from these rows instead
+    # Rework rates and the ML rework labels come from these rows instead
     # of guessing from repeated tasks.
     log = simulate_fixture("book_fig7_7", n_cases=500)
 

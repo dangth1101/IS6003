@@ -60,11 +60,8 @@ def theoretical_cycle_time(model: ProcessModel, params: Parameters, *, n_draws: 
     With logistic branches, the mean over n_draws attribute vectors drawn with
     `seed` (see the module docstring). With fixed branches both are ignored.
     """
-    starts = model.nodes_of_type("startEvent")
-    if len(starts) != 1:
-        raise ValueError(f"expected exactly one start event, found {len(starts)}")
     reducer = _Reducer(model, params)
-    first = _single_outgoing(model, starts[0])
+    first = _single_outgoing(model, model.single_start())
     if not any(branches.depends_on_attributes for branches in params.branch_probabilities.values()):
         return reducer.cycle_time(first, {})
     rng = np.random.default_rng(seed)
@@ -111,11 +108,11 @@ class _Reducer:
             node = self.model.nodes[flow.target]
             if node.id in self.loop_joins:
                 part_ct, flow, part_p = self.rework(node)
-            elif node.element_type == "endEvent" or _is_join(self.model, node) or node.id in self.loops:
+            elif node.element_type == "endEvent" or self.model.is_join(node.id) or node.id in self.loops:
                 return ct, flow, p
             elif node.element_type == "task":
                 part_ct, flow, part_p = self.task_mean(node.id), _single_outgoing(self.model, node), 1.0
-            elif _is_split(self.model, node):
+            elif self.model.is_split(node.id):
                 probabilities = self.probabilities(node.id) if node.element_type == "exclusiveGateway" else None
                 part_ct, flow, part_p = self.block(node, self.model.outgoing(node.id), probabilities)
             else:
@@ -229,14 +226,6 @@ def _find_loops(model: ProcessModel) -> dict[str, _Loop]:
             raise ValueError(f"{edge.id}: a cycle must be a rework block between an XOR-join and an XOR-split")
         loops[split.id] = _Loop(split.id, flow, tuple(back_tasks), edge.target)
     return loops
-
-
-def _is_split(model: ProcessModel, node: Node) -> bool:
-    return node.element_type.endswith("Gateway") and len(model.outgoing(node.id)) > 1
-
-
-def _is_join(model: ProcessModel, node: Node) -> bool:
-    return node.element_type.endswith("Gateway") and len(model.incoming(node.id)) > 1
 
 
 def _single_outgoing(model: ProcessModel, node: Node) -> Flow:

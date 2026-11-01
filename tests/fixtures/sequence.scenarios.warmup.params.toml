@@ -1,0 +1,27 @@
+# sequence.scenarios.params.toml plus a 100-day warm-up, about 15 cases dropped per run.
+
+version = "fixture-1"
+
+[arrivals]
+rate = 0.15
+rationale = "Fixture value."
+
+[lanes.Lane_Dev]
+capacity = 2
+rationale = "Fixture value."
+
+[tasks.Task_WriteSpec]
+duration = { triangular = [1.0, 2.0, 3.0] }
+rationale = "Fixture value."
+
+[tasks.Task_BuildApp]
+duration = { triangular = [3.0, 5.0, 10.0] }
+rationale = "Fixture value."
+
+[tasks.Task_TestApp]
+duration = { triangular = [1.0, 2.0, 6.0] }
+rationale = "Fixture value."
+
+[warm_up]
+length = 100
+rationale = "Fixture value."

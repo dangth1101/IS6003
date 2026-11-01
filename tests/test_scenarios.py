@@ -1,4 +1,4 @@
-"""Change catalog, scenarios and the scenario runner (ticket 13).
+"""Change catalog, scenarios and the scenario runner.
 
 Fixture catalog: tests/fixtures/sequence.catalog.toml on sequence.bpmn.
 C1 takes 2 days off Build application (parameter-only), C2 removes Write
@@ -12,8 +12,8 @@ import pytest
 from bpmopt.analysis import mean_cycle_time
 from bpmopt.bpmn import read_bpmn
 from bpmopt.parameters import load_parameters
-from bpmopt.results import build_results, validate_results
-from bpmopt.scenarios import ablation, load_catalog, replication_seeds, run_scenarios, t_quantile_975
+from bpmopt.results import build_results, element_names, validate_results
+from bpmopt.scenarios import ablation, load_catalog, replication_seeds, run_scenarios
 from bpmopt.simulation import simulate
 
 
@@ -46,11 +46,6 @@ def test_a_change_that_removes_a_fixed_amount_of_work_saves_exactly_that_much(lo
     assert saving["ci_high"] == pytest.approx(2.0)
 
 
-def test_the_ci_uses_the_t_quantile_from_the_usual_table():
-    # Two-sided 95% t values from any statistics table.
-    assert [round(t_quantile_975(df), 3) for df in (1, 2, 5, 10, 29, 100)] == [12.706, 4.303, 2.571, 2.228, 2.045, 1.984]
-
-
 def test_the_empty_scenario_reproduces_the_as_is_run_exactly(load, fixtures_dir):
     catalog = load("sequence.scenarios")
     seeds = replication_seeds(5, 3)
@@ -67,6 +62,25 @@ def test_the_empty_scenario_reproduces_the_as_is_run_exactly(load, fixtures_dir)
     assert as_is["cycle_time"]["mean"]["ci_low"] < as_is["cycle_time"]["mean"]["value"]
 
 
+def test_with_a_warm_up_every_scenario_leaves_out_the_warm_up_cases(load):
+    catalog = load("sequence.scenarios.warmup")
+    seeds = replication_seeds(5, 3)
+
+    scenarios = _by_changes(run_scenarios(catalog, n_cases=30, replications=3, seed=5))
+
+    # Changes can't touch the warm-up, so every scenario keeps it, structural ones too.
+    for combo in [(), ("C1",), ("C2",), ("C1", "C2", "C3")]:
+        model, params = catalog.resolve(combo)
+        assert params.warm_up == 100
+        logs = [simulate(model, params, n_cases=30, seed=s) for s in seeds]
+        assert all(log.case_id.nunique() == 30 and log.case_id.min() > 1 for log in logs)
+        expected = sum(mean_cycle_time(log) for log in logs) / 3
+        assert scenarios[frozenset(combo)]["cycle_time"]["mean"]["value"] == pytest.approx(expected, abs=1e-12)
+    # The warm-up changes which cases are measured, so the as-is estimate differs from a run without one.
+    without = _by_changes(run_scenarios(load("sequence.scenarios"), n_cases=30, replications=3, seed=5))
+    assert scenarios[frozenset()]["cycle_time"]["mean"]["value"] != pytest.approx(without[frozenset()]["cycle_time"]["mean"]["value"])
+
+
 def test_every_combination_of_changes_is_simulated_and_the_results_validate(load):
     catalog = load("sequence.scenarios")
     model, params = catalog.resolve([])
@@ -79,7 +93,8 @@ def test_every_combination_of_changes_is_simulated_and_the_results_validate(load
         frozenset(c) for c in [(), ("C1",), ("C2",), ("C3",), ("C1", "C2"), ("C1", "C3"), ("C2", "C3"), ("C1", "C2", "C3")]
     }
     results = build_results(log=log, model=model, params=params, seed=5)
-    results |= {"models": {"as_is": {"bpmn": "models/as_is.bpmn"}}, "changes": catalog.entries(), "scenarios": scenarios}
+    as_is = {"bpmn": "models/as_is.bpmn", "names": element_names(model)}
+    results |= {"models": {"as_is": as_is}, "changes": catalog.entries(), "scenarios": scenarios}
     validate_results(results)
 
 
@@ -240,3 +255,18 @@ def test_a_change_needs_every_catalog_field(write_catalog):
 
     with pytest.raises(ValueError, match="expected_effect"):
         write_catalog(text)
+
+
+def test_a_gateway_override_on_an_xor_join_is_an_error(tmp_path, fixtures_dir):
+    # Only XOR-splits have branches. An override on a join would be dropped without a word.
+    body = (
+        "[changes.C1.overrides.gateways.Gateway_LoopJoin]\n"
+        "branches = { Flow_Passed = 0.9, Flow_Failed = 0.1 }\n"
+        'rationale = "Wrong gateway."\n'
+    )
+    (tmp_path / "catalog.toml").write_text('version = "test"\n' + _change("C1", body))
+    model = read_bpmn(fixtures_dir / "rework_with_activity.bpmn")
+    params = load_parameters(fixtures_dir / "rework_with_activity.params.toml")
+
+    with pytest.raises(ValueError, match="Gateway_LoopJoin"):
+        load_catalog(tmp_path / "catalog.toml", model=model, params=params)

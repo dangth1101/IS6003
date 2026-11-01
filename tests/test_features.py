@@ -1,4 +1,4 @@
-"""Case-level feature table and the chronological split (tickets 11 and 12)."""
+"""Case-level feature table and the chronological split."""
 
 import pandas as pd
 

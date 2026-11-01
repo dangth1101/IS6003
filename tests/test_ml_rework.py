@@ -1,4 +1,4 @@
-"""ML task B: rework per gateway from case-start attributes, with SHAP drivers (ticket 12).
+"""ML task B: rework per gateway from case-start attributes, with SHAP drivers.
 
 The fixture has two rework gateways. Only complexity drives the test loop; the
 proposal loop is a fixed 25%, and 15% of cases are rejected before testing.

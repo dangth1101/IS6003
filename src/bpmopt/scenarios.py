@@ -39,6 +39,7 @@ from pathlib import Path
 
 import jsonschema
 import numpy as np
+from scipy.stats import t as student_t
 
 from bpmopt.analysis import cycle_times
 from bpmopt.bpmn import ProcessModel, read_bpmn
@@ -171,10 +172,11 @@ def _models(path: Path, raw: dict[str, str], ids: list[str]) -> dict[frozenset[s
 
 
 def _check_overrides(where: str, changes: tuple[Change, ...], models: list[ProcessModel]) -> None:
-    """Each override names an element of some model, and no two changes override the same entry."""
+    """Each override names an element of some model (a gateway must be an XOR-split), and no two changes override the same entry."""
+    what = {"tasks": "task", "gateways": "XOR-split", "lanes": "lane"}
     known = {
         "tasks": {node.id for m in models for node in m.nodes_of_type("task")},
-        "gateways": {node.id for m in models for node in m.nodes_of_type("exclusiveGateway")},
+        "gateways": {node.id for m in models for node in m.xor_splits()},
         "lanes": {lane_id for m in models for lane_id in m.lanes},
     }
     owner: dict[str, str] = {}
@@ -183,7 +185,7 @@ def _check_overrides(where: str, changes: tuple[Change, ...], models: list[Proce
             for element_id in entries if section in known else ():
                 entry = f"{section}.{element_id}"
                 if element_id not in known[section]:
-                    raise ValueError(f"{where}: changes.{change.id}.overrides.{entry}: no model in the catalog has this ID")
+                    raise ValueError(f"{where}: changes.{change.id}.overrides.{entry}: no model in the catalog has a {what[section]} with this ID")
                 if entry in owner:
                     raise ValueError(f"{where}: {owner[entry]} and {change.id} both override {entry}, so their combination is ambiguous")
                 owner[entry] = change.id
@@ -197,7 +199,7 @@ def _combinations(ids: list[str]) -> list[tuple[str, ...]]:
 def _restrict(params: Parameters, model: ProcessModel) -> Parameters:
     """Drop the task, gateway and lane entries the model doesn't have."""
     tasks = {node.id for node in model.nodes_of_type("task")}
-    gateways = {node.id for node in model.nodes_of_type("exclusiveGateway") if len(model.outgoing(node.id)) > 1}
+    gateways = {node.id for node in model.xor_splits()}
     keep = {f"tasks.{i}" for i in tasks} | {f"gateways.{i}" for i in gateways} | {f"lanes.{i}" for i in model.lanes}
     return replace(
         params,
@@ -269,40 +271,5 @@ def ablation(scenarios: list[dict]) -> list[dict]:
 def _estimate(values: np.ndarray) -> dict[str, float]:
     """Mean of the values with a 95% t-interval."""
     mean = float(values.mean())
-    half_width = t_quantile_975(len(values) - 1) * float(values.std(ddof=1)) / math.sqrt(len(values))
+    half_width = float(student_t.ppf(0.975, len(values) - 1)) * float(values.std(ddof=1)) / math.sqrt(len(values))
     return {"value": mean, "ci_low": mean - half_width, "ci_high": mean + half_width}
-
-
-def t_quantile_975(df: int) -> float:
-    """97.5% quantile of Student's t with df degrees of freedom, for a two-sided 95% interval.
-
-    Bisection on P(|T| <= t), which has a closed form for whole df
-    (Abramowitz & Stegun 26.7.3-4). Saves a SciPy dependency for one number.
-    """
-    if df < 1:
-        raise ValueError(f"df must be at least 1, got {df}")
-    low, high = 0.0, 1000.0
-    for _ in range(100):
-        mid = (low + high) / 2
-        if _t_central_probability(mid, df) < 0.95:
-            low = mid
-        else:
-            high = mid
-    return (low + high) / 2
-
-
-def _t_central_probability(t: float, df: int) -> float:
-    """P(|T| <= t) for Student's t with whole df."""
-    theta = math.atan(t / math.sqrt(df))
-    c2 = math.cos(theta) ** 2
-    if df % 2 == 1:
-        term, total = 1.0, 1.0 if df > 1 else 0.0
-        for k in range(1, (df - 1) // 2):
-            term *= c2 * (2 * k) / (2 * k + 1)
-            total += term
-        return 2 / math.pi * (theta + math.sin(theta) * math.cos(theta) * total)
-    term, total = 1.0, 1.0
-    for k in range(1, df // 2):
-        term *= c2 * (2 * k - 1) / (2 * k)
-        total += term
-    return math.sin(theta) * total

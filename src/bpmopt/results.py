@@ -11,16 +11,16 @@ from collections import Counter
 from collections.abc import Iterator
 from dataclasses import asdict
 from datetime import UTC, datetime
-from itertools import combinations
 from functools import cache
 from importlib import resources
+from itertools import combinations
 from pathlib import Path
 
 import jsonschema
 import pandas as pd
 
 from bpmopt.analysis import baseline_metrics, flow_analysis_check
-from bpmopt.bpmn import ProcessModel
+from bpmopt.bpmn import ProcessModel, read_bpmn
 from bpmopt.lint import lint
 from bpmopt.parameters import Parameters, assumptions
 
@@ -34,14 +34,14 @@ def build_results(*, log: pd.DataFrame, model: ProcessModel, params: Parameters,
     analysis check simulates the model once more with unlimited capacity, with
     the same seed and case count.
 
-    Later tickets add their own sections (value_added, ml, changes,
+    The notebook adds the other sections (value_added, ml, changes,
     scenarios, threats) to this dict before export.
     """
     return {
         "meta": {
             "schema_version": SCHEMA_VERSION,
             "seed": seed,
-            "replications": 1,  # one baseline run; ticket 13 runs R replications per scenario
+            "replications": 1,  # one baseline run; run_scenarios runs R replications per scenario
             "case_count": int(log.case_id.nunique()),
             "warm_up": params.warm_up,
             "parameter_version": params.version,
@@ -67,7 +67,9 @@ def export_results(results: dict, out_dir: str | Path, *, models: dict[str, Path
     """Copy each BPMN model into out_dir/models/, lint it, and write out_dir/results.json.
 
     out_dir ends up self-contained, so it can be served as a static site. Each
-    model's lint list is empty when it is clean.
+    model's lint list is empty when it is clean. Each model also carries its
+    element names (see element_names), so the page labels tables the same way
+    the notebook does.
     """
     out_dir = Path(out_dir)
     (out_dir / "models").mkdir(parents=True, exist_ok=True)
@@ -75,12 +77,35 @@ def export_results(results: dict, out_dir: str | Path, *, models: dict[str, Path
     for key, source in models.items():
         target = Path("models") / f"{key}.bpmn"
         shutil.copyfile(source, out_dir / target)
-        results["models"][key] = {"bpmn": target.as_posix(), "lint": [asdict(v) for v in lint(source)]}
+        results["models"][key] = {
+            "bpmn": target.as_posix(),
+            "names": element_names(read_bpmn(source), results["text"]),
+            "lint": [asdict(v) for v in lint(source)],
+        }
 
     validate_results(results)
     path = out_dir / "results.json"
     path.write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return path
+
+
+def element_names(model: ProcessModel, text: dict | None = None) -> dict[str, str]:
+    """Element ID -> display name, for every named node, flow and lane of the model.
+
+    Gateways in the models are unnamed. An unnamed XOR gateway with one
+    incoming flow is named after the element before it, with the page text's
+    `gateway_after` label ("Decision after {task}"). text defaults to the
+    English page text.
+    """
+    gateway_after = (text or load_page_text())["labels"]["gateway_after"]
+    names = {lane_id: name for lane_id, name in model.lanes.items() if name}
+    names |= {flow.id: flow.label for flow in model.flows.values() if flow.label}
+    names |= {node.id: node.label for node in model.nodes.values() if node.label}
+    for gateway in model.nodes_of_type("exclusiveGateway"):
+        incoming = model.incoming(gateway.id)
+        if gateway.id not in names and len(incoming) == 1 and incoming[0].source in names:
+            names[gateway.id] = gateway_after.replace("{task}", names[incoming[0].source])
+    return names
 
 
 def validate_results(results: dict) -> None:

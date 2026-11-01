@@ -4,7 +4,7 @@ Plan: `PLAN.md`. Spec and tickets: `.scratch/bpmn-time-optimization/`.
 
 ## Layout
 
-- `models/`: the corrected as-is model (`as_is.bpmn`, the source of truth for the process), its change log against the original `current_process.bpmn`, its parameter file (proposed defaults for a bank IT division), and `as_is_planted_effects.md`, the attribute effects put into those parameters on purpose, to check the ML findings against
+- `models/`: the corrected as-is model (`as_is.bpmn`, the source of truth for the process), its change log against the original `current_process.bpmn`, its parameter file (proposed defaults for a bank IT division), and the attribute effects put into those parameters on purpose, to check the ML findings against: `as_is.planted_effects.toml` for the notebook, `as_is_planted_effects.md` to explain them
 - `src/bpmopt/`: the Python package (BPMN reader, linter, simulator, flow analysis, log analysis, CSV export of the event log, case features and ML, scenario runner, results export)
 - `src/bpmopt/schema/results.schema.json`: the results contract between the notebook and the page
 - `src/bpmopt/content/page.en.toml`: all page text, copied into every results file
@@ -43,7 +43,7 @@ The page needs a static server. Opening `index.html` as a file doesn't work, bec
 
 To see the page with the fake data, open http://localhost:8000/?results=fixtures/fake_results.json. Model paths in a results file are relative to that file.
 
-Parameter files (TOML) set arrivals, case attributes, durations, branch probabilities, lane capacities and the warm-up. The format is described at the top of `src/bpmopt/parameters.py`. Every entry needs a rationale, which ends up in the assumptions table on the page. A duration can scale with the case attributes, and a two-way XOR-split can be a logistic of them; every such effect in `models/as_is.params.toml` must be listed in `models/as_is_planted_effects.md` (a test checks).
+Parameter files (TOML) set arrivals, case attributes, durations, branch probabilities, lane capacities and the warm-up. The format is described at the top of `src/bpmopt/parameters.py`. Every entry needs a rationale, which ends up in the assumptions table on the page. A duration can scale with the case attributes, and a two-way XOR-split can be a logistic of them; every such effect in `models/as_is.params.toml` must be listed in `models/as_is.planted_effects.toml` and in the table of `models/as_is_planted_effects.md` (a test checks both).
 
 `bpmopt.event_log.export_csv(log, path)` writes a log as CSV in the layout of the book's event log (Fig. 11.4), with ready, start and end times instead of one timestamp.
 

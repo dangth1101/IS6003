@@ -131,7 +131,6 @@
 
     let TEXT = null;
     let NUM = null;
-    const BPMN_NS = "http://www.omg.org/spec/BPMN/20100524/MODEL";
 
     /** Label from text.labels, with {name} placeholders filled from vars. */
     function t(key, vars = {}) {
@@ -184,21 +183,6 @@
       const response = await fetch(url);
       if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
       return response;
-    }
-
-    /** id -> name for every named element in a BPMN file. Used to label tables.
-     *  An unnamed gateway with one incoming flow is named after the element before it. */
-    function bpmnNames(xml) {
-      const doc = new DOMParser().parseFromString(xml, "application/xml");
-      const names = {};
-      for (const node of doc.querySelectorAll("[id][name]")) names[node.getAttribute("id")] = node.getAttribute("name");
-      for (const gateway of doc.getElementsByTagNameNS(BPMN_NS, "exclusiveGateway")) {
-        const id = gateway.getAttribute("id");
-        const incoming = [...doc.getElementsByTagNameNS(BPMN_NS, "sequenceFlow")].filter((f) => f.getAttribute("targetRef") === id);
-        const before = incoming.length === 1 ? names[incoming[0].getAttribute("sourceRef")] : undefined;
-        if (!names[id] && before) names[id] = t("gateway_after", { task: before });
-      }
-      return names;
     }
 
     // ---------- sections ----------
@@ -482,8 +466,9 @@
       const modelUrl = (model) => new URL(model.bpmn, resultsUrl);
       const asIsXml = await (await fetchOk(modelUrl(results.models.as_is))).text();
       const toBeXml = results.models.to_be ? await (await fetchOk(modelUrl(results.models.to_be))).text() : null;
-      const asIsNames = bpmnNames(asIsXml);
-      const toBeNames = toBeXml ? bpmnNames(toBeXml) : {};
+      // Element names come with the results, so the page and the notebook use the same ones.
+      const asIsNames = results.models.as_is.names;
+      const toBeNames = results.models.to_be?.names ?? {};
 
       const asIsDiagram = diagramBlock(t("as_is_model"));
       const toBeDiagram = toBeXml ? diagramBlock(t("to_be_model")) : null;
