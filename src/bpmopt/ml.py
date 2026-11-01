@@ -4,8 +4,10 @@ Every task follows the same recipe:
 
 - features: case_features(log), one row per case with the attributes known at
   case start (see features.py). start_time only orders the split.
-- split: chronological, the first 80% of cases by start time train, the last
-  20% test. A random split would let the model learn from later cases.
+- split: chronological. The last 20% of cases by start time test. Training
+  uses the first 80%, minus the cases that were still running when the first
+  test case started: their outcome lies in the test period, so training on
+  them would let the model learn from the future. A random split would too.
 - models: a reference baseline, a linear model and gradient boosting
   (scikit-learn's HistGradientBoosting). Label attributes are one-hot encoded,
   numbers go in as they are.
@@ -171,13 +173,18 @@ class TrainingData:
 def training_data(log: pd.DataFrame, target: pd.Series) -> TrainingData:
     """Join a per-case target (indexed by case_id) to the case features and split by start time.
 
-    Cases missing from the target (e.g. ones that never reached a gateway) are left out before the split.
+    Cases missing from the target (e.g. ones that never reached a gateway) are
+    left out before the split. After it, a training case must have ended before
+    the first test case started, so no training outcome comes from the test period.
     """
     features = case_features(log)
     if features.columns.size == 1:
         raise ValueError("the log has no case attributes to learn from; add [attributes.*] to the parameter file")
     features = features[features.index.isin(target.index)]
     train, test = chronological_split(features, TRAIN_SHARE)
+    if not test.empty:
+        case_end = log.groupby("case_id").end_time.max()
+        train = train[case_end.loc[train.index] < test.start_time.min()]
     return TrainingData(
         x_train=train.drop(columns="start_time"),
         x_test=test.drop(columns="start_time"),

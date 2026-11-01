@@ -103,7 +103,7 @@
       "va_VA": "Value-adding",
       "va_BVA": "Business value-adding",
       "va_NVA": "Non-value-adding",
-      "ml_split": "Trained on the first {train}% of cases by start date, tested on the rest.",
+      "ml_split": "Split by start date: tested on the last cases, trained on the first {train}% minus any case still open when the test cases began.",
       "ml_task_cycle_time": "Predicting cycle time",
       "ml_task_rework": "Predicting a loop back at: {gateway}",
       "ml_model": "Model",
