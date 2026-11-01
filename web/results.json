@@ -6,7 +6,7 @@
     "case_count": 100,
     "warm_up": 0.0,
     "parameter_version": "placeholder-1",
-    "generated_at": "2026-11-01T06:40:49+00:00"
+    "generated_at": "2026-11-01T06:43:54+00:00"
   },
   "text": {
     "lang": "en",
@@ -274,6 +274,84 @@
       "mean": 93.64,
       "median": 97.0,
       "p90": 136.0
+    }
+  },
+  "value_added": {
+    "Task_RegisterRequest": {
+      "class": "BVA",
+      "reason": "Logs the request so the PMO can track and prioritize it; the requester gets nothing from the record itself."
+    },
+    "Task_ApproveProposal": {
+      "class": "BVA",
+      "reason": "Control step (p.216): management checks budget and fit before money is spent."
+    },
+    "Task_ReviseProposal": {
+      "class": "NVA",
+      "reason": "Rework on a proposal that wasn't accepted the first time; defect waste (p.222)."
+    },
+    "Task_HoldKickOff": {
+      "class": "BVA",
+      "reason": "Aligns the business unit and IT on scope and roles, which lowers project risk; the customer doesn't pay for the meeting."
+    },
+    "Task_SpecifyRequirements": {
+      "class": "VA",
+      "reason": "Decides what the application will do; without it the customer gets a less useful result."
+    },
+    "Task_DraftPlan": {
+      "class": "BVA",
+      "reason": "Needed to book people and dates and to control the project; the plan itself adds nothing to the application."
+    },
+    "Task_ApprovePlan": {
+      "class": "BVA",
+      "reason": "Control step (p.216) on the plan."
+    },
+    "Task_BuildApplication": {
+      "class": "VA",
+      "reason": "Produces the application the customer asked for."
+    },
+    "Task_ReviewSourceCode": {
+      "class": "BVA",
+      "reason": "Control step (p.216): checks the code was written correctly."
+    },
+    "Task_RunFunctionalTests": {
+      "class": "BVA",
+      "reason": "Control step (p.216): checks the application works as specified."
+    },
+    "Task_RunSecurityTests": {
+      "class": "BVA",
+      "reason": "Control step required by the bank's security rules; reduces the risk of losses (p.214)."
+    },
+    "Task_RunAcceptanceTests": {
+      "class": "BVA",
+      "reason": "Control step (p.216): the acceptance unit confirms the application meets the request before release."
+    },
+    "Task_FixDefects": {
+      "class": "NVA",
+      "reason": "Repairs defects found in testing; rework is defect waste (p.222)."
+    },
+    "Task_ApproveRelease": {
+      "class": "BVA",
+      "reason": "Control step (p.216): management signs off the release before production."
+    },
+    "Task_RefineApplication": {
+      "class": "NVA",
+      "reason": "Rework after a rejected release (p.222). Could be VA if it adds missing scope, see open question 6 in the change log."
+    },
+    "Task_DeployApplication": {
+      "class": "VA",
+      "reason": "Puts the application where users can use it; the customer gets no value before this."
+    },
+    "Task_StartOperation": {
+      "class": "BVA",
+      "reason": "Formal go-live and handover to operations; the application is already deployed, so this is mostly sign-off."
+    },
+    "Task_MonitorOperation": {
+      "class": "BVA",
+      "reason": "Keeps the application stable after go-live and lowers the risk of incidents (p.214)."
+    },
+    "Task_EvaluateProject": {
+      "class": "BVA",
+      "reason": "Archives project records and collects lessons learned; useful to the bank, not to the requester."
     }
   },
   "models": {
