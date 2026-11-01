@@ -18,11 +18,11 @@ def fixtures_dir() -> Path:
 
 @pytest.fixture
 def simulate_fixture() -> Callable[..., pd.DataFrame]:
-    """Simulate fixtures/<name>.bpmn with fixtures/<name>.params.toml."""
+    """Simulate fixtures/<name>.bpmn with fixtures/<params or name>.params.toml."""
 
-    def run(name: str, n_cases: int = 50, seed: int = 42) -> pd.DataFrame:
+    def run(name: str, n_cases: int = 50, seed: int = 42, params: str | None = None) -> pd.DataFrame:
         model = read_bpmn(FIXTURES / f"{name}.bpmn")
-        params = load_parameters(FIXTURES / f"{name}.params.toml")
+        params = load_parameters(FIXTURES / f"{params or name}.params.toml")
         return simulate(model, params, n_cases=n_cases, seed=seed)
 
     return run
