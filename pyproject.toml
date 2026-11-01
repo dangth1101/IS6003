@@ -8,6 +8,8 @@ dependencies = [
     "numpy==2.5.4",
     "pandas==3.1.0",
     "rfc3339-validator==0.1.4",
+    "scikit-learn==1.9.1",
+    "shap==0.54.1",
     "simpy==4.1.2",
 ]
 
