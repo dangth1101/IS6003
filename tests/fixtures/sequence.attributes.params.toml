@@ -1,0 +1,31 @@
+# sequence.bpmn with case attributes, one of each distribution kind.
+
+version = "fixture-1"
+
+[attributes.project_type]
+distribution = { choice = ["web", "mobile", "core"], weights = [0.5, 0.3, 0.2] }
+rationale = "Fixture value."
+
+[attributes.complexity]
+distribution = { choice = [1, 2, 3], weights = [0.3, 0.5, 0.2] }
+rationale = "Fixture value."
+
+[attributes.integrations]
+distribution = { poisson = 1.5 }
+rationale = "Fixture value."
+
+[attributes.workload]
+distribution = { triangular = [0.2, 0.6, 1.0] }
+rationale = "Fixture value."
+
+[tasks.Task_WriteSpec]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[tasks.Task_BuildApp]
+duration = { fixed = 5.5 }
+rationale = "Fixture value."
+
+[tasks.Task_TestApp]
+duration = { fixed = 3.0 }
+rationale = "Fixture value."

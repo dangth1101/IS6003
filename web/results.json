@@ -6,7 +6,7 @@
     "case_count": 100,
     "warm_up": 0.0,
     "parameter_version": "placeholder-1",
-    "generated_at": "2026-11-01T06:39:57+00:00"
+    "generated_at": "2026-11-01T06:40:49+00:00"
   },
   "text": {
     "lang": "en",
@@ -151,6 +151,123 @@
       "workload": "Team workload at start"
     }
   },
+  "assumptions": [
+    {
+      "parameter": "tasks.Task_RegisterRequest.duration",
+      "value": 1.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_ApproveProposal.duration",
+      "value": 3.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_ReviseProposal.duration",
+      "value": 3.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_HoldKickOff.duration",
+      "value": 1.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_SpecifyRequirements.duration",
+      "value": 10.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_DraftPlan.duration",
+      "value": 5.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_ApprovePlan.duration",
+      "value": 2.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_BuildApplication.duration",
+      "value": 30.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_ReviewSourceCode.duration",
+      "value": 3.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_RunFunctionalTests.duration",
+      "value": 5.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_RunSecurityTests.duration",
+      "value": 3.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_RunAcceptanceTests.duration",
+      "value": 5.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_FixDefects.duration",
+      "value": 4.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_ApproveRelease.duration",
+      "value": 2.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_RefineApplication.duration",
+      "value": 4.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_DeployApplication.duration",
+      "value": 1.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_StartOperation.duration",
+      "value": 1.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_MonitorOperation.duration",
+      "value": 20.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "tasks.Task_EvaluateProject.duration",
+      "value": 2.0,
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "gateways.Gateway_ProposalSplit.branches",
+      "value": "Flow_ProposalApproved: 0.7, Flow_ProposalChangesRequested: 0.2, Flow_ProposalRejected: 0.1",
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "gateways.Gateway_PlanSplit.branches",
+      "value": "Flow_PlanApproved: 0.8, Flow_PlanChangesRequested: 0.2",
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "gateways.Gateway_TestSplit.branches",
+      "value": "Flow_TestsPassed: 0.7, Flow_DefectsFound: 0.3",
+      "rationale": "Placeholder until ticket 10."
+    },
+    {
+      "parameter": "gateways.Gateway_ReleaseSplit.branches",
+      "value": "Flow_ReleaseApproved: 0.9, Flow_ReleaseRejected: 0.1",
+      "rationale": "Placeholder until ticket 10."
+    }
+  ],
   "baseline": {
     "time_unit": "working days",
     "cycle_time": {

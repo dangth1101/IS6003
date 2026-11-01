@@ -19,7 +19,7 @@ import jsonschema
 import pandas as pd
 
 from bpmopt.analysis import cycle_time_stats
-from bpmopt.parameters import Parameters
+from bpmopt.parameters import Parameters, assumptions
 
 SCHEMA_VERSION = 2
 
@@ -27,7 +27,7 @@ SCHEMA_VERSION = 2
 def build_results(*, log: pd.DataFrame, params: Parameters, seed: int, lang: str = "en") -> dict:
     """Results without the `models` section, which export_results fills in.
 
-    Later tickets add their own sections (assumptions, value_added, ml, changes,
+    Later tickets add their own sections (value_added, ml, changes,
     scenarios, threats) to this dict before export.
     """
     return {
@@ -41,6 +41,7 @@ def build_results(*, log: pd.DataFrame, params: Parameters, seed: int, lang: str
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         },
         "text": load_page_text(lang),
+        "assumptions": assumptions(params),
         "baseline": {
             "time_unit": "working days",
             "cycle_time": cycle_time_stats(log),
