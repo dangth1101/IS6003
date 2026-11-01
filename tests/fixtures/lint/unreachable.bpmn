@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lint fixture: breaks only REACH. Task_ArchiveRequest can't reach an end;
+     Task_NotifyRequester and End_RequesterNotified can't be reached from the start. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_Unreachable" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_1" name="App development" processRef="Process_Unreachable" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Unreachable" isExecutable="false">
+    <bpmn:startEvent id="Start_RequestReceived" name="Request received" />
+    <bpmn:task id="Task_ReviewRequest" name="Review request" />
+    <bpmn:exclusiveGateway id="Gateway_Approved" />
+    <bpmn:endEvent id="End_RequestApproved" name="Request approved" />
+    <bpmn:task id="Task_ArchiveRequest" name="Archive request" />
+    <bpmn:task id="Task_NotifyRequester" name="Notify requester" />
+    <bpmn:endEvent id="End_RequesterNotified" name="Requester notified" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_RequestReceived" targetRef="Task_ReviewRequest" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_ReviewRequest" targetRef="Gateway_Approved" />
+    <bpmn:sequenceFlow id="Flow_3" name="request approved" sourceRef="Gateway_Approved" targetRef="End_RequestApproved" />
+    <bpmn:sequenceFlow id="Flow_4" name="request rejected" sourceRef="Gateway_Approved" targetRef="Task_ArchiveRequest" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_NotifyRequester" targetRef="End_RequesterNotified" />
+  </bpmn:process>
+</bpmn:definitions>
