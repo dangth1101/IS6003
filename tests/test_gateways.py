@@ -68,10 +68,22 @@ def test_a_task_on_the_loop_back_arc_runs_once_per_rework(simulate_fixture):
     assert (_executions(log, "Task_FixDefects") == _executions(log, "Task_TestBuild") - 1).all()
 
 
-@pytest.mark.parametrize("name", ["book_fig7_2", "book_fig7_4", "book_fig7_7", "book_fig7_10", "rework_with_activity"])
-def test_mean_cycle_time_matches_flow_analysis_with_unlimited_capacity(simulate_fixture, fixtures_dir, name):
-    expected = theoretical_cycle_time(read_bpmn(fixtures_dir / f"{name}.bpmn"), load_parameters(fixtures_dir / f"{name}.params.toml"))
-    log = simulate_fixture(name, n_cases=N_CASES)
+@pytest.mark.parametrize(
+    ("name", "params"),
+    [
+        ("book_fig7_2", None),
+        ("book_fig7_4", None),
+        ("book_fig7_7", None),
+        ("book_fig7_10", None),
+        ("rework_with_activity", None),
+        ("rework_with_activity", "rework_with_activity.logistic"),  # flow analysis averages over attributes
+        ("proposal_rejected", None),
+        ("early_exit_in_block", None),
+    ],
+)
+def test_mean_cycle_time_matches_flow_analysis_with_unlimited_capacity(simulate_fixture, fixtures_dir, name, params):
+    expected = theoretical_cycle_time(read_bpmn(fixtures_dir / f"{name}.bpmn"), load_parameters(fixtures_dir / f"{params or name}.params.toml"))
+    log = simulate_fixture(name, n_cases=N_CASES, params=params)
 
     _assert_mean_within_four_standard_errors(cycle_times(log), expected)
 
@@ -104,3 +116,18 @@ def test_branch_probabilities_that_do_not_sum_to_one_are_rejected(tmp_path):
 
     with pytest.raises(ValueError, match="Gateway_Split"):
         load_parameters(path)
+
+
+def test_each_xor_split_decision_is_logged_with_the_flow_taken(simulate_fixture):
+    # Ticket 08: rework rates (and ticket 12's labels) come from these rows instead
+    # of guessing from repeated tasks.
+    log = simulate_fixture("book_fig7_7", n_cases=500)
+
+    decisions = log[log.element_type == "exclusiveGateway"]
+    assert set(decisions.activity_id) == {"Gateway_LoopSplit"}  # splits only, not the join
+    assert set(decisions.flow_id) == {"Flow_Done", "Flow_Rework"}
+    assert (decisions.ready_time == decisions.end_time).all()  # zero duration, like start and end events
+    # One decision per run of B: each rework sends the case round B once more.
+    reworks = (decisions.flow_id == "Flow_Rework").groupby(decisions.case_id).sum()
+    pd.testing.assert_series_equal(reworks + 1, _executions(log, "Task_B"), check_names=False)
+    assert log[log.element_type != "exclusiveGateway"].flow_id.isna().all()
