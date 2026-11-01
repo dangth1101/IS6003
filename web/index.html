@@ -3,24 +3,44 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>App Development Cycle Time</title>
+  <title>…</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.28.0/dist/assets/diagram-js.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.28.0/dist/assets/bpmn-js.css">
   <style>
+    /* No wording in this file: every visible string comes from the results file (text.*)
+       or from the BPMN labels. Load another results file with ?results=<path>. */
     :root {
+      color-scheme: light;
       --bg: #fafaf8;
       --surface: #ffffff;
+      --canvas: #ffffff;
       --text: #1d1d1b;
-      --muted: #6b6b66;
+      --muted: #5f5e59;
       --border: #e2e1dc;
+      --accent: #2a78d6;
+      --track: #ecebe6;
+      --notice-bg: #fff4d6;
+      --notice-text: #5c4300;
+      --error: #b3261e;
+      /* value-added classes, categorical slots 1-3 (validated all-pairs) */
+      --va-VA: #2a78d6;
+      --va-NVA: #eb6834;
+      --va-BVA: #1baf7a;
     }
     @media (prefers-color-scheme: dark) {
       :root {
+        color-scheme: dark;
         --bg: #161615;
-        --surface: #fafaf8; /* the diagram keeps a light canvas so BPMN strokes stay readable */
+        --surface: #1f1f1d;
+        --canvas: #fafaf8; /* diagrams keep a light canvas so BPMN strokes stay readable */
         --text: #ecebe6;
-        --muted: #a3a29c;
+        --muted: #b0afa8;
         --border: #34332f;
+        --accent: #3987e5;
+        --track: #2c2b28;
+        --notice-bg: #3a2f10;
+        --notice-text: #f3dc9c;
+        --error: #f2b8b5;
       }
     }
     * { box-sizing: border-box; }
@@ -28,60 +48,456 @@
       margin: 0;
       background: var(--bg);
       color: var(--text);
-      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+      font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
     }
-    main { max-width: 960px; margin: 0 auto; padding: 32px 16px; }
-    h1 { font-size: 1.5rem; margin: 0 0 4px; }
-    .muted { color: var(--muted); margin: 0 0 24px; }
-    .stat { margin: 0 0 24px; }
-    .stat dt { color: var(--muted); font-size: 0.875rem; }
-    .stat dd { margin: 0; font-size: 2rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-    .stat dd span { font-size: 1rem; font-weight: 400; color: var(--muted); }
-    #diagram { height: 320px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
-    #error { color: #b3261e; }
+    main { max-width: 980px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: 1.75rem; line-height: 1.2; margin: 0 0 8px; }
+    h2 { font-size: 1.3rem; margin: 48px 0 12px; padding-top: 16px; border-top: 1px solid var(--border); }
+    h3 { font-size: 1.05rem; margin: 28px 0 8px; }
+    p { margin: 0 0 12px; max-width: 70ch; }
+    .muted { color: var(--muted); }
+    .small { font-size: 0.875rem; }
+    .notice { background: var(--notice-bg); color: var(--notice-text); padding: 10px 14px; border-radius: 8px; margin: 16px 0; }
+    #error { color: var(--error); white-space: pre-wrap; }
+
+    .diagram-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--canvas); }
+    .diagram { min-width: 720px; height: 380px; }
+    .diagram-caption { margin: 6px 0 0; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 0.875rem; }
+    .legend li { display: flex; align-items: center; gap: 6px; }
+    .swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+
+    .va-VA:not(.djs-connection) .djs-visual > :first-child { fill: color-mix(in srgb, var(--va-VA) 28%, white) !important; }
+    .va-BVA:not(.djs-connection) .djs-visual > :first-child { fill: color-mix(in srgb, var(--va-BVA) 28%, white) !important; }
+    .va-NVA:not(.djs-connection) .djs-visual > :first-child { fill: color-mix(in srgb, var(--va-NVA) 28%, white) !important; }
+
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 16px 0; }
+    .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+    .tile dt { color: var(--muted); font-size: 0.875rem; }
+    .tile dd { margin: 0; font-size: 1.6rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .tile dd span { font-size: 0.9rem; font-weight: 400; color: var(--muted); }
+    .tile .sub { font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+
+    .table-scroll { overflow-x: auto; margin: 8px 0 16px; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-weight: 500; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.num { white-space: nowrap; }
+    .ci-sub { font-size: 0.8rem; color: var(--muted); }
+    tr.reference td { color: var(--muted); }
+    td code { overflow-wrap: anywhere; }
+
+    .bars { display: grid; grid-template-columns: minmax(90px, max-content) 1fr; gap: 6px 12px; align-items: center; margin: 8px 0 16px; font-size: 0.9rem; }
+    .bar-track { position: relative; height: 18px; }
+    .bar { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; min-width: 2px; }
+    .bar-row:hover .bar { filter: brightness(1.15); }
+    .bar-value { position: absolute; top: 0; font-size: 0.8rem; line-height: 18px; color: var(--muted); padding-left: 6px; font-variant-numeric: tabular-nums; }
+
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin: 12px 0; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+    .card h3 { margin-top: 0; }
+    .card dl { margin: 0; font-size: 0.9rem; }
+    .card dt { color: var(--muted); margin-top: 8px; }
+    .card dd { margin: 0; }
+    .dq { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px 12px; }
+
+    .toggles { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 16px; padding: 0; border: 0; }
+    .toggles legend { font-weight: 600; margin-bottom: 4px; padding: 0; }
+    .toggles label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+    .toggles input { margin-top: 4px; width: 18px; height: 18px; flex: none; }
+
+    .ci-plot { margin: 8px 0 16px; display: grid; grid-template-columns: minmax(90px, max-content) 1fr; gap: 10px 12px; align-items: center; font-size: 0.9rem; }
+    .ci-track { position: relative; height: 22px; background: var(--track); border-radius: 4px; }
+    .ci-range { position: absolute; top: 9px; height: 4px; background: var(--accent); border-radius: 2px; }
+    .ci-dot { position: absolute; top: 5px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--surface); }
+    .ci-track.as-is .ci-range, .ci-track.as-is .ci-dot { background: var(--muted); }
+
+    ul.threats { padding-left: 20px; }
+    ul.threats li { margin-bottom: 8px; }
   </style>
 </head>
 <body>
-  <main>
-    <h1>App development: cycle time</h1>
-    <p class="muted">Walking skeleton. The model is a fixture, not the real process yet.</p>
-
-    <dl class="stat">
-      <dt>Mean cycle time (simulated, <span id="cases">…</span> cases)</dt>
-      <dd id="cycle-time">…</dd>
-    </dl>
-
-    <div id="diagram" aria-label="As-is BPMN model"></div>
-    <p id="error" hidden></p>
+  <main id="page" aria-live="polite">
+    <p id="error" role="alert" hidden></p>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/bpmn-js@18.28.0/dist/bpmn-viewer.production.min.js"></script>
   <script>
+    "use strict";
+
+    // ---------- tiny helpers ----------
+
+    let TEXT = null;
+    let NUM = null;
+
+    /** Label from text.labels, with {name} placeholders filled from vars. */
+    function t(key, vars = {}) {
+      const template = TEXT.labels[key] ?? `[${key}]`;
+      return template.replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? `{${name}}`));
+    }
+
+    function fmt(value, digits = 1) {
+      return NUM(digits).format(value);
+    }
+
+    function el(tag, attrs = {}, ...children) {
+      const node = document.createElement(tag);
+      for (const [name, value] of Object.entries(attrs)) {
+        if (value === undefined || value === null || value === false) continue;
+        if (name === "class") node.className = value;
+        else if (name === "style") node.style.cssText = value;
+        else node.setAttribute(name, value === true ? "" : value);
+      }
+      for (const child of children.flat(Infinity)) {
+        if (child === null || child === undefined || child === false) continue;
+        node.append(child instanceof Node ? child : String(child));
+      }
+      return node;
+    }
+
+    function table(headers, rows, { numeric = [] } = {}) {
+      const cls = (i) => (numeric.includes(i) ? "num" : undefined);
+      return el("div", { class: "table-scroll" },
+        el("table", {},
+          el("thead", {}, el("tr", {}, headers.map((h, i) => el("th", { class: cls(i), scope: "col" }, h)))),
+          el("tbody", {}, rows.map((row) =>
+            el("tr", { class: row.className }, (row.cells ?? row).map((c, i) => el("td", { class: cls(i) }, c)))))));
+    }
+
+    function pending() {
+      return el("p", { class: "muted" }, t("pending"));
+    }
+
+    function withCi(estimate) {
+      return `${fmt(estimate.value)} (${fmt(estimate.ci_low)} – ${fmt(estimate.ci_high)})`;
+    }
+
+    /** Table cell content: the estimate, with its CI on a second, smaller line. */
+    function ciCell(estimate) {
+      return [fmt(estimate.value), el("div", { class: "ci-sub" }, `${fmt(estimate.ci_low)} – ${fmt(estimate.ci_high)}`)];
+    }
+
     async function fetchOk(url) {
       const response = await fetch(url);
       if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
       return response;
     }
 
+    /** id -> name for every named element in a BPMN file. Used to label tables. */
+    function bpmnNames(xml) {
+      const doc = new DOMParser().parseFromString(xml, "application/xml");
+      const names = {};
+      for (const node of doc.querySelectorAll("[id][name]")) names[node.getAttribute("id")] = node.getAttribute("name");
+      return names;
+    }
+
+    // ---------- sections ----------
+
+    function header(results) {
+      const { meta } = results;
+      const date = new Intl.DateTimeFormat(TEXT.lang, { dateStyle: "medium" }).format(new Date(meta.generated_at));
+      return [
+        el("h1", {}, TEXT.title),
+        el("p", { class: "muted" }, TEXT.subtitle),
+        meta.fake ? el("p", { class: "notice" }, t("fake_notice")) : null,
+        el("p", { class: "muted small" }, t("run_summary", {
+          seed: meta.seed, replications: meta.replications, cases: meta.case_count,
+          warm_up: fmt(meta.warm_up, 0), version: meta.parameter_version, date,
+        })),
+      ];
+    }
+
+    function prose(key) {
+      const section = TEXT.sections[key];
+      return [el("h2", { id: key }, section.heading), section.paragraphs.map((p) => el("p", {}, p))];
+    }
+
+    function diagramBlock(caption) {
+      const canvas = el("div", { class: "diagram", role: "img", "aria-label": caption });
+      return { canvas, node: el("figure", { style: "margin:16px 0" },
+        el("div", { class: "diagram-scroll" }, canvas),
+        el("figcaption", { class: "diagram-caption muted small" }, caption)) };
+    }
+
+    function lintBlock(lint, names) {
+      if (lint === undefined) return el("p", { class: "muted small" }, `${t("lint")}: ${t("lint_not_checked")}`);
+      if (lint.length === 0) return el("p", { class: "small" }, `${t("lint")}: ${t("lint_clean")}`);
+      const severity = { error: t("severity_error"), warning: t("severity_warning") };
+      return [
+        el("h3", {}, t("lint")),
+        table([t("lint_rule"), t("lint_element"), t("lint_message")], lint.map((v) => [
+          `${v.rule} (${severity[v.severity]})`,
+          v.element_id ? (names[v.element_id] ?? v.element_id) : "",
+          v.message,
+        ])),
+      ];
+    }
+
+    function vaLabels() {
+      return { VA: t("va_VA"), BVA: t("va_BVA"), NVA: t("va_NVA") };
+    }
+
+    function asIsSection(results, names, diagram) {
+      const b = results.baseline;
+      const out = [prose("as_is"), diagram.node];
+
+      if (results.value_added) {
+        const labels = vaLabels();
+        out.push(el("ul", { class: "legend", "aria-label": t("value_added") },
+          ["VA", "BVA", "NVA"].map((c) => el("li", {},
+            el("span", { class: "swatch", style: `background: var(--va-${c})` }), labels[c]))));
+      }
+      out.push(lintBlock(results.models.as_is.lint, names));
+
+      const tile = (label, stats) => stats
+        ? el("div", { class: "tile" }, el("dt", {}, label),
+            el("dd", {}, fmt(stats.mean), " ", el("span", {}, t("days")),
+              el("div", { class: "sub" }, `${t("median")} ${fmt(stats.median)} · ${t("p90")} ${fmt(stats.p90)}`)))
+        : null;
+      out.push(el("dl", { class: "tiles" },
+        tile(t("cycle_time"), b.cycle_time),
+        tile(t("processing_time"), b.processing_time),
+        tile(t("waiting_time"), b.waiting_time),
+        b.cycle_time_efficiency === undefined ? null
+          : el("div", { class: "tile" }, el("dt", {}, t("cycle_time_efficiency")),
+              el("dd", {}, NUM(0, "percent").format(b.cycle_time_efficiency)))));
+
+      out.push(el("h3", {}, t("flow_analysis")));
+      if (b.flow_analysis) {
+        const { theoretical, simulated } = b.flow_analysis;
+        out.push(table([t("flow_theoretical"), t("flow_simulated"), t("flow_difference")],
+          [[fmt(theoretical), fmt(simulated), NUM(1, "percent").format((simulated - theoretical) / theoretical)]],
+          { numeric: [0, 1, 2] }));
+      } else out.push(pending());
+
+      out.push(el("h3", {}, t("waiting_by_activity")));
+      out.push(b.waiting_by_activity
+        ? bars(b.waiting_by_activity.map((w) => [names[w.activity_id] ?? w.activity_id, w.mean]), t("mean_waiting"))
+        : pending());
+
+      out.push(el("h3", {}, t("rework")));
+      out.push(b.rework
+        ? table([t("gateway"), t("rework_rate")],
+            b.rework.map((r) => [names[r.gateway_id] ?? r.gateway_id, NUM(0, "percent").format(r.rate)]), { numeric: [1] })
+        : pending());
+
+      out.push(el("h3", {}, t("value_added")));
+      if (results.value_added) {
+        const labels = vaLabels();
+        out.push(table([t("activity"), t("va_class"), t("va_reason")],
+          Object.entries(results.value_added).map(([id, v]) => [names[id] ?? id, labels[v.class], v.reason])));
+      } else out.push(pending());
+      return out;
+    }
+
+    /** Horizontal bars, one hue, value at the end of each bar. rows: [label, value]. */
+    function bars(rows, valueLabel, digits = 1) {
+      const max = Math.max(...rows.map(([, v]) => v), 0) || 1;
+      // Leave 48px at the right for the value label.
+      const length = (value) => `max(0px, calc(${(value / max) * 100}% - 48px))`;
+      return el("div", { class: "bars", role: "group", "aria-label": valueLabel },
+        rows.map(([label, value]) => [
+          el("div", {}, label),
+          el("div", { class: "bar-track bar-row", title: `${label}: ${fmt(value, digits)}` },
+            el("div", { class: "bar", style: `width: ${length(value)}` }),
+            el("span", { class: "bar-value", style: `left: ${length(value)}` }, fmt(value, digits))),
+        ]));
+    }
+
+    function mlSection(results, names) {
+      const out = [prose("ml")];
+      const ml = results.ml;
+      if (!ml) return [...out, pending()];
+      out.push(el("p", { class: "muted small" }, t("ml_split", { train: fmt(ml.split.train_share * 100, 0) })));
+
+      const features = TEXT.features ?? {};
+      for (const task of ml.tasks) {
+        const regression = task.kind === "regression";
+        const modelLabel = {
+          reference: regression ? t("model_reference_regression") : t("model_reference_classification"),
+          linear: regression ? t("model_linear_regression") : t("model_linear_classification"),
+          gradient_boosting: t("model_gradient_boosting"),
+        };
+        const metricKeys = regression ? ["mae", "r2"] : ["roc_auc", "f1"];
+        const metricLabel = { mae: t("metric_mae"), r2: t("metric_r2"), roc_auc: t("metric_roc_auc"), f1: t("metric_f1") };
+        const title = regression ? t("ml_task_cycle_time")
+          : t("ml_task_rework", { gateway: names[task.gateway_id] ?? task.gateway_id });
+
+        out.push(el("h3", {}, title));
+        out.push(table([t("ml_model"), ...metricKeys.map((k) => metricLabel[k])],
+          task.models.map((m) => ({
+            className: m.id === "reference" ? "reference" : undefined,
+            cells: [modelLabel[m.id], ...metricKeys.map((k) => fmt(m.metrics[k], 2))],
+          })), { numeric: [1, 2] }));
+        out.push(el("p", { class: "small muted" }, `${t("drivers")} (${t("mean_abs_shap")})`));
+        out.push(bars(task.drivers.map((d) => [features[d.feature] ?? d.feature, d.mean_abs_shap]),
+          t("mean_abs_shap"), regression ? 1 : 2));
+      }
+      return out;
+    }
+
+    function redesignSection(results, names, diagram) {
+      const out = [prose("redesign")];
+      out.push(diagram ? diagram.node : el("p", { class: "muted" }, t("to_be_missing")));
+      if (results.models.to_be) out.push(lintBlock(results.models.to_be.lint, names));
+
+      out.push(el("h3", {}, t("change_catalog")));
+      if (!results.changes) return [...out, pending()];
+      const effect = { better: t("effect_better"), worse: t("effect_worse"), neutral: t("effect_neutral") };
+      const dims = { time: t("dq_time"), cost: t("dq_cost"), quality: t("dq_quality"), flexibility: t("dq_flexibility") };
+      out.push(el("div", { class: "cards" }, results.changes.map((c) =>
+        el("article", { class: "card" },
+          el("h3", {}, `${c.id}. ${c.title}`),
+          el("dl", {},
+            el("dt", {}, t("driver")), el("dd", {}, c.driver),
+            el("dt", {}, t("heuristic")), el("dd", {}, `${c.heuristic.name} (${c.heuristic.ref})`),
+            el("dt", {}, t("expected_effect")), el("dd", {}, c.expected_effect),
+            el("dt", {}, t("trade_off")),
+            el("dd", {},
+              el("div", { class: "dq" }, Object.entries(dims).map(([k, label]) => el("span", {}, `${label}: ${effect[c.trade_off[k]]}`))),
+              c.trade_off.note ? el("div", { class: "muted" }, c.trade_off.note) : null))))));
+      return out;
+    }
+
+    function evaluationSection(results) {
+      const out = [prose("evaluation")];
+      const { changes, scenarios } = results;
+      if (!changes || !scenarios) return [...out, pending()];
+
+      const ids = changes.map((c) => c.id);
+      const keyOf = (set) => ids.filter((id) => set.has(id)).join("|");
+      const byKey = new Map(scenarios.map((s) => [keyOf(new Set(s.changes)), s]));
+      const asIs = byKey.get("");
+      const selected = new Set();
+
+      const result = el("div", {});
+      const render = () => {
+        const s = byKey.get(keyOf(selected));
+        if (!s) { result.replaceChildren(el("p", { class: "muted" }, t("scenario_missing"))); return; }
+        const stats = [["mean", t("mean")], ["median", t("median")], ["p90", t("p90")]];
+        const all = [asIs, s].flatMap((x) => [x.cycle_time.mean.ci_low, x.cycle_time.mean.ci_high]);
+        const lo = Math.min(...all) * 0.95, hi = Math.max(...all) * 1.02;
+        const pos = (v) => `${((v - lo) / (hi - lo)) * 100}%`;
+        const ciRow = (label, e, cls) => [
+          el("div", {}, label),
+          el("div", { class: `ci-track ${cls}`, title: `${label}: ${withCi(e)} ${t("days")}` },
+            el("div", { class: "ci-range", style: `left:${pos(e.ci_low)}; width:calc(${pos(e.ci_high)} - ${pos(e.ci_low)})` }),
+            el("div", { class: "ci-dot", style: `left:${pos(e.value)}` })),
+        ];
+        result.replaceChildren(
+          table([t("cycle_time"), `${t("scenario_as_is")} (${t("ci")})`, `${t("scenario_selected")} (${t("ci")})`],
+            stats.map(([k, label]) => [label, ciCell(asIs.cycle_time[k]), ciCell(s.cycle_time[k])]), { numeric: [1, 2] }),
+          el("div", { class: "ci-plot", "aria-hidden": "true" },
+            ciRow(t("scenario_as_is"), asIs.cycle_time.mean, "as-is"),
+            ciRow(t("scenario_selected"), s.cycle_time.mean, "")),
+          el("div", { class: "tiles" }, el("div", { class: "tile" },
+            el("dt", {}, `${t("saving")} (${t("mean")}, ${t("ci")})`),
+            el("dd", {}, fmt(s.saving.value), " ", el("span", {}, t("days")),
+              el("div", { class: "sub" }, `${fmt(s.saving.ci_low)} – ${fmt(s.saving.ci_high)}`)))),
+        );
+      };
+
+      out.push(el("fieldset", { class: "toggles" },
+        el("legend", {}, t("toggles")),
+        changes.map((c) => {
+          const box = el("input", { type: "checkbox", value: c.id });
+          box.addEventListener("change", () => { box.checked ? selected.add(c.id) : selected.delete(c.id); render(); });
+          return el("label", {}, box, el("span", {}, `${c.id}. ${c.title}`));
+        })));
+      out.push(result);
+      render();
+
+      // Ablation, derived from the full factorial: each change alone, and the full design without it.
+      const full = byKey.get(keyOf(new Set(ids)));
+      out.push(el("h3", {}, t("ablation")));
+      out.push(table([t("change_id"), `${t("ablation_alone")} (${t("ci")})`, t("ablation_full_minus")],
+        changes.map((c) => {
+          const alone = byKey.get(keyOf(new Set([c.id])));
+          const without = byKey.get(keyOf(new Set(ids.filter((id) => id !== c.id))));
+          return [`${c.id}. ${c.title}`, alone ? ciCell(alone.saving) : "", full && without ? fmt(full.saving.value - without.saving.value) : ""];
+        }), { numeric: [1, 2] }));
+      return out;
+    }
+
+    function assumptionsSection(results) {
+      const out = [prose("assumptions")];
+      out.push(el("h3", {}, t("assumptions")));
+      out.push(results.assumptions
+        ? table([t("parameter"), t("value"), t("rationale")],
+            results.assumptions.map((a) => [el("code", {}, a.parameter), typeof a.value === "number" ? fmt(a.value, Number.isInteger(a.value) ? 0 : 2) : a.value, a.rationale]))
+        : pending());
+      out.push(el("h3", {}, t("threats")));
+      out.push(results.threats
+        ? el("ul", { class: "threats" }, results.threats.map((x) => el("li", {}, el("strong", {}, x.title), ". ", x.detail)))
+        : pending());
+      return out;
+    }
+
+    // ---------- diagrams ----------
+
+    async function drawDiagram(diagram, xml, valueAdded) {
+      try {
+        const viewer = new BpmnJS({ container: diagram.canvas });
+        await viewer.importXML(xml);
+        const canvas = viewer.get("canvas");
+        canvas.zoom("fit-viewport");
+        const registry = viewer.get("elementRegistry");
+        for (const [id, v] of Object.entries(valueAdded ?? {})) {
+          if (registry.get(id)) canvas.addMarker(id, `va-${v.class}`);
+        }
+      } catch (err) {
+        diagram.canvas.replaceChildren(el("p", { style: "padding:12px", class: "small" }, t("diagram_error", { error: err.message })));
+      }
+    }
+
+    // ---------- main ----------
+
     async function main() {
-      const results = await (await fetchOk("results.json")).json();
-      const { cycle_time, time_unit } = results.baseline;
+      const resultsUrl = new URL(new URLSearchParams(location.search).get("results") ?? "results.json", location.href);
+      const results = await (await fetchOk(resultsUrl)).json();
+      TEXT = results.text;
+      const formats = new Map();
+      NUM = (digits, style = "decimal") => {
+        const key = `${digits}/${style}`;
+        if (!formats.has(key)) formats.set(key, new Intl.NumberFormat(TEXT.lang, { style, minimumFractionDigits: digits, maximumFractionDigits: digits }));
+        return formats.get(key);
+      };
+      document.documentElement.lang = TEXT.lang;
+      document.title = TEXT.title;
 
-      document.getElementById("cases").textContent = results.meta.case_count;
-      const value = document.getElementById("cycle-time");
-      value.textContent = cycle_time.mean.toFixed(1) + " ";
-      value.append(Object.assign(document.createElement("span"), { textContent: time_unit }));
+      const modelUrl = (model) => new URL(model.bpmn, resultsUrl);
+      const asIsXml = await (await fetchOk(modelUrl(results.models.as_is))).text();
+      const toBeXml = results.models.to_be ? await (await fetchOk(modelUrl(results.models.to_be))).text() : null;
+      const asIsNames = bpmnNames(asIsXml);
+      const toBeNames = toBeXml ? bpmnNames(toBeXml) : {};
 
-      const xml = await (await fetchOk(results.models.as_is.bpmn)).text();
-      const viewer = new BpmnJS({ container: "#diagram" });
-      await viewer.importXML(xml);
-      viewer.get("canvas").zoom("fit-viewport");
+      const asIsDiagram = diagramBlock(t("as_is_model"));
+      const toBeDiagram = toBeXml ? diagramBlock(t("to_be_model")) : null;
+
+      document.getElementById("page").append(
+        ...[
+          header(results),
+          prose("problem"),
+          asIsSection(results, asIsNames, asIsDiagram),
+          mlSection(results, asIsNames),
+          redesignSection(results, toBeNames, toBeDiagram),
+          evaluationSection(results),
+          assumptionsSection(results),
+        ].flat(Infinity).filter(Boolean),
+      );
+
+      await drawDiagram(asIsDiagram, asIsXml, results.value_added);
+      if (toBeDiagram) await drawDiagram(toBeDiagram, toBeXml, null);
     }
 
     main().catch((err) => {
+      // No wording here: if the results file itself didn't load, there is no text to show.
       const box = document.getElementById("error");
       box.hidden = false;
-      box.textContent = `Could not load the results: ${err.message}. Serve this folder with a static server (e.g. python -m http.server); opening the file directly doesn't work.`;
+      box.textContent = `${err.name}: ${err.message}`;
+      console.error(err);
     });
   </script>
 </body>
