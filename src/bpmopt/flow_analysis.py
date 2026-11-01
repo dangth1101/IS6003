@@ -42,6 +42,12 @@ class _Reducer:
         self.loops = _find_loops(model)  # loop split ID -> loop
         self.loop_joins = {loop.join for loop in self.loops.values()}
 
+    def probabilities(self, split_id: str) -> dict[str, float]:
+        branches = self.params.branch_probabilities[split_id]
+        if branches.depends_on_attributes:
+            raise ValueError(f"{split_id}: branch probabilities depend on case attributes, flow analysis needs fixed ones")
+        return branches.probabilities({})
+
     def fragment(self, flow: Flow) -> tuple[float, Flow]:
         """CT of the fragment entered by `flow`, up to the first join or end event.
 
@@ -73,7 +79,7 @@ class _Reducer:
         if join is None or join.element_type != split.element_type or not _is_join(self.model, join):
             raise ValueError(f"{split.id}: branches don't meet at one join of the same type, the model is not block-structured")
         if split.element_type == "exclusiveGateway":
-            probabilities = self.params.branch_probabilities[split.id]
+            probabilities = self.probabilities(split.id)
             ct = sum(probabilities[flow.id] * branch_ct for flow, branch_ct, _ in branches)
         elif split.element_type == "parallelGateway":
             ct = max(branch_ct for _, branch_ct, _ in branches)
@@ -90,7 +96,7 @@ class _Reducer:
         exits = [f for f in self.model.outgoing(loop.split) if f.id != loop.back.id]
         if len(exits) != 1:
             raise ValueError(f"{loop.split}: a rework split needs exactly one exit arc, found {len(exits)}")
-        r = self.params.branch_probabilities[loop.split][loop.back.id]
+        r = self.probabilities(loop.split)[loop.back.id]
         if r >= 1:
             raise ValueError(f"{loop.split}: rework probability {r} never leaves the loop")
         back_ct = sum(self.params.task_durations[task].mean for task in loop.back_tasks)

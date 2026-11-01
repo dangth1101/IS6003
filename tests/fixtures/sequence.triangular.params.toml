@@ -1,0 +1,15 @@
+# sequence.bpmn with triangular durations. Means: 2, 6 and 3 days, so 11 days in all.
+
+version = "fixture-1"
+
+[tasks.Task_WriteSpec]
+duration = { triangular = [1.0, 2.0, 3.0] }
+rationale = "Fixture value."
+
+[tasks.Task_BuildApp]
+duration = { triangular = [3.0, 5.0, 10.0] }
+rationale = "Fixture value."
+
+[tasks.Task_TestApp]
+duration = { triangular = [1.0, 2.0, 6.0] }
+rationale = "Fixture value."
