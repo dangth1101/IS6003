@@ -22,4 +22,4 @@
 - A gateway where the training or test cases are all one class raises `ValueError` naming the gateway, instead of writing a meaningless AUC. If the as-is model has a rarely reached gateway, 14 may hit this.
 - The split is 11's `chronological_split`, tested in `test_features.py`. No separate test here.
 - Seen on the fixture: the continuous noise attribute `workload` gets about 0.2 to 0.3 mean |SHAP| even where nothing drives rework. Worth a line in 14 when reading small drivers.
-- Fixed in passing: `test_ml.py` called `build_results` without `model=` (08 made it required), which broke the suite on `bpmn-time-optimization` after the 11 merge.
+- `test_ml.py` called `build_results` without `model=` after the 11 merge. I fixed it here, and the branch fixed it too in the meantime; the merge kept the branch's version.

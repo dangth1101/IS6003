@@ -1,0 +1,36 @@
+# Change catalog for sequence.bpmn: two parameter-only changes (C1, C3) and one structural change (C2).
+
+version = "fixture-1"
+
+[changes.C1]
+title = "Start every build from a project template"
+driver = "Build application is the longest task."
+heuristic = { name = "Activity automation", ref = "Appendix A.6" }
+expected_effect = "Build application takes 2 days less in every case."
+trade_off = { time = "better", cost = "worse", quality = "neutral", flexibility = "worse", note = "The template needs upkeep and fits unusual projects less well." }
+
+[changes.C1.overrides.tasks.Task_BuildApp]
+duration = { triangular = [1.0, 3.0, 8.0] }
+rationale = "The as-is duration shifted down by 2 days."
+
+[changes.C2]
+title = "Drop the separate specification step"
+driver = "Write specification adds a step before any build work starts."
+heuristic = { name = "Activity elimination", ref = "Appendix A.2" }
+expected_effect = "Saves the time spent writing the specification, 2 days on average."
+trade_off = { time = "better", cost = "better", quality = "worse", flexibility = "neutral", note = "Requirements get clarified during the build, so more of them are found late." }
+
+[changes.C3]
+title = "Add a third developer"
+driver = "Tasks wait for a free developer."
+heuristic = { name = "Extra resources", ref = "Appendix A.4" }
+expected_effect = "Less waiting for a developer."
+trade_off = { time = "better", cost = "worse", quality = "neutral", flexibility = "better", note = "One more salary." }
+
+[changes.C3.overrides.lanes.Lane_Dev]
+capacity = 3
+rationale = "One developer more than the as-is team."
+
+# Structural changes: the model each combination of them runs on.
+[models]
+C2 = "sequence_without_spec.bpmn"

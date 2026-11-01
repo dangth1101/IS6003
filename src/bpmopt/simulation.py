@@ -84,8 +84,8 @@ def _arrivals(
 
     Random streams are separate so a design change in one case doesn't shift the
     draws of the others (common random numbers): one generator for interarrival
-    times, one per case for task durations, one per case and XOR-split for
-    branch choices (see _BranchDraws), and one per case and attribute.
+    times, one per case and task for durations, one per case and XOR-split
+    for branch choices (see _Streams), and one per case and attribute.
 
     Returns the number of warm-up cases. Arrival times only grow, so those are
     the cases with the lowest IDs.
@@ -102,7 +102,7 @@ def _arrivals(
             model,
             params,
             case_id,
-            rng=np.random.default_rng([seed, 1, case_id]),
+            durations=_Streams(seed, 1, case_id),
             branches=_BranchDraws(seed, case_id),
             attributes=_draw_attributes(params, seed, case_id),
             rows=rows,
@@ -123,7 +123,7 @@ class _Case:
     model: ProcessModel
     params: Parameters
     case_id: int
-    rng: np.random.Generator  # durations
+    durations: "_Streams"  # one stream per task
     branches: "_BranchDraws"
     attributes: dict[str, AttributeValue]  # drawn at arrival, repeated on every log row
     rows: list[dict]
@@ -153,7 +153,7 @@ def _move_token(case: _Case, node: Node) -> Generator[simpy.Event, object, Node 
                 return None
         elif node.element_type == "task":
             ready = env.now
-            start_time = yield from _perform_task(env, node, case.params, case.rng, case.pools.get(node.lane))
+            start_time = yield from _perform_task(env, node, case.params, case.durations[node.id], case.pools.get(node.lane))
             case.rows.append(_row(case, node, ready, start_time, env.now))
         elif node.element_type == "exclusiveGateway" and len(outgoing) > 1:
             flow = case.branches.choose(node.id, outgoing, case.params, case.attributes)
@@ -178,19 +178,34 @@ def _move_token(case: _Case, node: Node) -> Generator[simpy.Event, object, Node 
         node = model.nodes[outgoing[0].target]
 
 
+class _Streams:
+    """Random streams of one case, one per element (task or XOR-split), made on first use.
+
+    Keyed by element ID, not by draw order, so adding or removing a task or a
+    gateway elsewhere doesn't change what this case draws for the others. That
+    keeps common random numbers between designs (ticket 13). A task that runs
+    again in a rework loop takes the next draw from its own stream.
+    """
+
+    def __init__(self, seed: int, kind: int, case_id: int):
+        self._key = [seed, kind, case_id]
+        self._rngs: dict[str, np.random.Generator] = {}
+
+    def __getitem__(self, element_id: str) -> np.random.Generator:
+        if element_id not in self._rngs:
+            self._rngs[element_id] = np.random.default_rng([*self._key, zlib.crc32(element_id.encode())])
+        return self._rngs[element_id]
+
+
 class _BranchDraws:
     """Branch choices of one case, with one random stream per XOR-split.
 
-    Keyed by gateway ID, not by draw order, so adding or removing a task or a
-    gateway elsewhere doesn't change which branch this case takes here. That
-    keeps common random numbers between designs (ticket 13). Each choice uses one
-    uniform draw against the cumulative probabilities, so a small change in a
-    probability only flips the cases near the boundary.
+    Each choice uses one uniform draw against the cumulative probabilities, so a
+    small change in a probability only flips the cases near the boundary.
     """
 
     def __init__(self, seed: int, case_id: int):
-        self._key = [seed, 2, case_id]
-        self._rngs: dict[str, np.random.Generator] = {}
+        self._streams = _Streams(seed, 2, case_id)
 
     def choose(self, gateway_id: str, outgoing: list[Flow], params: Parameters, attributes: dict[str, AttributeValue]) -> Flow:
         """Pick an outgoing flow of the XOR-split.
@@ -198,9 +213,7 @@ class _BranchDraws:
         Probabilities can depend on the case attributes (logistic branches).
         """
         probabilities = params.branch_probabilities[gateway_id].probabilities(attributes)
-        if gateway_id not in self._rngs:
-            self._rngs[gateway_id] = np.random.default_rng([*self._key, zlib.crc32(gateway_id.encode())])
-        u = self._rngs[gateway_id].random()
+        u = self._streams[gateway_id].random()
         cumulative = 0.0
         for flow in outgoing:
             cumulative += probabilities[flow.id]
