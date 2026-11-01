@@ -58,7 +58,8 @@ def test_each_model_is_reported_next_to_the_reference(task):
 
 def test_ml_section_validates_against_the_schema(tmp_path, planted_log, task, fixtures_dir):
     params = load_parameters(fixtures_dir / "rework_with_activity.ml.params.toml")
-    results = build_results(log=planted_log, params=params, seed=7)
+    model = read_bpmn(fixtures_dir / "rework_with_activity.bpmn")
+    results = build_results(log=planted_log, params=params, model=model, seed=7)
     results["ml"] = ml_section([task])
 
     path = export_results(results, tmp_path, models={"as_is": fixtures_dir / "rework_with_activity.bpmn"})

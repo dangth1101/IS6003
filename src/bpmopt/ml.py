@@ -13,8 +13,9 @@ Every task follows the same recipe:
   label attribute becomes several one-hot columns; their SHAP values are added
   per case (SHAP values are additive), so each driver is one attribute.
 
-Task A, cycle time, is cycle_time_task. ml_section wraps tasks into the `ml`
-section of the results file.
+Task A, cycle time, is cycle_time_task. Task B, rework, is rework_tasks: one
+classifier per rework gateway. ml_section wraps tasks into the `ml` section of
+the results file.
 """
 
 from dataclasses import dataclass
@@ -23,15 +24,17 @@ import numpy as np
 import pandas as pd
 import shap
 from sklearn.compose import ColumnTransformer
-from sklearn.dummy import DummyRegressor
-from sklearn.ensemble import HistGradientBoostingRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.dummy import DummyClassifier, DummyRegressor
+from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.metrics import f1_score, mean_absolute_error, r2_score, roc_auc_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
 from bpmopt.analysis import cycle_times
+from bpmopt.bpmn import ProcessModel
 from bpmopt.features import case_features, chronological_split
+from bpmopt.flow_analysis import loop_back_flows
 
 TRAIN_SHARE = 0.8
 
@@ -76,6 +79,75 @@ def cycle_time_task(log: pd.DataFrame, *, seed: int) -> dict:
     }
 
 
+def rework_tasks(log: pd.DataFrame, model: ProcessModel, *, seed: int) -> list[dict]:
+    """Task B: per rework gateway, predict whether a case loops back at least once.
+
+    One classification task per rework gateway of the model, in model order, with
+    id `rework_<gateway_id>`. Only cases that reached the gateway are used.
+    Reports ROC-AUC and F1 on the test cases for the reference (majority class),
+    logistic regression and gradient boosting, and the drivers ranked by mean
+    |SHAP| of the gradient boosting model, in log-odds.
+
+    Class imbalance: rework is usually the minority class. Both real models use
+    class_weight="balanced", so each class weighs the same in training. Without
+    it, a gateway where no group of cases reworks more often than not gets a model
+    that never predicts rework, and F1 0 at the default 0.5 threshold. ROC-AUC
+    doesn't depend on the threshold. The reference stays unweighted on purpose:
+    it shows what always guessing the majority class scores.
+    """
+    tasks = []
+    for gateway_id, target in rework_targets(log, model).items():
+        data = training_data(log, target)
+        if data.y_train.nunique() < 2 or data.y_test.nunique() < 2:
+            raise ValueError(
+                f"{gateway_id}: the training and the test cases both need cases that loop back and cases that don't"
+            )
+        models = {
+            "reference": DummyClassifier(strategy="most_frequent"),
+            "linear": Pipeline(
+                [("encode", encoder(data.x_train)), ("model", LogisticRegression(class_weight="balanced", max_iter=1_000))]
+            ),
+            "gradient_boosting": Pipeline(
+                [
+                    ("encode", encoder(data.x_train)),
+                    ("model", HistGradientBoostingClassifier(**GRADIENT_BOOSTING, class_weight="balanced", random_state=seed)),
+                ]
+            ),
+        }
+        reported = []
+        for model_id, classifier in models.items():
+            classifier.fit(data.x_train, data.y_train)
+            metrics = {
+                "roc_auc": float(roc_auc_score(data.y_test, classifier.predict_proba(data.x_test)[:, 1])),
+                "f1": float(f1_score(data.y_test, classifier.predict(data.x_test), zero_division=0)),
+            }
+            reported.append({"id": model_id, "metrics": metrics})
+        tasks.append(
+            {
+                "id": f"rework_{gateway_id}",
+                "kind": "classification",
+                "gateway_id": gateway_id,
+                "models": reported,
+                "drivers": shap_drivers(models["gradient_boosting"], data.x_test),
+            }
+        )
+    return tasks
+
+
+def rework_targets(log: pd.DataFrame, model: ProcessModel) -> dict[str, pd.Series]:
+    """Per rework gateway: True for each case that reached it and looped back at least once.
+
+    Indexed by case_id, with only the cases that have a decision row at the
+    gateway. Same reading of the log as analysis.rework_rates.
+    """
+    decisions = log[log.element_type == "exclusiveGateway"]
+    targets = {}
+    for gateway_id, back_flow in loop_back_flows(model).items():
+        at_gateway = decisions[decisions.activity_id == gateway_id]
+        targets[gateway_id] = (at_gateway.flow_id == back_flow).groupby(at_gateway.case_id).any()
+    return targets
+
+
 @dataclass(frozen=True)
 class TrainingData:
     """Case-start attributes (x) and a per-case target (y), split chronologically."""
@@ -87,10 +159,14 @@ class TrainingData:
 
 
 def training_data(log: pd.DataFrame, target: pd.Series) -> TrainingData:
-    """Join a per-case target (indexed by case_id) to the case features and split by start time."""
+    """Join a per-case target (indexed by case_id) to the case features and split by start time.
+
+    Cases missing from the target (e.g. ones that never reached a gateway) are left out before the split.
+    """
     features = case_features(log)
     if features.columns.size == 1:
         raise ValueError("the log has no case attributes to learn from; add [attributes.*] to the parameter file")
+    features = features[features.index.isin(target.index)]
     train, test = chronological_split(features, TRAIN_SHARE)
     return TrainingData(
         x_train=train.drop(columns="start_time"),
