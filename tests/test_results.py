@@ -33,6 +33,15 @@ def test_exported_results_carry_meta_and_baseline(exported):
     assert exported["baseline"]["cycle_time"] == pytest.approx({"mean": 10.5, "median": 10.5, "p90": 10.5})
 
 
+def test_results_report_the_warm_up_from_the_parameter_file(simulate_fixture, fixtures_dir):
+    log = simulate_fixture("single_task", n_cases=60, seed=1, params="single_task.warmup")
+    params = load_parameters(fixtures_dir / "single_task.warmup.params.toml")
+
+    results = build_results(log=log, params=params, seed=1)
+
+    assert results["meta"]["warm_up"] == 50.0
+
+
 def test_exported_results_carry_the_page_text(exported):
     assert exported["text"]["lang"] == "en"
     assert exported["text"]["sections"]["problem"]["paragraphs"]

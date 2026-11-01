@@ -36,7 +36,7 @@ def build_results(*, log: pd.DataFrame, params: Parameters, seed: int, lang: str
             "seed": seed,
             "replications": 1,  # one baseline run; ticket 13 runs R replications per scenario
             "case_count": int(log.case_id.nunique()),
-            "warm_up": 0.0,  # the simulator has no warm-up yet (ticket 04)
+            "warm_up": params.warm_up,
             "parameter_version": params.version,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         },
