@@ -62,6 +62,25 @@ def test_the_empty_scenario_reproduces_the_as_is_run_exactly(load, fixtures_dir)
     assert as_is["cycle_time"]["mean"]["ci_low"] < as_is["cycle_time"]["mean"]["value"]
 
 
+def test_with_a_warm_up_every_scenario_leaves_out_the_warm_up_cases(load):
+    catalog = load("sequence.scenarios.warmup")
+    seeds = replication_seeds(5, 3)
+
+    scenarios = _by_changes(run_scenarios(catalog, n_cases=30, replications=3, seed=5))
+
+    # Changes can't touch the warm-up, so every scenario keeps it, structural ones too.
+    for combo in [(), ("C1",), ("C2",), ("C1", "C2", "C3")]:
+        model, params = catalog.resolve(combo)
+        assert params.warm_up == 100
+        logs = [simulate(model, params, n_cases=30, seed=s) for s in seeds]
+        assert all(log.case_id.nunique() == 30 and log.case_id.min() > 1 for log in logs)
+        expected = sum(mean_cycle_time(log) for log in logs) / 3
+        assert scenarios[frozenset(combo)]["cycle_time"]["mean"]["value"] == pytest.approx(expected, abs=1e-12)
+    # The warm-up changes which cases are measured, so the as-is estimate differs from a run without one.
+    without = _by_changes(run_scenarios(load("sequence.scenarios"), n_cases=30, replications=3, seed=5))
+    assert scenarios[frozenset()]["cycle_time"]["mean"]["value"] != pytest.approx(without[frozenset()]["cycle_time"]["mean"]["value"])
+
+
 def test_every_combination_of_changes_is_simulated_and_the_results_validate(load):
     catalog = load("sequence.scenarios")
     model, params = catalog.resolve([])
