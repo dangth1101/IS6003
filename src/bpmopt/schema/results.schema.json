@@ -195,12 +195,14 @@
     },
     "ml_task": {
       "type": "object",
-      "required": ["id", "kind", "models", "drivers"],
+      "description": "A fitted task has models and drivers. A rework gateway whose training or test cases all went the same way can't be fitted; its task has `skipped` with the reason instead.",
+      "required": ["id", "kind"],
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "kind": { "enum": ["regression", "classification"] },
         "gateway_id": { "type": "string", "description": "Rework gateway this classifier predicts. Classification only." },
+        "skipped": { "type": "string", "minLength": 1, "description": "Why the task wasn't fitted. Classification only." },
         "models": {
           "type": "array",
           "minItems": 1,
@@ -229,6 +231,14 @@
         }
       },
       "allOf": [
+        {
+          "if": { "required": ["skipped"] },
+          "then": {
+            "properties": { "kind": { "const": "classification" } },
+            "not": { "anyOf": [{ "required": ["models"] }, { "required": ["drivers"] }] }
+          },
+          "else": { "required": ["models", "drivers"] }
+        },
         {
           "if": { "properties": { "kind": { "const": "regression" } } },
           "then": {
@@ -350,7 +360,7 @@
         "lint", "lint_clean", "lint_not_checked", "lint_rule", "lint_element", "lint_message", "severity_error", "severity_warning",
         "mean", "median", "p90", "ci",
         "cycle_time", "processing_time", "waiting_time", "cycle_time_efficiency", "days",
-        "rework", "gateway", "rework_rate", "waiting_by_activity", "activity", "mean_waiting",
+        "rework", "gateway", "gateway_after", "rework_rate", "waiting_by_activity", "activity", "mean_waiting",
         "flow_analysis", "flow_theoretical", "flow_simulated", "flow_difference",
         "value_added", "va_class", "va_reason", "va_VA", "va_BVA", "va_NVA",
         "ml_split", "ml_task_cycle_time", "ml_task_rework", "ml_model", "model_reference_regression", "model_reference_classification",

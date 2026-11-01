@@ -7,6 +7,7 @@ proposal loop is a fixed 25%, and 15% of cases are rejected before testing.
 import json
 from pathlib import Path
 
+import jsonschema
 import pytest
 
 from bpmopt.bpmn import read_bpmn
@@ -97,13 +98,49 @@ def test_rework_and_cycle_time_sit_side_by_side_in_the_ml_section(tmp_path, plan
     ]
 
 
-def test_a_gateway_that_never_loops_back_is_refused_with_a_clear_message(tmp_path, model):
+@pytest.fixture(scope="module")
+def never_fails(tmp_path_factory, model):
+    """The proposal_rejected fixture with a test loop that never sends work back."""
     text = (FIXTURES / "proposal_rejected.ml.params.toml").read_text()
     never_fails = text.replace(
         "Flow_Failed = { logistic = { intercept = -4.5, complexity = 1.2 } }", "Flow_Failed = 0.0"
     ).replace('Flow_Passed = "rest"', "Flow_Passed = 1.0")
-    (tmp_path / "never_fails.toml").write_text(never_fails)
-    log = simulate(model, load_parameters(tmp_path / "never_fails.toml"), n_cases=200, seed=1)
+    path = tmp_path_factory.mktemp("never_fails") / "never_fails.toml"
+    path.write_text(never_fails)
+    params = load_parameters(path)
+    return params, simulate(model, params, n_cases=400, seed=1)
 
-    with pytest.raises(ValueError, match="Gateway_TestSplit"):
-        rework_tasks(log, model, seed=1)
+
+def test_a_gateway_that_never_loops_back_is_skipped_with_the_reason(never_fails, model):
+    _, log = never_fails
+
+    tasks = {task["gateway_id"]: task for task in rework_tasks(log, model, seed=1)}
+
+    skipped = tasks["Gateway_TestSplit"]
+    assert skipped["id"] == "rework_Gateway_TestSplit"
+    assert "models" not in skipped and "drivers" not in skipped
+    assert "loop back" in skipped["skipped"]
+    # One gateway without both classes doesn't stop the others.
+    assert "skipped" not in tasks["Gateway_ReviewSplit"]
+    assert tasks["Gateway_ReviewSplit"]["drivers"]
+
+
+def test_a_skipped_gateway_still_validates_in_the_results(tmp_path, never_fails, model):
+    params, log = never_fails
+    results = build_results(log=log, params=params, model=model, seed=1)
+    results["ml"] = ml_section([cycle_time_task(log, seed=1), *rework_tasks(log, model, seed=1)])
+
+    path = export_results(results, tmp_path, models={"as_is": FIXTURES / "proposal_rejected.bpmn"})
+
+    validate_results(json.loads(path.read_text()))
+
+
+def test_a_skipped_task_cannot_also_carry_models(tmp_path, never_fails, model):
+    params, log = never_fails
+    results = build_results(log=log, params=params, model=model, seed=1)
+    tasks = rework_tasks(log, model, seed=1)
+    fitted = next(t for t in tasks if "skipped" not in t)
+    results["ml"] = ml_section([{**fitted, "skipped": "made up"}])
+
+    with pytest.raises(jsonschema.ValidationError):
+        validate_results({**results, "models": {"as_is": {"bpmn": "models/as_is.bpmn"}}})

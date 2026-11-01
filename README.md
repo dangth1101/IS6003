@@ -9,7 +9,8 @@ Plan: `PLAN.md`. Spec and tickets: `.scratch/bpmn-time-optimization/`.
 - `src/bpmopt/schema/results.schema.json`: the results contract between the notebook and the page
 - `src/bpmopt/content/page.en.toml`: all page text, copied into every results file
 - `tests/`: pytest suite, fixture models in `tests/fixtures/`
-- `notebooks/time_optimization.ipynb`: runs the whole path and writes `web/results.json`
+- `notebooks/time_optimization.ipynb`: runs the whole as-is path (lint, simulation, baseline, value-added, ML, drivers vs planted effects) and writes `web/results.json`, plus the event log as CSV in `notebooks/output/` (not committed)
+- `docs/analysis/phase1-qualitative.md`: Phase 1 draft (value-added, waste, issue register, objective), awaiting the student's review
 - `web/`: the static page, `results.json` and the BPMN models it shows
 - `web/fixtures/`: a fake results file with every section filled, and its models, for building the page
 
@@ -35,6 +36,8 @@ python3 -m venv .venv
 cd notebooks && ../.venv/bin/jupyter execute time_optimization.ipynb   # regenerate web/results.json
 cd web && ../.venv/bin/python -m http.server 8000             # page at http://localhost:8000
 ```
+
+`export_results` lints every model it copies, so the page shows the rule check for each. A rework gateway whose training or test cases all went the same way isn't fitted; its ML task carries `skipped` with the reason instead of scores, and the run goes on.
 
 The page needs a static server. Opening `index.html` as a file doesn't work, because browsers block file fetches.
 

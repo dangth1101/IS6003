@@ -106,6 +106,28 @@ def test_export_copies_the_model_next_to_the_results(exported, tmp_path, fixture
     assert copied.read_bytes() == (fixtures_dir / "sequence.bpmn").read_bytes()
 
 
+def test_export_lints_each_model(exported, tmp_path, simulate_fixture, fixtures_dir):
+    # A clean model gets an empty list ("checked, clean"), not a missing one ("not checked").
+    assert exported["models"]["as_is"]["lint"] == []
+
+    log = simulate_fixture("sequence", n_cases=10, seed=3)
+    params = load_parameters(fixtures_dir / "sequence.params.toml")
+    results = build_results(log=log, model=read_bpmn(fixtures_dir / "sequence.bpmn"), params=params, seed=3)
+    path = export_results(
+        results,
+        tmp_path / "with_violations",
+        models={"as_is": fixtures_dir / "sequence.bpmn", "to_be": fixtures_dir / "lint/event_labels.bpmn"},
+    )
+
+    lint = json.loads(path.read_text())["models"]["to_be"]["lint"]
+    assert {(v["rule"], v["element_id"]) for v in lint} == {
+        ("EVENT-LABEL", "Start_Unlabeled"),
+        ("EVENT-LABEL", "End_Generic"),
+        ("EVENT-LABEL", "End_NoObject"),
+    }
+    assert all(v["severity"] == "error" and v["message"] for v in lint)
+
+
 def test_results_without_a_baseline_are_rejected(exported):
     del exported["baseline"]
 
