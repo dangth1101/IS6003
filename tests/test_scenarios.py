@@ -69,7 +69,8 @@ def test_the_empty_scenario_reproduces_the_as_is_run_exactly(load, fixtures_dir)
 
 def test_every_combination_of_changes_is_simulated_and_the_results_validate(load):
     catalog = load("sequence.scenarios")
-    log = simulate(*catalog.resolve([]), n_cases=30, seed=5)
+    model, params = catalog.resolve([])
+    log = simulate(model, params, n_cases=30, seed=5)
 
     scenarios = run_scenarios(catalog, n_cases=30, replications=3, seed=5)
 
@@ -77,7 +78,7 @@ def test_every_combination_of_changes_is_simulated_and_the_results_validate(load
     assert {frozenset(s["changes"]) for s in scenarios} == {
         frozenset(c) for c in [(), ("C1",), ("C2",), ("C3",), ("C1", "C2"), ("C1", "C3"), ("C2", "C3"), ("C1", "C2", "C3")]
     }
-    results = build_results(log=log, params=catalog.resolve([])[1], seed=5)
+    results = build_results(log=log, model=model, params=params, seed=5)
     results |= {"models": {"as_is": {"bpmn": "models/as_is.bpmn"}}, "changes": catalog.entries(), "scenarios": scenarios}
     validate_results(results)
 
