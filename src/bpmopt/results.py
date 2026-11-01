@@ -6,7 +6,11 @@ notebook and the page. Every export is validated against it.
 
 import json
 import shutil
+import tomllib
+from collections import Counter
+from collections.abc import Iterator
 from datetime import UTC, datetime
+from itertools import combinations
 from functools import cache
 from importlib import resources
 from pathlib import Path
@@ -14,27 +18,40 @@ from pathlib import Path
 import jsonschema
 import pandas as pd
 
-from bpmopt.analysis import mean_cycle_time
+from bpmopt.analysis import cycle_time_stats
 from bpmopt.parameters import Parameters
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
-def build_results(*, log: pd.DataFrame, params: Parameters, seed: int) -> dict:
-    """Results without the `models` section, which export_results fills in."""
+def build_results(*, log: pd.DataFrame, params: Parameters, seed: int, lang: str = "en") -> dict:
+    """Results without the `models` section, which export_results fills in.
+
+    Later tickets add their own sections (assumptions, value_added, ml, changes,
+    scenarios, threats) to this dict before export.
+    """
     return {
         "meta": {
             "schema_version": SCHEMA_VERSION,
             "seed": seed,
+            "replications": 1,  # one baseline run; ticket 13 runs R replications per scenario
             "case_count": int(log.case_id.nunique()),
+            "warm_up": 0.0,  # the simulator has no warm-up yet (ticket 04)
             "parameter_version": params.version,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         },
+        "text": load_page_text(lang),
         "baseline": {
             "time_unit": "working days",
-            "cycle_time": {"mean": mean_cycle_time(log)},
+            "cycle_time": cycle_time_stats(log),
         },
     }
+
+
+def load_page_text(lang: str = "en") -> dict:
+    """Page text from content/page.<lang>.toml. Translating the page means adding a file there."""
+    source = resources.files("bpmopt").joinpath(f"content/page.{lang}.toml")
+    return tomllib.loads(source.read_text(encoding="utf-8"))
 
 
 def export_results(results: dict, out_dir: str | Path, *, models: dict[str, Path]) -> Path:
@@ -57,10 +74,41 @@ def export_results(results: dict, out_dir: str | Path, *, models: dict[str, Path
 
 
 def validate_results(results: dict) -> None:
-    """Raise jsonschema.ValidationError if results break the contract."""
-    jsonschema.validate(results, _schema())
+    """Raise jsonschema.ValidationError if results break the contract.
+
+    First the JSON schema, then the rules a schema can't express: the scenarios
+    are the full factorial of the change catalog, and every CI holds its estimate.
+    """
+    error = jsonschema.exceptions.best_match(_validator().iter_errors(results))
+    if error is not None:
+        raise error
+    for message in _cross_field_errors(results):
+        raise jsonschema.ValidationError(message)
+
+
+def _cross_field_errors(results: dict) -> Iterator[str]:
+    scenarios = results.get("scenarios", [])
+    if scenarios:
+        catalog = [change["id"] for change in results.get("changes", [])]
+        seen = Counter(frozenset(s["changes"]) for s in scenarios)
+        unknown = set().union(*seen) - set(catalog)
+        if unknown:
+            yield f"scenarios use changes that aren't in the catalog: {', '.join(sorted(unknown))}"
+        for k in range(len(catalog) + 1):
+            for combo in combinations(catalog, k):
+                if seen[frozenset(combo)] != 1:
+                    count = seen[frozenset(combo)]
+                    yield f"expected one scenario for changes [{', '.join(combo)}], found {count}"
+
+    for i, scenario in enumerate(scenarios):
+        estimates = {f"cycle_time.{k}": v for k, v in scenario["cycle_time"].items()} | {"saving": scenario["saving"]}
+        for name, e in estimates.items():
+            if not e["ci_low"] <= e["value"] <= e["ci_high"]:
+                yield f"scenarios[{i}].{name}: interval [{e['ci_low']}, {e['ci_high']}] doesn't contain {e['value']}"
 
 
 @cache
-def _schema() -> dict:
-    return json.loads(resources.files("bpmopt").joinpath("schema/results.schema.json").read_text())
+def _validator() -> jsonschema.Draft202012Validator:
+    schema = json.loads(resources.files("bpmopt").joinpath("schema/results.schema.json").read_text())
+    # Formats like date-time are only checked with a format checker (needs rfc3339-validator).
+    return jsonschema.Draft202012Validator(schema, format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER)

@@ -1,15 +1,162 @@
 {
   "meta": {
-    "schema_version": 1,
+    "schema_version": 2,
     "seed": 42,
+    "replications": 1,
     "case_count": 100,
+    "warm_up": 0.0,
     "parameter_version": "fixture-1",
-    "generated_at": "2026-11-01T05:59:07+00:00"
+    "generated_at": "2026-11-01T06:26:19+00:00"
+  },
+  "text": {
+    "lang": "en",
+    "title": "Making app development faster",
+    "subtitle": "IS6003 final assignment. A simulation and machine learning study of how long our app development process takes, and how to shorten it.",
+    "sections": {
+      "problem": {
+        "heading": "Problem and method",
+        "paragraphs": [
+          "Our app development process runs from a business request through approvals, specification, planning, build, testing and deployment. Nobody knows how long it takes end to end, or where the time goes.",
+          "We can't use real company data. So we simulate the process straight from its BPMN model and treat the simulated event log as our data. Every parameter is an estimate, and all of them are listed under Assumptions at the bottom.",
+          "The work follows Design Science Research (Peffers et al., 2007): find the problem, set an objective, design a fix, show it and evaluate it. The process analysis follows Fundamentals of Business Process Management, 2nd ed. (Dumas et al.).",
+          "The objective is a shorter mean cycle time, with the saving backed by a confidence interval."
+        ]
+      },
+      "as_is": {
+        "heading": "As-is process and baseline",
+        "paragraphs": [
+          "This is the process as it runs today, checked against the book's modeling rules (§5.4). Activity colors show the value-added class from the qualitative analysis (§6.1).",
+          "The numbers come from the simulated event log. Cycle time runs from the request to the end event (§7.1). Waiting time is time an activity spends ready while nobody works on it.",
+          "The flow analysis check compares the simulation with the book's formula (§7.1.1), with unlimited capacity. The two should agree."
+        ]
+      },
+      "ml": {
+        "heading": "What machine learning found",
+        "paragraphs": [
+          "We trained models on the event log, using only what is known when a request comes in. One model predicts the cycle time. The others predict, for each gateway that can send work back, whether a case loops back at least once.",
+          "Each model is compared with a reference that ignores the inputs. The data is split by start date, so no model learns from the future.",
+          "Drivers are ranked by the mean absolute SHAP value of the gradient boosting model. A longer bar means that attribute moves the prediction more."
+        ]
+      },
+      "redesign": {
+        "heading": "Redesign",
+        "paragraphs": [
+          "The to-be model applies a few changes, picked from the drivers above and the book's redesign heuristics (Appendix A). Each change says what it targets and what it costs on the Devil's Quadrangle (§8.1.3).",
+          "The redesign is a human decision. Machine learning shows where time is lost. It doesn't draw the new process."
+        ]
+      },
+      "evaluation": {
+        "heading": "Evaluation",
+        "paragraphs": [
+          "Switch changes on and off to see the simulated cycle time of that design. Every combination ran with the same random seeds, so differences come from the design and not from luck.",
+          "Ranges are 95% confidence intervals over the replications. The ablation shows each change on its own and what the full design loses without it."
+        ]
+      },
+      "assumptions": {
+        "heading": "Assumptions and threats to validity",
+        "paragraphs": [
+          "Every number on this page comes from the parameters below. They are estimates, not measurements, and can be changed in the parameter file."
+        ]
+      }
+    },
+    "labels": {
+      "fake_notice": "Fake data. These numbers are made up so the page could be built before the real results exist.",
+      "pending": "Not available yet.",
+      "diagram_error": "Couldn't draw this model: {error}",
+      "run_summary": "Seed: {seed}. Replications: {replications}. Cases per run: {cases}. Warm-up: {warm_up} days. Parameters: {version}. Generated {date}.",
+      "as_is_model": "As-is model",
+      "to_be_model": "To-be model",
+      "to_be_missing": "There is no to-be model yet.",
+      "lint": "Rule check",
+      "lint_clean": "No rule violations.",
+      "lint_not_checked": "Not checked yet.",
+      "lint_rule": "Rule",
+      "lint_element": "Element",
+      "lint_message": "Problem",
+      "severity_error": "Error",
+      "severity_warning": "Warning",
+      "mean": "Mean",
+      "median": "Median",
+      "p90": "90th percentile",
+      "ci": "95% CI",
+      "cycle_time": "Cycle time",
+      "processing_time": "Processing time",
+      "waiting_time": "Waiting time",
+      "cycle_time_efficiency": "Cycle time efficiency",
+      "days": "days",
+      "rework": "Rework",
+      "gateway": "Gateway",
+      "rework_rate": "Cases that loop back",
+      "waiting_by_activity": "Waiting time per activity",
+      "activity": "Activity",
+      "mean_waiting": "Mean waiting (days)",
+      "flow_analysis": "Flow analysis check",
+      "flow_theoretical": "Book formula",
+      "flow_simulated": "Simulation, unlimited capacity",
+      "flow_difference": "Difference",
+      "value_added": "Value-added analysis",
+      "va_class": "Class",
+      "va_reason": "Why",
+      "va_VA": "Value-adding",
+      "va_BVA": "Business value-adding",
+      "va_NVA": "Non-value-adding",
+      "ml_split": "Trained on the first {train}% of cases by start date, tested on the rest.",
+      "ml_task_cycle_time": "Predicting cycle time",
+      "ml_task_rework": "Predicting a loop back at: {gateway}",
+      "ml_model": "Model",
+      "model_reference_regression": "Reference: always predict the mean",
+      "model_reference_classification": "Reference: always predict the most common outcome",
+      "model_linear_regression": "Linear regression",
+      "model_linear_classification": "Logistic regression",
+      "model_gradient_boosting": "Gradient boosting",
+      "metric_mae": "MAE (days)",
+      "metric_r2": "R²",
+      "metric_roc_auc": "ROC-AUC",
+      "metric_f1": "F1",
+      "drivers": "Drivers",
+      "mean_abs_shap": "Mean |SHAP|",
+      "change_catalog": "Change catalog",
+      "change_id": "ID",
+      "driver": "Targets",
+      "heuristic": "Heuristic",
+      "expected_effect": "Expected effect",
+      "trade_off": "Trade-off",
+      "dq_time": "Time",
+      "dq_cost": "Cost",
+      "dq_quality": "Quality",
+      "dq_flexibility": "Flexibility",
+      "effect_better": "better",
+      "effect_worse": "worse",
+      "effect_neutral": "no change",
+      "toggles": "Changes to apply",
+      "scenario_as_is": "As-is",
+      "scenario_selected": "With the selected changes",
+      "saving": "Saved vs as-is",
+      "scenario_missing": "This combination wasn't simulated.",
+      "ablation": "Ablation",
+      "ablation_alone": "Saving on its own",
+      "ablation_full_minus": "Lost if dropped from the full design",
+      "assumptions": "Assumptions",
+      "parameter": "Parameter",
+      "value": "Value",
+      "rationale": "Rationale",
+      "threats": "Threats to validity"
+    },
+    "features": {
+      "project_type": "Project type",
+      "complexity": "Complexity",
+      "integrations": "Number of integrations",
+      "security_level": "Security level",
+      "requesting_unit": "Requesting unit",
+      "workload": "Team workload at start"
+    }
   },
   "baseline": {
     "time_unit": "working days",
     "cycle_time": {
-      "mean": 10.5
+      "mean": 10.5,
+      "median": 10.5,
+      "p90": 10.5
     }
   },
   "models": {
