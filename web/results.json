@@ -6,7 +6,7 @@
     "case_count": 100,
     "warm_up": 0.0,
     "parameter_version": "fixture-1",
-    "generated_at": "2026-11-01T06:27:47+00:00"
+    "generated_at": "2026-11-01T06:36:45+00:00"
   },
   "text": {
     "lang": "en",
@@ -151,6 +151,23 @@
       "workload": "Team workload at start"
     }
   },
+  "assumptions": [
+    {
+      "parameter": "tasks.Task_WriteSpec.duration",
+      "value": 2.0,
+      "rationale": "Fixture value."
+    },
+    {
+      "parameter": "tasks.Task_BuildApp.duration",
+      "value": 5.5,
+      "rationale": "Fixture value."
+    },
+    {
+      "parameter": "tasks.Task_TestApp.duration",
+      "value": 3.0,
+      "rationale": "Fixture value."
+    }
+  ],
   "baseline": {
     "time_unit": "working days",
     "cycle_time": {
