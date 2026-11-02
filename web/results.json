@@ -4,7 +4,7 @@
     "seed": 42,
     "case_count": 100,
     "parameter_version": "fixture-1",
-    "generated_at": "2026-11-01T05:59:07+00:00"
+    "generated_at": "2026-11-01T06:11:53+00:00"
   },
   "baseline": {
     "time_unit": "working days",
