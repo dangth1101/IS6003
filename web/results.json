@@ -1,12 +1,12 @@
 {
   "meta": {
-    "schema_version": 2,
+    "schema_version": 3,
     "seed": 42,
     "replications": 1,
     "case_count": 2000,
     "warm_up": 250.0,
-    "parameter_version": "proposed-1",
-    "generated_at": "2026-11-01T07:32:59+00:00"
+    "parameter_version": "proposed-2",
+    "generated_at": "2026-11-02T03:01:22+00:00"
   },
   "text": {
     "lang": "en",
@@ -26,14 +26,15 @@
         "heading": "As-is process and baseline",
         "paragraphs": [
           "This is the process as it runs today, checked against the book's modeling rules (§5.4). Activity colors show the value-added class from the qualitative analysis (§6.1).",
-          "The numbers come from the simulated event log. Cycle time runs from the request to the end event (§7.1). Waiting time is time an activity spends ready while nobody works on it.",
+          "The numbers come from the simulated event log. Cycle time runs from the request to go-live, the end of “Start live operation” (§7.1). Monitoring and the project evaluation come after go-live, so they stay in the model but don't count. A proposal that is rejected ends there. Waiting time is time an activity spends ready while nobody works on it.",
+          "The headline counts every case. The table by outcome shows approved projects and rejected proposals apart, as a check.",
           "The flow analysis check compares the simulation with the book's formula (§7.1.1), with unlimited capacity. The two should agree."
         ]
       },
       "ml": {
         "heading": "What machine learning found",
         "paragraphs": [
-          "We trained models on the event log, using only what is known when a request comes in. One model predicts the cycle time. The others predict, for each gateway that can send work back, whether a case loops back at least once.",
+          "We trained models on the event log, using only what is known when a request comes in. One model predicts the cycle time of approved projects. The others predict, for each gateway that can send work back, whether a case loops back at least once.",
           "Each model is compared with a reference that ignores the inputs. The data is split by start date, so no model learns from the future.",
           "Drivers are ranked by the mean absolute SHAP value of the gradient boosting model. A longer bar means that attribute moves the prediction more.",
           "Expect low scores. Much of a case's cycle time depends on luck, such as how often work is sent back and how long the queues are when it arrives. No attribute known at the start can predict that. The ranking of the drivers matters more here than the scores."
@@ -85,6 +86,10 @@
       "waiting_time": "Waiting time",
       "cycle_time_efficiency": "Cycle time efficiency",
       "days": "days",
+      "by_outcome": "Cycle time by outcome",
+      "outcome": "Outcome",
+      "cases": "Cases",
+      "ml_outcome": "Trained and tested only on cases that end at “{outcome}”.",
       "rework": "Rework",
       "gateway": "Gateway",
       "gateway_after": "Decision after {task}",
@@ -163,6 +168,11 @@
       "parameter": "warm_up.length",
       "value": 250.0,
       "rationale": "Proposed default. One working year, long enough for every lane queue to fill from the empty start; cases arriving before it are dropped from the log."
+    },
+    {
+      "parameter": "cycle_time.ends_at",
+      "value": "Task_StartOperation",
+      "rationale": "Student decision. The cycle time ends at go-live, the end of Start live operation. Monitoring and the project evaluation come after it; they stay in the model and the log but don't count, since the users already have the application. A rejected proposal ends at its end event."
     },
     {
       "parameter": "attributes.project_type.distribution",
@@ -307,7 +317,7 @@
     {
       "parameter": "tasks.Task_MonitorOperation.duration",
       "value": "triangular(5, 10, 20)",
-      "rationale": "Proposed default. About two weeks of hypercare after go-live, counted in the cycle time (open question in the change log)."
+      "rationale": "Proposed default, confirmed by the student. About two weeks of hypercare after go-live. Not part of the cycle time, which ends at go-live."
     },
     {
       "parameter": "tasks.Task_EvaluateProject.duration",
@@ -316,8 +326,8 @@
     },
     {
       "parameter": "gateways.Gateway_ProposalSplit.branches",
-      "value": "Flow_ProposalApproved: 0.72, Flow_ProposalChangesRequested: 0.2, Flow_ProposalRejected: 0.08",
-      "rationale": "Proposed default. One proposal decision in five asks for changes and 8% reject outright, so about 10% of requests end rejected. A three-way split can't be logistic, so no attribute effect here."
+      "value": "Flow_ProposalApproved: 0.77, Flow_ProposalChangesRequested: 0.2, Flow_ProposalRejected: 0.03",
+      "rationale": "Student: possible but rare. 3% of proposal decisions reject outright, so about 4% of requests end rejected. One decision in five asks for changes (proposed default). A three-way split can't be logistic, so no attribute effect here."
     },
     {
       "parameter": "gateways.Gateway_PlanSplit.branches",
@@ -338,120 +348,134 @@
   "baseline": {
     "time_unit": "working days",
     "cycle_time": {
-      "mean": 140.37099166542467,
-      "median": 136.45060132099616,
-      "p90": 211.28447841734663
+      "mean": 150.99799757821808,
+      "median": 137.45579122192993,
+      "p90": 229.82798180909035
     },
     "processing_time": {
-      "mean": 111.11325414582065,
-      "median": 110.8722674927144,
-      "p90": 160.2070591978692
+      "mean": 104.73863945225862,
+      "median": 99.3667335294665,
+      "p90": 147.68445858136022
     },
     "waiting_time": {
-      "mean": 29.25773751960401,
-      "median": 20.935103569180797,
-      "p90": 66.42404841376366
+      "mean": 46.25935812595948,
+      "median": 36.369138030087925,
+      "p90": 94.27676826706085
     },
-    "cycle_time_efficiency": 0.7915684916628639,
+    "cycle_time_efficiency": 0.6936425722996972,
+    "by_outcome": [
+      {
+        "end_event_id": "End_ProjectClosed",
+        "case_count": 1925,
+        "cycle_time": {
+          "mean": 156.34003422793245,
+          "median": 139.49848317874103,
+          "p90": 232.85070480430133
+        },
+        "cycle_time_efficiency": 0.6940776138240897
+      },
+      {
+        "end_event_id": "End_ProposalRejected",
+        "case_count": 75,
+        "cycle_time": {
+          "mean": 13.885723568883044,
+          "median": 11.344797091770488,
+          "p90": 24.139129664608312
+        },
+        "cycle_time_efficiency": 0.5679232967020238
+      }
+    ],
     "rework": [
       {
         "gateway_id": "Gateway_ReleaseSplit",
-        "rate": 0.08402893711741792
+        "rate": 0.08311688311688312
       },
       {
         "gateway_id": "Gateway_TestSplit",
-        "rate": 0.3745130773511408
+        "rate": 0.37194805194805197
       },
       {
         "gateway_id": "Gateway_PlanSplit",
-        "rate": 0.19031719532554256
+        "rate": 0.19480519480519481
       },
       {
         "gateway_id": "Gateway_ProposalSplit",
-        "rate": 0.193
+        "rate": 0.2045
       }
     ],
     "waiting_by_activity": [
       {
-        "activity_id": "Task_ApproveProposal",
-        "mean": 2.0129406801258423
+        "activity_id": "Task_RunAcceptanceTests",
+        "mean": 3.5919237184068065
       },
       {
         "activity_id": "Task_RunSecurityTests",
-        "mean": 1.9872438375075758
-      },
-      {
-        "activity_id": "Task_RunAcceptanceTests",
-        "mean": 1.9854355101397156
+        "mean": 3.5836387403396053
       },
       {
         "activity_id": "Task_RunFunctionalTests",
-        "mean": 1.9730327558240655
-      },
-      {
-        "activity_id": "Task_ApprovePlan",
-        "mean": 1.9246582660848754
+        "mean": 3.5819858250088155
       },
       {
         "activity_id": "Task_ReviewSourceCode",
-        "mean": 1.8893985178347028
-      },
-      {
-        "activity_id": "Task_ApproveRelease",
-        "mean": 1.8449902629061026
+        "mean": 3.4948992578907125
       },
       {
         "activity_id": "Task_HoldKickOff",
-        "mean": 1.6591834831151424
+        "mean": 2.33201206181969
+      },
+      {
+        "activity_id": "Task_ApproveProposal",
+        "mean": 2.302865070292846
       },
       {
         "activity_id": "Task_RegisterRequest",
-        "mean": 1.5977761769445384
+        "mean": 2.2213063977091094
+      },
+      {
+        "activity_id": "Task_ApprovePlan",
+        "mean": 2.2147473763924403
+      },
+      {
+        "activity_id": "Task_ApproveRelease",
+        "mean": 2.1265100007439885
       },
       {
         "activity_id": "Task_RefineApplication",
-        "mean": 1.5575684857479486
-      },
-      {
-        "activity_id": "Task_SpecifyRequirements",
-        "mean": 1.1252135661325542
-      },
-      {
-        "activity_id": "Task_DeployApplication",
-        "mean": 1.0795097532097375
+        "mean": 1.928313653032921
       },
       {
         "activity_id": "Task_FixDefects",
-        "mean": 1.0723526332130162
+        "mean": 1.8900651154323618
       },
       {
         "activity_id": "Task_DraftPlan",
-        "mean": 1.0410556947355387
+        "mean": 1.7920719282968196
       },
       {
-        "activity_id": "Task_EvaluateProject",
-        "mean": 0.9913092483933257
+        "activity_id": "Task_DeployApplication",
+        "mean": 1.7758402107392295
       },
       {
         "activity_id": "Task_ReviseProposal",
-        "mean": 0.9826204446437141
+        "mean": 1.6664687006354586
+      },
+      {
+        "activity_id": "Task_SpecifyRequirements",
+        "mean": 1.6595797451324965
       },
       {
         "activity_id": "Task_StartOperation",
-        "mean": 0.9684251099883131
-      },
-      {
-        "activity_id": "Task_MonitorOperation",
-        "mean": 0.8388759676548366
+        "mean": 1.5707808553847977
       },
       {
         "activity_id": "Task_BuildApplication",
-        "mean": 0.806955638526216
+        "mean": 1.4586505280222217
       }
     ],
     "flow_analysis": {
-      "theoretical": 111.65158277344834,
-      "simulated": 111.11325414582063
+      "theoretical": 105.36303528086376,
+      "simulated": 104.7386394522586
     }
   },
   "value_added": {
@@ -513,7 +537,7 @@
     },
     "Task_RefineApplication": {
       "class": "NVA",
-      "reason": "Rework after a rejected release (p.222). Could be VA if it adds missing scope, see open question 6 in the change log."
+      "reason": "Rework after a rejected release (p.222). Could be VA if it adds missing scope, see answered question 6 in the change log."
     },
     "Task_DeployApplication": {
       "class": "VA",
@@ -545,51 +569,52 @@
           {
             "id": "reference",
             "metrics": {
-              "mae": 42.54057420656067,
-              "r2": -0.00687487343899984
+              "mae": 39.648779702379436,
+              "r2": -0.005883338283307449
             }
           },
           {
             "id": "linear",
             "metrics": {
-              "mae": 42.353488258322265,
-              "r2": 0.017074540571119123
+              "mae": 38.18803460935708,
+              "r2": 0.07174858061466338
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "mae": 42.67627680872214,
-              "r2": -0.00785512837644875
+              "mae": 38.338527186480334,
+              "r2": 0.06988792445844816
             }
           }
         ],
         "drivers": [
           {
             "feature": "complexity",
-            "mean_abs_shap": 9.837050267474027
+            "mean_abs_shap": 12.291495539715987
           },
           {
             "feature": "security_level",
-            "mean_abs_shap": 7.126918207492215
-          },
-          {
-            "feature": "team_workload",
-            "mean_abs_shap": 3.525394441381295
-          },
-          {
-            "feature": "requesting_unit",
-            "mean_abs_shap": 3.47366955360107
+            "mean_abs_shap": 8.076095943396053
           },
           {
             "feature": "integrations",
-            "mean_abs_shap": 3.282274222668036
+            "mean_abs_shap": 5.747802129076967
+          },
+          {
+            "feature": "team_workload",
+            "mean_abs_shap": 3.6354426803631985
           },
           {
             "feature": "project_type",
-            "mean_abs_shap": 3.1293211427982275
+            "mean_abs_shap": 1.69889070600859
+          },
+          {
+            "feature": "requesting_unit",
+            "mean_abs_shap": 1.0637192971238116
           }
-        ]
+        ],
+        "outcome": "End_ProjectClosed"
       },
       {
         "id": "rework_Gateway_ReleaseSplit",
@@ -606,42 +631,42 @@
           {
             "id": "linear",
             "metrics": {
-              "roc_auc": 0.6999442275515896,
-              "f1": 0.27450980392156865
+              "roc_auc": 0.6891235126529245,
+              "f1": 0.2375
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "roc_auc": 0.5223089793641942,
-              "f1": 0.13333333333333333
+              "roc_auc": 0.5209485503603151,
+              "f1": 0.17543859649122806
             }
           }
         ],
         "drivers": [
           {
             "feature": "team_workload",
-            "mean_abs_shap": 0.32593091069194324
+            "mean_abs_shap": 0.33633001856146383
           },
           {
             "feature": "project_type",
-            "mean_abs_shap": 0.2543005991364055
+            "mean_abs_shap": 0.22853881145194097
           },
           {
             "feature": "complexity",
-            "mean_abs_shap": 0.1880632475721589
+            "mean_abs_shap": 0.10914836176508692
           },
           {
             "feature": "requesting_unit",
-            "mean_abs_shap": 0.09075777660835345
+            "mean_abs_shap": 0.10665248920723171
           },
           {
             "feature": "integrations",
-            "mean_abs_shap": 0.07196155580691639
+            "mean_abs_shap": 0.05704976093452511
           },
           {
             "feature": "security_level",
-            "mean_abs_shap": 0.012689811114368198
+            "mean_abs_shap": 0.012250166244611498
           }
         ]
       },
@@ -660,42 +685,42 @@
           {
             "id": "linear",
             "metrics": {
-              "roc_auc": 0.6403843578411677,
-              "f1": 0.5185185185185185
+              "roc_auc": 0.633935860058309,
+              "f1": 0.5203761755485894
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "roc_auc": 0.6355464041783849,
-              "f1": 0.49324324324324326
+              "roc_auc": 0.6346938775510205,
+              "f1": 0.5094339622641509
             }
           }
         ],
         "drivers": [
           {
             "feature": "complexity",
-            "mean_abs_shap": 0.3432788178646652
+            "mean_abs_shap": 0.36052022224701924
           },
           {
             "feature": "security_level",
-            "mean_abs_shap": 0.26196234233830185
+            "mean_abs_shap": 0.24996429205705664
           },
           {
             "feature": "integrations",
-            "mean_abs_shap": 0.23149863765408876
+            "mean_abs_shap": 0.2146705854176545
           },
           {
             "feature": "team_workload",
-            "mean_abs_shap": 0.10580905322433239
+            "mean_abs_shap": 0.09902774944738414
           },
           {
             "feature": "project_type",
-            "mean_abs_shap": 0.05886192399986784
+            "mean_abs_shap": 0.057838122961611865
           },
           {
             "feature": "requesting_unit",
-            "mean_abs_shap": 0.05250583232369902
+            "mean_abs_shap": 0.03827499306419517
           }
         ]
       },
@@ -714,42 +739,42 @@
           {
             "id": "linear",
             "metrics": {
-              "roc_auc": 0.5390513187487221,
-              "f1": 0.28901734104046245
+              "roc_auc": 0.5504917456972251,
+              "f1": 0.31958762886597936
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "roc_auc": 0.5661930075649151,
-              "f1": 0.3384615384615385
+              "roc_auc": 0.5650904460835967,
+              "f1": 0.30917874396135264
             }
           }
         ],
         "drivers": [
           {
             "feature": "project_type",
-            "mean_abs_shap": 0.283645159346617
+            "mean_abs_shap": 0.29290949499087787
           },
           {
             "feature": "team_workload",
-            "mean_abs_shap": 0.2087140371237583
-          },
-          {
-            "feature": "complexity",
-            "mean_abs_shap": 0.06249924468917134
-          },
-          {
-            "feature": "security_level",
-            "mean_abs_shap": 0.05811891249310305
+            "mean_abs_shap": 0.20960718083037072
           },
           {
             "feature": "requesting_unit",
-            "mean_abs_shap": 0.05496914918307755
+            "mean_abs_shap": 0.07804327974535917
+          },
+          {
+            "feature": "complexity",
+            "mean_abs_shap": 0.06859963989688757
           },
           {
             "feature": "integrations",
-            "mean_abs_shap": 0.05388881721609021
+            "mean_abs_shap": 0.06091066828834706
+          },
+          {
+            "feature": "security_level",
+            "mean_abs_shap": 0.027751527231044237
           }
         ]
       },
@@ -768,42 +793,42 @@
           {
             "id": "linear",
             "metrics": {
-              "roc_auc": 0.5302597402597402,
-              "f1": 0.26714801444043323
+              "roc_auc": 0.4671620418746856,
+              "f1": 0.29545454545454547
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "roc_auc": 0.548051948051948,
-              "f1": 0.2943722943722944
+              "roc_auc": 0.5137389217848988,
+              "f1": 0.27385892116182575
             }
           }
         ],
         "drivers": [
           {
             "feature": "team_workload",
-            "mean_abs_shap": 0.1741362496629675
-          },
-          {
-            "feature": "requesting_unit",
-            "mean_abs_shap": 0.11665331707595125
-          },
-          {
-            "feature": "security_level",
-            "mean_abs_shap": 0.09571042852368343
+            "mean_abs_shap": 0.21391234755033894
           },
           {
             "feature": "integrations",
-            "mean_abs_shap": 0.07356160928349392
+            "mean_abs_shap": 0.10455107864306937
           },
           {
-            "feature": "complexity",
-            "mean_abs_shap": 0.04092528947872794
+            "feature": "security_level",
+            "mean_abs_shap": 0.08994922913626467
+          },
+          {
+            "feature": "requesting_unit",
+            "mean_abs_shap": 0.061148574816546605
           },
           {
             "feature": "project_type",
-            "mean_abs_shap": 0.02394122503970637
+            "mean_abs_shap": 0.02709807461273828
+          },
+          {
+            "feature": "complexity",
+            "mean_abs_shap": 0.014777988121749432
           }
         ]
       }

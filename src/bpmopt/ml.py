@@ -34,7 +34,7 @@ from sklearn.metrics import f1_score, mean_absolute_error, r2_score, roc_auc_sco
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
-from bpmopt.analysis import cycle_times, rework_flags
+from bpmopt.analysis import cycle_times, outcomes, rework_flags
 from bpmopt.bpmn import ProcessModel
 from bpmopt.features import case_features, chronological_split
 
@@ -52,14 +52,26 @@ def ml_section(tasks: list[dict]) -> dict:
     return {"split": {"method": "chronological", "train_share": TRAIN_SHARE}, "tasks": tasks}
 
 
-def cycle_time_task(log: pd.DataFrame, *, seed: int) -> dict:
+def cycle_time_task(log: pd.DataFrame, *, seed: int, ends_at: str | None = None, outcome: str | None = None) -> dict:
     """Task A: predict each case's cycle time from its attributes at case start.
 
     Reports MAE and R² on the test cases for the reference (training mean),
     linear regression and gradient boosting, and the drivers ranked by mean |SHAP|
     of the gradient boosting model, in working days.
+
+    ends_at is the cycle time cut-off (Parameters.cycle_time_end). With an
+    outcome (an end event ID), only cases that ended there are used, for both
+    training and testing, and the task records it. A case rejected early has a
+    short cycle time for a reason no attribute explains, so mixing it in mostly
+    adds noise.
     """
-    data = training_data(log, cycle_times(log))
+    target = cycle_times(log, ends_at)
+    if outcome is not None:
+        ended_at = outcomes(log)
+        target = target[target.index.isin(ended_at[ended_at == outcome].index)]
+        if target.empty:
+            raise ValueError(f"no case in the log ended at {outcome}")
+    data = training_data(log, target)
     models = {
         "reference": DummyRegressor(strategy="mean"),
         "linear": Pipeline([("encode", encoder(data.x_train)), ("model", LinearRegression())]),
@@ -67,7 +79,8 @@ def cycle_time_task(log: pd.DataFrame, *, seed: int) -> dict:
             [("encode", encoder(data.x_train)), ("model", HistGradientBoostingRegressor(**GRADIENT_BOOSTING, random_state=seed))]
         ),
     }
-    return {"id": "cycle_time", "kind": "regression", **_fit_and_score(models, data, _regression_metrics)}
+    task = {"id": "cycle_time", "kind": "regression", **_fit_and_score(models, data, _regression_metrics)}
+    return task | ({"outcome": outcome} if outcome is not None else {})
 
 
 def rework_tasks(log: pd.DataFrame, model: ProcessModel, *, seed: int) -> list[dict]:

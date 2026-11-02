@@ -29,3 +29,9 @@
   - Measure the target on all cases or only on closed projects? Rejected proposals end early and pull the mean down.
   - Does "Monitor live operation" count in the cycle time (change log Q9)?
   - Change log Q1 to Q5 and Q7 change issues 1 to 6.
+- Student answers applied (change log Q1-Q10) and method decided: cycle time ends at go-live, headline on all cases with approved-only next to it, target "mean saving at least 20% and the 95% CI of the saving above 0". The draft now says so in section 4.
+- Numbers refreshed from parameters `proposed-2` (seed 42, 2,000 cases). Judgments moved with them, each listed under "Changes since first draft" at the top of `docs/analysis/phase1-qualitative.md`. Main one: QC waiting (23.9 days per case) is now issue 2 with priority 1, and the approvals queue (7.8 days) drops to issue 4, priority 2. Issues renumbered in priority order.
+- The 20% reasoning is rewritten: waiting is 31% of cycle time, half of it at QC, so 20% likely needs two or three testing changes together.
+- Review questions cut to the open ones, plus two new: is eight QC testers realistic, and does one request a week still fit now that few proposals are rejected.
+- Still a draft. Not signed off.
+

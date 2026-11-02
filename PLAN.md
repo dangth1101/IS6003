@@ -11,7 +11,7 @@ Deliverables: one Python notebook (data, training, evaluation) and one static HT
 - [x] Replace Có/Không with explicit conditions on the outgoing arcs (p.190)
 - [x] Split compound activities, especially the test task (code review, testing, security, acceptance)
 - [x] Add an end event for a rejected proposal (G3)
-- [ ] Check which lane "Bổ sung / điều chỉnh đề xuất" belongs in (open question in `models/as_is_changelog.md`)
+- [x] Check which lane "Bổ sung / điều chỉnh đề xuất" belongs in (answered: stays in IT operations, `models/as_is_changelog.md`)
 - [x] Run the 7PMG checklist (G1–G7)
 
 Done when: `models/as_is.bpmn` passes the checklist.

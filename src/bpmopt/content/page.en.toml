@@ -19,14 +19,15 @@ paragraphs = [
 heading = "As-is process and baseline"
 paragraphs = [
   "This is the process as it runs today, checked against the book's modeling rules (§5.4). Activity colors show the value-added class from the qualitative analysis (§6.1).",
-  "The numbers come from the simulated event log. Cycle time runs from the request to the end event (§7.1). Waiting time is time an activity spends ready while nobody works on it.",
+  "The numbers come from the simulated event log. Cycle time runs from the request to go-live, the end of “Start live operation” (§7.1). Monitoring and the project evaluation come after go-live, so they stay in the model but don't count. A proposal that is rejected ends there. Waiting time is time an activity spends ready while nobody works on it.",
+  "The headline counts every case. The table by outcome shows approved projects and rejected proposals apart, as a check.",
   "The flow analysis check compares the simulation with the book's formula (§7.1.1), with unlimited capacity. The two should agree.",
 ]
 
 [sections.ml]
 heading = "What machine learning found"
 paragraphs = [
-  "We trained models on the event log, using only what is known when a request comes in. One model predicts the cycle time. The others predict, for each gateway that can send work back, whether a case loops back at least once.",
+  "We trained models on the event log, using only what is known when a request comes in. One model predicts the cycle time of approved projects. The others predict, for each gateway that can send work back, whether a case loops back at least once.",
   "Each model is compared with a reference that ignores the inputs. The data is split by start date, so no model learns from the future.",
   "Drivers are ranked by the mean absolute SHAP value of the gradient boosting model. A longer bar means that attribute moves the prediction more.",
   "Expect low scores. Much of a case's cycle time depends on luck, such as how often work is sent back and how long the queues are when it arrives. No attribute known at the start can predict that. The ranking of the drivers matters more here than the scores.",
@@ -77,6 +78,10 @@ processing_time = "Processing time"
 waiting_time = "Waiting time"
 cycle_time_efficiency = "Cycle time efficiency"
 days = "days"
+by_outcome = "Cycle time by outcome"
+outcome = "Outcome"
+cases = "Cases"
+ml_outcome = "Trained and tested only on cases that end at “{outcome}”."
 rework = "Rework"
 gateway = "Gateway"
 # Not read by the page: export_results uses it to name unnamed gateways in models.*.names.

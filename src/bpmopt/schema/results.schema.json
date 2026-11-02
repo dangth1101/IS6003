@@ -12,7 +12,7 @@
       "required": ["schema_version", "seed", "replications", "case_count", "warm_up", "parameter_version", "generated_at"],
       "additionalProperties": false,
       "properties": {
-        "schema_version": { "const": 2 },
+        "schema_version": { "const": 3 },
         "seed": { "type": "integer" },
         "replications": { "type": "integer", "minimum": 1, "description": "Replications per scenario. 1 for a single baseline run." },
         "case_count": { "type": "integer", "minimum": 1, "description": "Cases per run, after the warm-up is dropped." },
@@ -61,8 +61,8 @@
     },
     "baseline": {
       "type": "object",
-      "description": "As-is performance measures from the event log (book §7.1).",
-      "required": ["time_unit", "cycle_time", "processing_time", "waiting_time", "cycle_time_efficiency", "rework", "waiting_by_activity", "flow_analysis"],
+      "description": "As-is performance measures from the event log (book §7.1). Every cycle time ends at the parameters' cut-off (cycle_time.ends_at in the assumptions), or at the end event for a case that ends before it.",
+      "required": ["time_unit", "cycle_time", "processing_time", "waiting_time", "cycle_time_efficiency", "by_outcome", "rework", "waiting_by_activity", "flow_analysis"],
       "additionalProperties": false,
       "properties": {
         "time_unit": { "const": "working days" },
@@ -70,6 +70,21 @@
         "processing_time": { "$ref": "#/$defs/stats" },
         "waiting_time": { "$ref": "#/$defs/stats" },
         "cycle_time_efficiency": { "type": "number", "minimum": 0, "maximum": 1, "description": "Processing time / cycle time (§7.1.2)." },
+        "by_outcome": {
+          "type": "array",
+          "description": "Cycle time of the cases that ended at each end event, most common first. Only end events some case reached.",
+          "items": {
+            "type": "object",
+            "required": ["end_event_id", "case_count", "cycle_time", "cycle_time_efficiency"],
+            "additionalProperties": false,
+            "properties": {
+              "end_event_id": { "type": "string" },
+              "case_count": { "type": "integer", "minimum": 1 },
+              "cycle_time": { "$ref": "#/$defs/stats" },
+              "cycle_time_efficiency": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        },
         "rework": {
           "type": "array",
           "items": {
@@ -208,6 +223,7 @@
         "kind": { "enum": ["regression", "classification"] },
         "gateway_id": { "type": "string", "description": "Rework gateway this classifier predicts. Classification only." },
         "skipped": { "type": "string", "minLength": 1, "description": "Why the task wasn't fitted. Classification only." },
+        "outcome": { "type": "string", "description": "End event ID. When set, the task trained and tested only on cases that ended there." },
         "models": {
           "type": "array",
           "description": "Every fitted task reports the reference model, so the others can be read against it.",
@@ -367,6 +383,7 @@
         "lint", "lint_clean", "lint_not_checked", "lint_rule", "lint_element", "lint_message", "severity_error", "severity_warning",
         "mean", "median", "p90", "ci",
         "cycle_time", "processing_time", "waiting_time", "cycle_time_efficiency", "days",
+        "by_outcome", "outcome", "cases", "ml_outcome",
         "rework", "gateway", "rework_rate", "waiting_by_activity", "activity", "mean_waiting",
         "flow_analysis", "flow_theoretical", "flow_simulated", "flow_difference",
         "value_added", "va_class", "va_reason", "va_VA", "va_BVA", "va_NVA",

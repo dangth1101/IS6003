@@ -68,7 +68,7 @@ reason = "Control step (p.216): management signs off the release before producti
 
 [Task_RefineApplication]
 class = "NVA"
-reason = "Rework after a rejected release (p.222). Could be VA if it adds missing scope, see open question 6 in the change log."
+reason = "Rework after a rejected release (p.222). Could be VA if it adds missing scope, see answered question 6 in the change log."
 
 [Task_DeployApplication]
 class = "VA"

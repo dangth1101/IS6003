@@ -24,7 +24,7 @@ from bpmopt.bpmn import ProcessModel, read_bpmn
 from bpmopt.lint import lint
 from bpmopt.parameters import Parameters, assumptions
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def build_results(*, log: pd.DataFrame, model: ProcessModel, params: Parameters, seed: int, lang: str = "en") -> dict:
@@ -32,7 +32,8 @@ def build_results(*, log: pd.DataFrame, model: ProcessModel, params: Parameters,
 
     `log` is the simulation of `model` with `params` and `seed`. The flow
     analysis check simulates the model once more with unlimited capacity, with
-    the same seed and case count.
+    the same seed and case count. Every cycle time stops at the parameters'
+    cut-off (cycle_time_end), if they set one.
 
     The notebook adds the other sections (value_added, ml, changes,
     scenarios, threats) to this dict before export.
@@ -51,7 +52,7 @@ def build_results(*, log: pd.DataFrame, model: ProcessModel, params: Parameters,
         "assumptions": assumptions(params),
         "baseline": {
             "time_unit": "working days",
-            **baseline_metrics(log, model),
+            **baseline_metrics(log, model, ends_at=params.cycle_time_end),
             "flow_analysis": flow_analysis_check(model, params, n_cases=int(log.case_id.nunique()), seed=seed),
         },
     }

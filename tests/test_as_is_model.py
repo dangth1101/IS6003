@@ -64,6 +64,6 @@ def test_flow_analysis_of_the_as_is_model_agrees_with_its_simulation():
     params = replace(load_parameters(PARAMETERS), lane_capacities={})
     log = simulate(model, params, n_cases=10_000, seed=1)
 
-    ct = cycle_times(log)
+    ct = cycle_times(log, params.cycle_time_end)
     sem = ct.std() / math.sqrt(len(ct))
     assert abs(ct.mean() - theoretical_cycle_time(model, params)) <= 4 * sem

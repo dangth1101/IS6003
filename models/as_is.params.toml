@@ -1,28 +1,31 @@
 # Proposed default parameters for the corrected as-is model (models/as_is.bpmn).
 #
 # Context: the application development process of a bank's IT division. A case is
-# one development request, from registration to project closure. Time is in
+# one development request, from registration to project closure. Its cycle time
+# runs from registration to go-live (see [cycle_time]). Time is in
 # working days on a continuous clock (no calendar). Task durations are the time
 # a resource of the lane spends on the task; waiting for a free resource comes
 # on top, from the lane capacities.
 #
-# Every value is a proposed default, an estimate for the student to correct. None
-# of it is measured. The planted attribute effects, and what the ML should find,
+# Every value is a proposed default, an estimate for the student to correct, unless
+# its rationale starts with "Student", which marks an answer or decision of the
+# student. None of it is measured. The planted attribute effects, and what the ML should find,
 # are listed in models/as_is.planted_effects.toml and explained in
 # models/as_is_planted_effects.md.
 #
 # Targets these defaults aim for (checked in tests/test_as_is_parameters.py on a
 # 2,000-case log, seed 42):
-# - mean cycle time of a closed project 120-200 working days (6-10 months)
-# - 7-13% of requests rejected, 15-25% of proposal decisions ask for changes
+# - mean cycle time of an approved project, request to go-live, 120-200 working days (6-10 months)
+# - 2-6% of requests rejected (rare), 15-25% of proposal decisions ask for changes
 # - 15-25% of plans sent back
 # - 30-45% of test rounds find defects, 30-50% of projects fail testing at least once
 # - 5-12% of releases rejected
 # - waiting 10-40% of the cycle time
 # - every lane busy 70-95% of the time (utilisation below 1, so queues settle),
-#   QC the busiest at about 0.88
+#   QC the busiest at about 0.93 (0.88 before rejections became rare: more
+#   projects now reach testing with the same eight testers)
 
-version = "proposed-1"
+version = "proposed-2"  # proposed-1 plus the student's answers: rare rejection, cycle time to go-live
 
 [arrivals]
 rate = 0.25
@@ -31,6 +34,10 @@ rationale = "Proposed default. About one new request a week (62 a year), plausib
 [warm_up]
 length = 250
 rationale = "Proposed default. One working year, long enough for every lane queue to fill from the empty start; cases arriving before it are dropped from the log."
+
+[cycle_time]
+ends_at = "Task_StartOperation"
+rationale = "Student decision. The cycle time ends at go-live, the end of Start live operation. Monitoring and the project evaluation come after it; they stay in the model and the log but don't count, since the users already have the application. A rejected proposal ends at its end event."
 
 # Case attributes, drawn once per case at arrival.
 
@@ -152,7 +159,7 @@ rationale = "Proposed default. Handover to operations and go-live checks."
 
 [tasks.Task_MonitorOperation]
 duration = { triangular = [5, 10, 20] }
-rationale = "Proposed default. About two weeks of hypercare after go-live, counted in the cycle time (open question in the change log)."
+rationale = "Proposed default, confirmed by the student. About two weeks of hypercare after go-live. Not part of the cycle time, which ends at go-live."
 
 [tasks.Task_EvaluateProject]
 duration = { triangular = [1, 2, 4] }
@@ -161,8 +168,8 @@ rationale = "Proposed default. Closing report and lessons learned."
 # XOR-splits. A logistic branch is 1 / (1 + exp(-z)), z = intercept + attribute terms.
 
 [gateways.Gateway_ProposalSplit]
-branches = { Flow_ProposalApproved = 0.72, Flow_ProposalChangesRequested = 0.2, Flow_ProposalRejected = 0.08 }
-rationale = "Proposed default. One proposal decision in five asks for changes and 8% reject outright, so about 10% of requests end rejected. A three-way split can't be logistic, so no attribute effect here."
+branches = { Flow_ProposalApproved = 0.77, Flow_ProposalChangesRequested = 0.2, Flow_ProposalRejected = 0.03 }
+rationale = "Student: possible but rare. 3% of proposal decisions reject outright, so about 4% of requests end rejected. One decision in five asks for changes (proposed default). A three-way split can't be logistic, so no attribute effect here."
 
 [gateways.Gateway_PlanSplit]
 branches = { Flow_PlanApproved = "rest", Flow_PlanChangesRequested = { logistic = { intercept = -1.8, project_type = { new_system = 1.0 } } } }

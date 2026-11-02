@@ -13,6 +13,10 @@ which goes into the assumptions table of the results. The file looks like:
     length = 100                    # working days
     rationale = "..."
 
+    [cycle_time]                    # optional; without it the cycle time runs to the end event
+    ends_at = "Task_GoLive"         # a task: a case's cycle time ends when this task first ends
+    rationale = "..."
+
     [attributes.complexity]         # drawn once per case, in the log as a column
     distribution = { choice = [1, 2, 3], weights = [0.3, 0.5, 0.2] }   # or labels: ["web", "mobile"]
     rationale = "..."               # also { poisson = 1.5 } and { triangular = [min, mode, max] }
@@ -40,6 +44,11 @@ attribute takes a table of label -> coefficient, unlisted labels count 0.
 A scaled duration multiplies the drawn duration by 1 + the sum of its terms,
 written the same way as logistic terms. The example above takes 10% longer per
 integration and 50% longer for a mobile project.
+
+The cycle time cut-off is part of how the process is measured, not of the
+process itself. Tasks after it are still simulated and logged. A case that
+ends before reaching it (an early end event) ends at its end event. Baseline,
+flow analysis, ML and scenarios all read it from here.
 """
 
 import math
@@ -229,10 +238,11 @@ class Parameters:
     branch_probabilities: dict[str, Branches] = field(default_factory=dict)  # XOR-split ID -> its branches
     attributes: dict[str, Distribution] = field(default_factory=dict)  # attribute name -> distribution, drawn once per case
     rationales: dict[str, str] = field(default_factory=dict)  # entry, e.g. "tasks.Task_X" or "arrivals" -> why this value
+    cycle_time_end: str | None = None  # task whose end closes a case's cycle time; None: the case's end event
 
 
 # What each entry holds besides its rationale. Single entries are one table; collections hold one table per ID.
-_SINGLE_ENTRIES = {"arrivals": "rate", "warm_up": "length"}
+_SINGLE_ENTRIES = {"arrivals": "rate", "warm_up": "length", "cycle_time": "ends_at"}
 _COLLECTIONS = {"attributes": "distribution", "lanes": "capacity", "tasks": "duration", "gateways": "branches"}
 
 
@@ -249,6 +259,9 @@ def load_parameters(path: str | Path, model: ProcessModel | None = None) -> Para
         raise ValueError(f"warm_up.length must not be negative, got {warm_up}")
     if warm_up > 0 and arrival_rate is None:
         raise ValueError("warm_up needs an arrival rate: without [arrivals] every case arrives at time 0")
+    cycle_time_end = raw["cycle_time"]["ends_at"] if "cycle_time" in raw else None
+    if cycle_time_end is not None and (not isinstance(cycle_time_end, str) or not cycle_time_end):
+        raise ValueError(f"cycle_time.ends_at must be a task ID, got {cycle_time_end!r}")
     capacities = {lane_id: _capacity(lane_id, entry["capacity"]) for lane_id, entry in raw.get("lanes", {}).items()}
     attributes = {name: _distribution(name, entry["distribution"]) for name, entry in raw.get("attributes", {}).items()}
     durations = {task_id: _duration(task_id, entry["duration"], attributes) for task_id, entry in raw.get("tasks", {}).items()}
@@ -264,6 +277,7 @@ def load_parameters(path: str | Path, model: ProcessModel | None = None) -> Para
         branch_probabilities=branches,
         attributes=attributes,
         rationales=rationales,
+        cycle_time_end=cycle_time_end,
     )
     if model is not None:
         check_parameters(params, model)
@@ -271,7 +285,8 @@ def load_parameters(path: str | Path, model: ProcessModel | None = None) -> Para
 
 
 # What a redesign may change. Arrivals, attributes and the warm-up describe the demand and the
-# run, not the design, so they stay the same in every scenario.
+# run, and the cycle time cut-off how it is measured, not the design, so they stay the same in
+# every scenario.
 _OVERRIDABLE = ("lanes", "tasks", "gateways")
 
 
@@ -312,6 +327,8 @@ def assumptions(params: Parameters) -> list[dict]:
         values["arrivals"] = ("rate", params.arrival_rate)
     if params.warm_up:
         values["warm_up"] = ("length", params.warm_up)
+    if params.cycle_time_end is not None:
+        values["cycle_time"] = ("ends_at", params.cycle_time_end)
     values |= {f"attributes.{name}": ("distribution", d.describe()) for name, d in params.attributes.items()}
     values |= {f"lanes.{lane_id}": ("capacity", capacity) for lane_id, capacity in params.lane_capacities.items()}
     values |= {f"tasks.{task_id}": ("duration", d.describe()) for task_id, d in params.task_durations.items()}
@@ -366,7 +383,8 @@ def check_parameters(params: Parameters, model: ProcessModel) -> None:
 
     Every task needs a duration, and every XOR-split needs a branch for each of
     its outgoing flows. Tasks, lanes and gateways that aren't in the model are
-    errors too, since they are usually typos.
+    errors too, since they are usually typos. So is a cycle time cut-off that
+    isn't a task of the model.
     """
     tasks = {node.id for node in model.nodes_of_type("task")}
     splits = {node.id: {f.id for f in model.outgoing(node.id)} for node in model.xor_splits()}
@@ -374,6 +392,8 @@ def check_parameters(params: Parameters, model: ProcessModel) -> None:
     problems += [f"gateways.{gateway_id}: XOR-split has no branches" for gateway_id in sorted(set(splits) - set(params.branch_probabilities))]
     problems += [f"tasks.{task_id}: no task with this ID in the model" for task_id in params.task_durations if task_id not in tasks]
     problems += [f"lanes.{lane_id}: no lane with this ID in the model" for lane_id in params.lane_capacities if lane_id not in model.lanes]
+    if params.cycle_time_end is not None and params.cycle_time_end not in tasks:
+        problems.append(f"cycle_time.ends_at: {params.cycle_time_end} is not a task of the model")
     for gateway_id, branches in params.branch_probabilities.items():
         if gateway_id not in splits:
             problems.append(f"gateways.{gateway_id}: no XOR-split with this ID in the model")

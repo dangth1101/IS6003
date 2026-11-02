@@ -224,6 +224,8 @@ def run_scenarios(catalog: Catalog, *, n_cases: int, seed: int, replications: in
     per scenario; the estimate is their average over replications, with a 95%
     t-interval. The saving is the as-is mean cycle time minus the scenario's,
     paired by replication, so the CI only reflects how the difference varies.
+    Cycle times stop at the as-is parameters' cut-off (cycle_time_end), which no
+    change can override, so every scenario is measured over the same span.
     """
     if replications < 2:
         raise ValueError(f"need at least 2 replications for a confidence interval, got {replications}")
@@ -231,7 +233,7 @@ def run_scenarios(catalog: Catalog, *, n_cases: int, seed: int, replications: in
     stats = {}
     for combo in _combinations(catalog.ids):
         model, params = catalog.resolve(combo)
-        runs = [cycle_times(simulate(model, params, n_cases=n_cases, seed=s)) for s in seeds]
+        runs = [cycle_times(simulate(model, params, n_cases=n_cases, seed=s), params.cycle_time_end) for s in seeds]
         stats[combo] = {
             "mean": np.array([ct.mean() for ct in runs]),
             "median": np.array([ct.median() for ct in runs]),

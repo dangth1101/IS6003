@@ -147,4 +147,4 @@ A small Python package, one notebook and one static HTML page, organised by the 
 - **Default parameter values** are proposals the student will correct. Their rationale fields should say "proposed default" until then.
 - **Redesign (Phase 5) is a human ticket.** It depends on the ML drivers and the baseline, so its changes can't be specified ahead of time.
 - The repo is public at github.com/dangth1101/IS6003, so GitHub Pages can host the page.
-- Book page references in this spec use the book's printed page numbers. The PDF page is the printed page + 24.
+- Book page references in this spec use the book's printed page numbers. The offset to the PDF page differs by part of the book: printed page + 26 in chapter 3, + 24 in chapters 5 to 8, + 22 in chapter 11 and + 21 in Appendix A.

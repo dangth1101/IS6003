@@ -226,6 +226,7 @@ BASELINE_FIELDS = {
     "rework",
     "waiting_by_activity",
     "flow_analysis",
+    "by_outcome",
 }
 
 
@@ -241,6 +242,7 @@ def test_exported_baseline_has_every_measure(tmp_path, simulate_fixture, fixture
     assert set(baseline) == BASELINE_FIELDS
     assert baseline["flow_analysis"]["theoretical"] == pytest.approx(8.4)  # worked by hand in the params file
     assert {row["gateway_id"] for row in baseline["rework"]} == {"Gateway_ReviewSplit", "Gateway_TestSplit"}
+    assert {row["end_event_id"] for row in baseline["by_outcome"]} == {"End_AppReleased", "End_ProposalRejected"}
 
 
 @pytest.mark.parametrize("field", sorted(BASELINE_FIELDS))

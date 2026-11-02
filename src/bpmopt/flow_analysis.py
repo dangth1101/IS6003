@@ -41,6 +41,12 @@ splits nothing is drawn, scaled durations go in with their mean over the
 attribute distributions (exact, since the scale is linear), and the result is
 the plain formula.
 
+A cycle time cut-off (`Parameters.cycle_time_end`) is handled like an early
+end event placed right after that task: the task counts, nothing after it
+does. That keeps the theoretical value on the same span as the measured one,
+which stops at the end of the same task. The cut-off must not sit inside a
+rework block or an AND-block, since a case can't end there.
+
 Like the book's equations, this only works for block-structured models
 (§7.1.7, p.272). Anything else raises ValueError.
 """
@@ -112,6 +118,8 @@ class _Reducer:
                 return ct, flow, p
             elif node.element_type == "task":
                 part_ct, flow, part_p = self.task_mean(node.id), _single_outgoing(self.model, node), 1.0
+                if node.id == self.params.cycle_time_end:
+                    flow = None  # the cycle time ends here, as at an end event
             elif self.model.is_split(node.id):
                 probabilities = self.probabilities(node.id) if node.element_type == "exclusiveGateway" else None
                 part_ct, flow, part_p = self.block(node, self.model.outgoing(node.id), probabilities)

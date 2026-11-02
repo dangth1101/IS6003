@@ -1,6 +1,6 @@
 {
   "meta": {
-    "schema_version": 2,
+    "schema_version": 3,
     "seed": 42,
     "replications": 30,
     "case_count": 400,
@@ -86,6 +86,10 @@
       "waiting_time": "Waiting time",
       "cycle_time_efficiency": "Cycle time efficiency",
       "days": "days",
+      "by_outcome": "Cycle time by outcome",
+      "outcome": "Outcome",
+      "cases": "Cases",
+      "ml_outcome": "Trained and tested only on cases that end at “{outcome}”.",
       "rework": "Rework",
       "gateway": "Gateway",
       "gateway_after": "Decision after {task}",
@@ -347,6 +351,18 @@
       "p90": 118.0
     },
     "cycle_time_efficiency": 0.35,
+    "by_outcome": [
+      {
+        "end_event_id": "end",
+        "case_count": 400,
+        "cycle_time": {
+          "mean": 118.4,
+          "median": 109.7,
+          "p90": 171.2
+        },
+        "cycle_time_efficiency": 0.35
+      }
+    ],
     "rework": [
       {
         "gateway_id": "g1",
@@ -489,7 +505,8 @@
             "feature": "requesting_unit",
             "mean_abs_shap": 0.6
           }
-        ]
+        ],
+        "outcome": "end"
       },
       {
         "id": "rework_g3",

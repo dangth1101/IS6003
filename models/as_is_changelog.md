@@ -19,7 +19,7 @@ The new model lints with no errors and no warnings and has 30 flow nodes, the G7
 | Original | New | What |
 | --- | --- | --- |
 | `lane_bu` "Đơn vị nghiệp vụ / PMO" | `Lane_BusinessUnit` "Business unit / PMO" | Renamed |
-| `lane_ld` "CNTT" | `Lane_ITManagement` "IT management" | Renamed. Read as IT management because it holds all approvals (see open questions) |
+| `lane_ld` "CNTT" | `Lane_ITManagement` "IT management" | Renamed. Read as IT management because it holds all approvals. Confirmed by the student (answered question 7) |
 | `lane_dev` "PTUD" | `Lane_Development` "Application development" | Renamed |
 | `lane_qa` "QC/ Đơn vị nghiệm thu" | `Lane_QualityControl` "QC / Acceptance unit" | Renamed |
 | `lane_ops` "ITO / HTUD / PMO" | `Lane_ITOperations` "IT operations / App support / PMO" | Renamed |
@@ -33,7 +33,7 @@ The new model lints with no errors and no warnings and has 30 flow nodes, the G7
 | `approve` "Phê duyệt thực hiện dự án" | `Task_ApproveProposal` "Approve project proposal" | Renamed; now fed by XOR join `Gateway_ProposalJoin` | G6; rework block (p.260) |
 | `g1` "Được phê duyệt?" | `Gateway_ProposalSplit` | Label removed; three conditions: "proposal approved", "changes requested", "proposal rejected" | p.190; G3 |
 | (none) | `End_ProposalRejected` "Proposal rejected" | Added. Before, a proposal could only loop back, so a never-approved request could cycle forever | One end event per outcome (G3 p.192); always end with an end event (p.81); livelock (p.185) |
-| `revise` "Bổ sung / điều chỉnh đề xuất" | `Task_ReviseProposal` "Revise project proposal" | Renamed. **Kept in the IT operations lane on purpose**, see open question 1 | G6 |
+| `revise` "Bổ sung / điều chỉnh đề xuất" | `Task_ReviseProposal` "Revise project proposal" | Renamed. **Kept in the IT operations lane on purpose**, confirmed by the student (answered question 1) | G6 |
 | `kick` "Kick-off dự án" | `Task_HoldKickOff` "Hold project kick-off" | Renamed | G6 |
 | `spec` "Đặc tả yêu cầu nghiệp vụ và kỹ thuật" | `Task_SpecifyRequirements` "Specify business and technical requirements" | Renamed | G6 |
 | `plan` "Lập kế hoạch dự án chi tiết" | `Task_DraftPlan` "Draft detailed project plan" | Renamed; now fed by XOR join `Gateway_PlanJoin` | G6; p.260 |
@@ -86,21 +86,45 @@ New flows with no original: `Flow_ProposalSubmitted`, `Flow_ProposalRejected`, `
 
 The model sits exactly at G7's 30 flow nodes, so every extra node had to pay for itself.
 
-1. The four checks run in sequence, not in parallel. An AND block around code review, functional and security testing costs two gateways and gives 31 nodes. The original label lists them one after another, so sequence is also the closer reading. If they really run in parallel, the as-is cycle time is overstated (open question 3). Running them in parallel is a natural redesign candidate for ticket 15.
+1. The four checks run in sequence, not in parallel. An AND block around code review, functional and security testing costs two gateways and gives 31 nodes. The original label lists them one after another, so sequence is also the closer reading. The student confirmed they run in sequence (answered question 3). Running them in parallel is a natural redesign candidate for ticket 15.
 2. There are two rework tasks instead of one shared "fix" task. In the original, failed tests and a rejected release both go to the same `fix` task. Keeping that needs an extra XOR join (29 nodes) but gives an unstructured cycle, which the book's flow analysis can't reduce (§7.1.7 p.272). Two tasks give nested rework blocks: 30 nodes, structured (G4), and the flow analysis works on it.
 3. There is one test decision after all four checks, as in the original. A decision per check would be more realistic (a failed code review doesn't wait for acceptance testing) but adds at least four nodes (three more splits and a join in front of the fix task).
 4. "Evaluate project results" stays one task even though the original label has three actions (archive records, evaluate, improve). Splitting it needs nodes we don't have, and its time isn't on the critical question.
 5. The to-be model has no slack. Ticket 15 must stay at 30 flow nodes too, or decompose. Sub-processes are outside the simulator's subset, so decomposing means removing elements, not collapsing them.
+6. A plan or a release can't be cancelled in the model; both only loop back. The student says cancelling happens, but rarely (answered question 2). Each cancel path needs a third arc and its own end event, so at least two more nodes, and the model is at the 30-node limit. Rare outcomes are left out on purpose. The effect is small: a few cancelled projects would end early and pull the all-cases mean down a little.
 
-## Open questions for the student
+## Answered questions
 
-1. Which lane does "Revise project proposal" belong in? The original puts it in "ITO / HTUD / PMO" (IT operations). Usually the requester, i.e. the business unit / PMO lane, revises its own proposal. It's kept where the original has it. The answer decides whose capacity the revision uses and where its waiting time shows up.
-2. When is a proposal rejected outright? The original has no rejection at all. The model now has three outcomes at the approval step (approved, changes requested, rejected). Is that how it works, or is a proposal only dropped after several revision rounds? Can a plan or a release also be cancelled? The model says no: they only loop back.
-3. Do the four checks run in sequence? They're modeled as code review → functional tests → security tests → acceptance tests. Do some run at the same time?
-4. After a failed check, what reruns? The model reruns all four checks again, like the original (`fix` → `test`). Or only the check that failed?
-5. Who does each check? All four sit in the QC / Acceptance unit lane, as in the original. Is code review done by developers, and acceptance by the business unit?
-6. Is "Refine application" different work from "Fix defects"? The split follows the slash in the original label "Khắc phục lỗi / hoàn thiện ứng dụng". If it's the same work done by the same people, say so; the durations can then be equal.
-7. Is "CNTT" IT management? The lane holds all three approvals, and its original ID `lane_ld` suggests leadership (lãnh đạo).
-8. PMO shows up in two lanes ("Đơn vị nghiệp vụ / PMO" and "ITO / HTUD / PMO"). Is it one team? If so, the two lanes share capacity, which the simulator can't express yet.
-9. How long is "Monitor live operation"? Is it a fixed warranty period before the project closes, or open-ended? It decides whether it belongs in the cycle time at all.
-10. What should the pool be called? "Bank" is a generic stand-in, since the spec uses no real company data. Change it if the report names the organization differently.
+The student answered the open questions from ticket 06. Most answers keep the model and the defaults as they were.
+
+1. Which lane does "Revise project proposal" belong in?
+   - Answer: okay, keep it in IT operations as in the original.
+   - Changed: nothing.
+2. When is a proposal rejected outright, and can a plan or a release be cancelled?
+   - Answer: possible but rarely happens. Read as: outright rejection happens but is rare, and cancelling a plan or a release also happens but is rare.
+   - Changed: the rejection probability at `Gateway_ProposalSplit` went from 8% to 3% (approved 72% to 77%), so about 4% of requests end rejected instead of 10%. Rationale in the parameter file: "Student: possible but rare". No cancel paths were added for the plan or the release (trade-off 6).
+   - Side effect: more projects reach build and testing with the same lanes. QC is now busy about 93% of the time instead of 88%, and waiting grew with it.
+3. Do the four checks run in sequence?
+   - Answer: okay, in sequence.
+   - Changed: nothing. Parallel checks stay a redesign candidate for ticket 15.
+4. After a failed check, what reruns?
+   - Answer: okay, all four rerun, and this can be optimized.
+   - Changed: nothing in the as-is model, which keeps rerunning all four checks. "Rerun only the failed check" is a redesign candidate for ticket 15 (noted there).
+5. Who does each check?
+   - Answer: okay, all four in the QC / Acceptance unit lane.
+   - Changed: nothing.
+6. Is "Refine application" different work from "Fix defects"?
+   - Answer: okay, different work, as modeled.
+   - Changed: nothing. The durations stay different (refine is the larger job).
+7. Is "CNTT" IT management?
+   - Answer: okay.
+   - Changed: nothing.
+8. Is PMO in the two lanes one team?
+   - Answer: okay, keep two lanes.
+   - Changed: nothing. The lanes keep separate capacities.
+9. How long is "Monitor live operation", and does it belong in the cycle time?
+   - Answer: okay, keep about two weeks of hypercare.
+   - Changed: the student also decided that the cycle time ends at go-live, the end of "Start live operation". Monitoring and the evaluation stay in the model and the log but don't count. This is one setting, `[cycle_time] ends_at` in `models/as_is.params.toml`, and the baseline, flow analysis, ML and scenarios all read it.
+10. What should the pool be called?
+    - Answer: okay, "Bank".
+    - Changed: nothing.

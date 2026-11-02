@@ -11,3 +11,7 @@
 - [ ] To-be model lints with zero errors
 - [ ] Every combination of changes resolves to a valid model and parameter set
 - [ ] Number of changes is small enough that 2^k scenarios stay practical (about 3 to 5)
+
+## Comments
+
+- Redesign candidates from the student's answers (`models/as_is_changelog.md`, answered questions 3 and 4): rerun only the failed check after "Fix defects" (the as-is model reruns all four, and the student says this can be optimized), and run the checks in parallel. Both target the QC lane, which is now the main queue (Phase 1 draft, issues 1 to 3).

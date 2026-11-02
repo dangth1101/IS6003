@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from bpmopt.analysis import task_runs
 from bpmopt.bpmn import ProcessModel
 
 CLASSES = ("VA", "BVA", "NVA")
@@ -42,14 +43,16 @@ def load_value_added(path: str | Path, model: ProcessModel) -> dict[str, dict[st
     return value_added
 
 
-def time_per_class(log: pd.DataFrame, value_added: dict[str, dict[str, str]]) -> pd.DataFrame:
+def time_per_class(log: pd.DataFrame, value_added: dict[str, dict[str, str]], *, ends_at: str | None = None) -> pd.DataFrame:
     """Per class (VA, BVA, NVA): number of tasks, task time per case in working days, and share of all task time.
 
     Task time is start to end of each task run, so a task that reruns in a
     rework loop counts every run. Waiting isn't task time and isn't counted.
+    With a cycle time cut-off (ends_at), only task time up to it counts, the
+    same span as the processing time in the baseline.
     """
     classes = pd.Series({task_id: entry["class"] for task_id, entry in value_added.items()})
-    runs = log[log.element_type == "task"]
+    runs = task_runs(log, ends_at)
     days = (runs.end_time - runs.start_time).groupby(runs.activity_id.map(classes)).sum() / log.case_id.nunique()
     table = pd.DataFrame(
         {"tasks": classes.value_counts(), "days_per_case": days},

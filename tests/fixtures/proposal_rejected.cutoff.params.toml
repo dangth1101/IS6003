@@ -1,0 +1,41 @@
+# proposal_rejected.bpmn with the cycle time cut off at the end of Build application.
+# Expected CT, worked by hand:
+# - review loop: r = 0.25, (Review 1 + 0.25 x Revise 2) / 0.75 = 2
+# - leaving the loop, the case is approved with 0.6 / 0.75 = 0.8 and rejected with 0.15 / 0.75 = 0.2
+# - approved path: Build 5, then the cut-off. The test loop after it adds nothing
+# - rejected path: the case ends at "Proposal rejected", before the cut-off, and counts up to there
+# - CT = 2 + 0.8 x 5 + 0.2 x 0 = 6.0 (8.4 without the cut-off)
+
+version = "fixture-1"
+
+[cycle_time]
+ends_at = "Task_BuildApp"
+rationale = "Fixture value."
+
+[tasks.Task_ReviewProposal]
+duration = { fixed = 1.0 }
+rationale = "Fixture value."
+
+[tasks.Task_ReviseProposal]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[tasks.Task_BuildApp]
+duration = { fixed = 5.0 }
+rationale = "Fixture value."
+
+[tasks.Task_TestApp]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[tasks.Task_FixDefects]
+duration = { fixed = 1.0 }
+rationale = "Fixture value."
+
+[gateways.Gateway_ReviewSplit]
+branches = { Flow_Approved = 0.6, Flow_Revise = 0.25, Flow_Rejected = 0.15 }
+rationale = "Fixture value."
+
+[gateways.Gateway_TestSplit]
+branches = { Flow_Passed = 0.75, Flow_Failed = 0.25 }
+rationale = "Fixture value."

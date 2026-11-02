@@ -256,6 +256,15 @@
           : el("div", { class: "tile" }, el("dt", {}, t("cycle_time_efficiency")),
               el("dd", {}, NUM(0, "percent").format(b.cycle_time_efficiency)))));
 
+      if (b.by_outcome) {
+        out.push(el("h3", {}, t("by_outcome")));
+        out.push(table([t("outcome"), t("cases"), t("mean"), t("median"), t("p90"), t("cycle_time_efficiency")],
+          b.by_outcome.map((o) => [names[o.end_event_id] ?? o.end_event_id, NUM(0).format(o.case_count),
+            fmt(o.cycle_time.mean), fmt(o.cycle_time.median), fmt(o.cycle_time.p90),
+            NUM(0, "percent").format(o.cycle_time_efficiency)]),
+          { numeric: [1, 2, 3, 4, 5] }));
+      }
+
       out.push(el("h3", {}, t("flow_analysis")));
       if (b.flow_analysis) {
         const { theoretical, simulated } = b.flow_analysis;
@@ -318,6 +327,9 @@
           : t("ml_task_rework", { gateway: names[task.gateway_id] ?? task.gateway_id });
 
         out.push(el("h3", {}, title));
+        if (task.outcome) {
+          out.push(el("p", { class: "muted small" }, t("ml_outcome", { outcome: names[task.outcome] ?? task.outcome })));
+        }
         if (task.skipped) {
           out.push(el("p", { class: "muted" }, task.skipped));
           continue;

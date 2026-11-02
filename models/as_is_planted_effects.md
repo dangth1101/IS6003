@@ -27,13 +27,13 @@ Duration effects multiply the drawn duration by 1 + the terms. Branch effects ad
 |---|---|
 | `requesting_unit` | Negative control. It's drawn like the others but nothing reads it. Any importance the ML gives it is noise |
 
-`Gateway_ProposalSplit` has fixed probabilities (a three-way split can't be logistic), so no attribute predicts a revised or rejected proposal. A rework model for that split should do no better than the majority-class baseline.
+`Gateway_ProposalSplit` has fixed probabilities (a three-way split can't be logistic), so no attribute predicts a revised or rejected proposal. A rework model for that split should do no better than the majority-class baseline. Outright rejection is rare (3% of decisions, the student's answer), and the cycle time model only learns from approved projects, so rejections hardly touch the planted effects.
 
 Queueing adds noise that no attribute explains: waiting depends on how busy the lanes are when the case arrives, not on the case.
 
 ## What the ML should find
 
-- Cycle time: `complexity` first, since it acts on three places (requirements, build, test failures). Then `security_level` and `integrations`. `project_type` and `team_workload` are weak and may not stand out from noise. `requesting_unit` should rank last. A quick linear fit on the 2,000-case log (closed projects, seed 42) gives about 21 days per complexity step, 12 per security level and 6 per integration, with R² of only about 0.15. Most of the variation comes from the random number of rework loops and from queueing.
+- Cycle time: `complexity` first, since it acts on three places (requirements, build, test failures). Then `security_level` and `integrations`. `project_type` and `team_workload` are weak and may not stand out from noise. `requesting_unit` should rank last. A quick linear fit on the 2,000-case log (approved projects, cycle time up to go-live, seed 42) gives about 23 days per complexity step, 14 per security level and 6 per integration, with R² of only about 0.13. Most of the variation comes from the random number of rework loops and from queueing.
 - Test rework: `complexity`, `security_level`, `integrations`. Nothing else.
 - Plan rework: `project_type` only (`new_system`).
 - Release rework: `project_type` only (`regulatory`). Few releases are rejected, so this signal is weak.

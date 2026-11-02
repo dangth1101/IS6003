@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from bpmopt.analysis import cycle_times
+from bpmopt.analysis import baseline_metrics, cycle_times, outcomes
 from bpmopt.bpmn import read_bpmn
 from bpmopt.ml import cycle_time_task, ml_section, rework_tasks
 from bpmopt.parameters import load_parameters
@@ -61,9 +61,13 @@ def test_parameters_cover_every_task_xor_split_and_lane_of_the_model(model, para
     assert params.arrival_rate and params.warm_up > 0
 
 
-def test_every_rationale_is_marked_as_a_proposed_default(params):
-    not_marked = [entry for entry, text in params.rationales.items() if not text.startswith("Proposed default.")]
+def test_every_rationale_is_marked_as_a_proposed_default_or_the_students_answer(params):
+    not_marked = [entry for entry, text in params.rationales.items() if not text.startswith(("Proposed default", "Student"))]
     assert not not_marked
+
+
+def test_the_cycle_time_ends_at_go_live(params):
+    assert params.cycle_time_end == "Task_StartOperation"
 
 
 def test_a_log_of_the_target_size_simulates_quickly(run):
@@ -75,11 +79,12 @@ def test_a_log_of_the_target_size_simulates_quickly(run):
     assert log.case_id.min() > 1
 
 
-def test_mean_cycle_time_of_a_closed_project_is_six_to_ten_months(log):
-    ct = cycle_times(log)
-    closed = ct[log.groupby("case_id").activity_id.last() == "End_ProjectClosed"]
+def test_mean_cycle_time_of_an_approved_project_is_six_to_ten_months(log, params):
+    ct = cycle_times(log, params.cycle_time_end)
+    ended_at = outcomes(log)
+    approved = ct[ended_at[ended_at == "End_ProjectClosed"].index]
 
-    assert 120 <= closed.mean() <= 200
+    assert 120 <= approved.mean() <= 200
 
 
 def _counts(log: pd.DataFrame) -> pd.Series:
@@ -91,7 +96,8 @@ def test_proposals_are_sent_back_or_rejected_at_the_stated_rates(log):
     outcome = log.groupby("case_id").activity_id.last()
 
     assert 0.15 <= n["Task_ReviseProposal"] / n["Task_ApproveProposal"] <= 0.25
-    assert 0.07 <= (outcome == "End_ProposalRejected").mean() <= 0.13
+    # Student: outright rejection is possible but rare.
+    assert 0.02 <= (outcome == "End_ProposalRejected").mean() <= 0.06
 
 
 def test_plans_tests_and_releases_loop_back_at_the_stated_rates(log):
@@ -121,11 +127,10 @@ def test_every_lane_is_busy_but_below_capacity_and_qc_is_the_bottleneck(log, par
     assert rho.idxmax() == "Lane_QualityControl"
 
 
-def test_waiting_is_a_real_but_minor_part_of_the_cycle_time(log):
-    tasks = log[log.element_type == "task"]
-    waiting = (tasks.start_time - tasks.ready_time).sum()
+def test_waiting_is_a_real_but_minor_part_of_the_cycle_time(log, model, params):
+    metrics = baseline_metrics(log, model, ends_at=params.cycle_time_end)
 
-    assert 0.10 <= waiting / cycle_times(log).sum() <= 0.40
+    assert 0.10 <= metrics["waiting_time"]["mean"] / metrics["cycle_time"]["mean"] <= 0.40
 
 
 @pytest.fixture(scope="module")
@@ -189,7 +194,8 @@ def test_the_as_is_pipeline_writes_results_that_validate(tmp_path, model, params
     # The notebook's path on the real model, parameters and seed.
     results = build_results(log=log, model=model, params=params, seed=42)
     results["value_added"] = load_value_added(VALUE_ADDED, model)
-    results["ml"] = ml_section([cycle_time_task(log, seed=42), *rework_tasks(log, model, seed=42)])
+    cycle_time = cycle_time_task(log, seed=42, ends_at=params.cycle_time_end, outcome="End_ProjectClosed")
+    results["ml"] = ml_section([cycle_time, *rework_tasks(log, model, seed=42)])
 
     path = export_results(results, tmp_path, models={"as_is": MODEL})
 
@@ -199,3 +205,9 @@ def test_the_as_is_pipeline_writes_results_that_validate(tmp_path, model, params
     assert exported["meta"]["case_count"] == N_CASES
     rework_ids = {f"rework_{r['gateway_id']}" for r in exported["baseline"]["rework"]}
     assert {t["id"] for t in exported["ml"]["tasks"]} == {"cycle_time"} | rework_ids
+    assert exported["ml"]["tasks"][0]["outcome"] == "End_ProjectClosed"
+    # Headline on all cases, approved projects next to it as a check.
+    by_outcome = {row["end_event_id"]: row for row in exported["baseline"]["by_outcome"]}
+    assert set(by_outcome) == {"End_ProjectClosed", "End_ProposalRejected"}
+    assert sum(row["case_count"] for row in by_outcome.values()) == N_CASES
+    assert by_outcome["End_ProjectClosed"]["cycle_time"]["mean"] > exported["baseline"]["cycle_time"]["mean"]
