@@ -22,14 +22,14 @@
 # - 5-12% of releases rejected
 # - waiting 10-40% of the cycle time
 # - every lane busy 70-95% of the time (utilisation below 1, so queues settle),
-#   QC the busiest at about 0.93 (0.88 before rejections became rare: more
-#   projects now reach testing with the same eight testers)
+#   QC the busiest at about 0.87 (the arrival rate is set to keep it there;
+#   at 0.25 it was 0.93 once rejections became rare)
 
-version = "proposed-2"  # proposed-1 plus the student's answers: rare rejection, cycle time to go-live
+version = "proposed-3"  # proposed-2 with the arrival rate lowered from 0.25 to 0.234
 
 [arrivals]
-rate = 0.25
-rationale = "Proposed default. About one new request a week (62 a year), plausible for the change portfolio of a mid-size bank's IT division."
+rate = 0.234
+rationale = "Proposed default. About 58 new requests a year, a bit under one a week, plausible for the change portfolio of a mid-size bank's IT division. Chosen to keep the busiest lane, QC, near the 88% it had before rejections became rare, so the results aren't dominated by queueing close to saturation (§7.2, p.276). Resulting utilisation on the 2,000-case log (seed 42): business unit 0.78, IT management 0.77, development 0.81, IT operations 0.79, QC 0.87."
 
 [warm_up]
 length = 250

@@ -5,8 +5,8 @@
     "replications": 1,
     "case_count": 2000,
     "warm_up": 250.0,
-    "parameter_version": "proposed-2",
-    "generated_at": "2026-11-02T03:01:22+00:00"
+    "parameter_version": "proposed-3",
+    "generated_at": "2026-11-02T03:56:28+00:00"
   },
   "text": {
     "lang": "en",
@@ -161,8 +161,8 @@
   "assumptions": [
     {
       "parameter": "arrivals.rate",
-      "value": 0.25,
-      "rationale": "Proposed default. About one new request a week (62 a year), plausible for the change portfolio of a mid-size bank's IT division."
+      "value": 0.234,
+      "rationale": "Proposed default. About 58 new requests a year, a bit under one a week, plausible for the change portfolio of a mid-size bank's IT division. Chosen to keep the busiest lane, QC, near the 88% it had before rejections became rare, so the results aren't dominated by queueing close to saturation (§7.2, p.276). Resulting utilisation on the 2,000-case log (seed 42): business unit 0.78, IT management 0.77, development 0.81, IT operations 0.79, QC 0.87."
     },
     {
       "parameter": "warm_up.length",
@@ -348,55 +348,55 @@
   "baseline": {
     "time_unit": "working days",
     "cycle_time": {
-      "mean": 150.99799757821808,
-      "median": 137.45579122192993,
-      "p90": 229.82798180909035
+      "mean": 132.51123174314924,
+      "median": 122.88215062428276,
+      "p90": 197.95814761617294
     },
     "processing_time": {
-      "mean": 104.73863945225862,
-      "median": 99.3667335294665,
-      "p90": 147.68445858136022
+      "mean": 104.7293275860765,
+      "median": 99.38728271771856,
+      "p90": 147.68445858135985
     },
     "waiting_time": {
-      "mean": 46.25935812595948,
-      "median": 36.369138030087925,
-      "p90": 94.27676826706085
+      "mean": 27.781904157072713,
+      "median": 20.44379316452023,
+      "p90": 61.263151329263714
     },
-    "cycle_time_efficiency": 0.6936425722996972,
+    "cycle_time_efficiency": 0.7903430238206275,
     "by_outcome": [
       {
         "end_event_id": "End_ProjectClosed",
-        "case_count": 1925,
+        "case_count": 1924,
         "cycle_time": {
-          "mean": 156.34003422793245,
-          "median": 139.49848317874103,
-          "p90": 232.85070480430133
+          "mean": 137.27172430863018,
+          "median": 124.3321161324775,
+          "p90": 200.2653777337232
         },
-        "cycle_time_efficiency": 0.6940776138240897
+        "cycle_time_efficiency": 0.7908080188517053
       },
       {
         "end_event_id": "End_ProposalRejected",
-        "case_count": 75,
+        "case_count": 76,
         "cycle_time": {
-          "mean": 13.885723568883044,
-          "median": 11.344797091770488,
-          "p90": 24.139129664608312
+          "mean": 11.995604164393788,
+          "median": 9.150632984998538,
+          "p90": 22.54130221242167
         },
-        "cycle_time_efficiency": 0.5679232967020238
+        "cycle_time_efficiency": 0.6556333606622752
       }
     ],
     "rework": [
       {
         "gateway_id": "Gateway_ReleaseSplit",
-        "rate": 0.08311688311688312
+        "rate": 0.08316008316008316
       },
       {
         "gateway_id": "Gateway_TestSplit",
-        "rate": 0.37194805194805197
+        "rate": 0.37266112266112267
       },
       {
         "gateway_id": "Gateway_PlanSplit",
-        "rate": 0.19480519480519481
+        "rate": 0.1943866943866944
       },
       {
         "gateway_id": "Gateway_ProposalSplit",
@@ -406,76 +406,76 @@
     "waiting_by_activity": [
       {
         "activity_id": "Task_RunAcceptanceTests",
-        "mean": 3.5919237184068065
+        "mean": 1.9660456964600421
       },
       {
         "activity_id": "Task_RunSecurityTests",
-        "mean": 3.5836387403396053
+        "mean": 1.962133410887549
       },
       {
         "activity_id": "Task_RunFunctionalTests",
-        "mean": 3.5819858250088155
+        "mean": 1.9436690894429558
       },
       {
         "activity_id": "Task_ReviewSourceCode",
-        "mean": 3.4948992578907125
-      },
-      {
-        "activity_id": "Task_HoldKickOff",
-        "mean": 2.33201206181969
-      },
-      {
-        "activity_id": "Task_ApproveProposal",
-        "mean": 2.302865070292846
-      },
-      {
-        "activity_id": "Task_RegisterRequest",
-        "mean": 2.2213063977091094
+        "mean": 1.8932887088202581
       },
       {
         "activity_id": "Task_ApprovePlan",
-        "mean": 2.2147473763924403
+        "mean": 1.6066474387643257
+      },
+      {
+        "activity_id": "Task_ApproveProposal",
+        "mean": 1.6056493835029715
+      },
+      {
+        "activity_id": "Task_HoldKickOff",
+        "mean": 1.5836769809166178
+      },
+      {
+        "activity_id": "Task_RegisterRequest",
+        "mean": 1.569169072134357
       },
       {
         "activity_id": "Task_ApproveRelease",
-        "mean": 2.1265100007439885
+        "mean": 1.4927433920546238
       },
       {
         "activity_id": "Task_RefineApplication",
-        "mean": 1.928313653032921
-      },
-      {
-        "activity_id": "Task_FixDefects",
-        "mean": 1.8900651154323618
-      },
-      {
-        "activity_id": "Task_DraftPlan",
-        "mean": 1.7920719282968196
-      },
-      {
-        "activity_id": "Task_DeployApplication",
-        "mean": 1.7758402107392295
+        "mean": 1.4166014332948642
       },
       {
         "activity_id": "Task_ReviseProposal",
-        "mean": 1.6664687006354586
+        "mean": 1.1892509349135882
       },
       {
-        "activity_id": "Task_SpecifyRequirements",
-        "mean": 1.6595797451324965
+        "activity_id": "Task_DeployApplication",
+        "mean": 1.1669682871399893
+      },
+      {
+        "activity_id": "Task_FixDefects",
+        "mean": 1.1244747354177422
       },
       {
         "activity_id": "Task_StartOperation",
-        "mean": 1.5707808553847977
+        "mean": 1.0653982444389938
+      },
+      {
+        "activity_id": "Task_SpecifyRequirements",
+        "mean": 1.0104634188086417
+      },
+      {
+        "activity_id": "Task_DraftPlan",
+        "mean": 0.9993418300542074
       },
       {
         "activity_id": "Task_BuildApplication",
-        "mean": 1.4586505280222217
+        "mean": 0.7620483105571912
       }
     ],
     "flow_analysis": {
       "theoretical": 105.36303528086376,
-      "simulated": 104.7386394522586
+      "simulated": 104.7293275860765
     }
   },
   "value_added": {
@@ -569,49 +569,49 @@
           {
             "id": "reference",
             "metrics": {
-              "mae": 39.648779702379436,
-              "r2": -0.005883338283307449
+              "mae": 31.797721960328353,
+              "r2": -0.002001825501031007
             }
           },
           {
             "id": "linear",
             "metrics": {
-              "mae": 38.18803460935708,
-              "r2": 0.07174858061466338
+              "mae": 30.098370692314752,
+              "r2": 0.10820256170328102
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "mae": 38.338527186480334,
-              "r2": 0.06988792445844816
+              "mae": 30.216124618676027,
+              "r2": 0.10136963308570424
             }
           }
         ],
         "drivers": [
           {
             "feature": "complexity",
-            "mean_abs_shap": 12.291495539715987
+            "mean_abs_shap": 11.042726616452901
           },
           {
             "feature": "security_level",
-            "mean_abs_shap": 8.076095943396053
+            "mean_abs_shap": 7.365810071890866
           },
           {
             "feature": "integrations",
-            "mean_abs_shap": 5.747802129076967
+            "mean_abs_shap": 4.939214454983588
           },
           {
             "feature": "team_workload",
-            "mean_abs_shap": 3.6354426803631985
+            "mean_abs_shap": 3.008567218001237
           },
           {
             "feature": "project_type",
-            "mean_abs_shap": 1.69889070600859
+            "mean_abs_shap": 1.3798930117930557
           },
           {
             "feature": "requesting_unit",
-            "mean_abs_shap": 1.0637192971238116
+            "mean_abs_shap": 0.764329511021398
           }
         ],
         "outcome": "End_ProjectClosed"
@@ -631,42 +631,42 @@
           {
             "id": "linear",
             "metrics": {
-              "roc_auc": 0.6891235126529245,
-              "f1": 0.2375
+              "roc_auc": 0.690296631473102,
+              "f1": 0.2360248447204969
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "roc_auc": 0.5209485503603151,
-              "f1": 0.17543859649122806
+              "roc_auc": 0.5234623764035529,
+              "f1": 0.17177914110429449
             }
           }
         ],
         "drivers": [
           {
             "feature": "team_workload",
-            "mean_abs_shap": 0.33633001856146383
+            "mean_abs_shap": 0.3333103839495592
           },
           {
             "feature": "project_type",
-            "mean_abs_shap": 0.22853881145194097
+            "mean_abs_shap": 0.23276898070273988
           },
           {
             "feature": "complexity",
-            "mean_abs_shap": 0.10914836176508692
+            "mean_abs_shap": 0.1101357559188099
           },
           {
             "feature": "requesting_unit",
-            "mean_abs_shap": 0.10665248920723171
+            "mean_abs_shap": 0.10408110485276516
           },
           {
             "feature": "integrations",
-            "mean_abs_shap": 0.05704976093452511
+            "mean_abs_shap": 0.05750641426381153
           },
           {
             "feature": "security_level",
-            "mean_abs_shap": 0.012250166244611498
+            "mean_abs_shap": 0.01495317673169333
           }
         ]
       },
@@ -685,42 +685,42 @@
           {
             "id": "linear",
             "metrics": {
-              "roc_auc": 0.633935860058309,
-              "f1": 0.5203761755485894
+              "roc_auc": 0.6339941050684852,
+              "f1": 0.525
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "roc_auc": 0.6346938775510205,
-              "f1": 0.5094339622641509
+              "roc_auc": 0.6405536612148183,
+              "f1": 0.5283018867924528
             }
           }
         ],
         "drivers": [
           {
             "feature": "complexity",
-            "mean_abs_shap": 0.36052022224701924
+            "mean_abs_shap": 0.3715605676996065
           },
           {
             "feature": "security_level",
-            "mean_abs_shap": 0.24996429205705664
+            "mean_abs_shap": 0.2518206614496113
           },
           {
             "feature": "integrations",
-            "mean_abs_shap": 0.2146705854176545
+            "mean_abs_shap": 0.22142127405340029
           },
           {
             "feature": "team_workload",
-            "mean_abs_shap": 0.09902774944738414
+            "mean_abs_shap": 0.10288796628043462
           },
           {
             "feature": "project_type",
-            "mean_abs_shap": 0.057838122961611865
+            "mean_abs_shap": 0.05707820905108721
           },
           {
             "feature": "requesting_unit",
-            "mean_abs_shap": 0.03827499306419517
+            "mean_abs_shap": 0.034575572115877716
           }
         ]
       },
@@ -739,42 +739,42 @@
           {
             "id": "linear",
             "metrics": {
-              "roc_auc": 0.5504917456972251,
-              "f1": 0.31958762886597936
+              "roc_auc": 0.5509255235943339,
+              "f1": 0.32323232323232326
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "roc_auc": 0.5650904460835967,
-              "f1": 0.30917874396135264
+              "roc_auc": 0.5646997479794907,
+              "f1": 0.32075471698113206
             }
           }
         ],
         "drivers": [
           {
             "feature": "project_type",
-            "mean_abs_shap": 0.29290949499087787
+            "mean_abs_shap": 0.2916096628835492
           },
           {
             "feature": "team_workload",
-            "mean_abs_shap": 0.20960718083037072
+            "mean_abs_shap": 0.2043132549560861
           },
           {
             "feature": "requesting_unit",
-            "mean_abs_shap": 0.07804327974535917
+            "mean_abs_shap": 0.07335087005965518
           },
           {
             "feature": "complexity",
-            "mean_abs_shap": 0.06859963989688757
+            "mean_abs_shap": 0.06772235513697472
           },
           {
             "feature": "integrations",
-            "mean_abs_shap": 0.06091066828834706
+            "mean_abs_shap": 0.06387712592400813
           },
           {
             "feature": "security_level",
-            "mean_abs_shap": 0.027751527231044237
+            "mean_abs_shap": 0.027785528884008245
           }
         ]
       },
@@ -793,42 +793,42 @@
           {
             "id": "linear",
             "metrics": {
-              "roc_auc": 0.4671620418746856,
-              "f1": 0.29545454545454547
+              "roc_auc": 0.46634487476720765,
+              "f1": 0.291044776119403
             }
           },
           {
             "id": "gradient_boosting",
             "metrics": {
-              "roc_auc": 0.5137389217848988,
-              "f1": 0.27385892116182575
+              "roc_auc": 0.5088556117213332,
+              "f1": 0.2869198312236287
             }
           }
         ],
         "drivers": [
           {
             "feature": "team_workload",
-            "mean_abs_shap": 0.21391234755033894
+            "mean_abs_shap": 0.19759958847806927
           },
           {
             "feature": "integrations",
-            "mean_abs_shap": 0.10455107864306937
+            "mean_abs_shap": 0.10327023766351587
           },
           {
             "feature": "security_level",
-            "mean_abs_shap": 0.08994922913626467
+            "mean_abs_shap": 0.08949985050798304
           },
           {
             "feature": "requesting_unit",
-            "mean_abs_shap": 0.061148574816546605
+            "mean_abs_shap": 0.06109917175767198
           },
           {
             "feature": "project_type",
-            "mean_abs_shap": 0.02709807461273828
+            "mean_abs_shap": 0.029499342464678512
           },
           {
             "feature": "complexity",
-            "mean_abs_shap": 0.014777988121749432
+            "mean_abs_shap": 0.014417307850896921
           }
         ]
       }

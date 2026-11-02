@@ -103,7 +103,7 @@ The student answered the open questions from ticket 06. Most answers keep the mo
 2. When is a proposal rejected outright, and can a plan or a release be cancelled?
    - Answer: possible but rarely happens. Read as: outright rejection happens but is rare, and cancelling a plan or a release also happens but is rare.
    - Changed: the rejection probability at `Gateway_ProposalSplit` went from 8% to 3% (approved 72% to 77%), so about 4% of requests end rejected instead of 10%. Rationale in the parameter file: "Student: possible but rare". No cancel paths were added for the plan or the release (trade-off 6).
-   - Side effect: more projects reach build and testing with the same lanes. QC is now busy about 93% of the time instead of 88%, and waiting grew with it.
+   - Side effect: more projects reach build and testing with the same lanes. QC is now busy about 93% of the time instead of 88%, and waiting grew with it. Later the arrival rate went from 0.25 to 0.234 a day, which brings QC back to about 87% (parameters `proposed-3`).
 3. Do the four checks run in sequence?
    - Answer: okay, in sequence.
    - Changed: nothing. Parallel checks stay a redesign candidate for ticket 15.

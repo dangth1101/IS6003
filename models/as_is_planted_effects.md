@@ -33,7 +33,7 @@ Queueing adds noise that no attribute explains: waiting depends on how busy the 
 
 ## What the ML should find
 
-- Cycle time: `complexity` first, since it acts on three places (requirements, build, test failures). Then `security_level` and `integrations`. `project_type` and `team_workload` are weak and may not stand out from noise. `requesting_unit` should rank last. A quick linear fit on the 2,000-case log (approved projects, cycle time up to go-live, seed 42) gives about 23 days per complexity step, 14 per security level and 6 per integration, with R² of only about 0.13. Most of the variation comes from the random number of rework loops and from queueing.
+- Cycle time: `complexity` first, since it acts on three places (requirements, build, test failures). Then `security_level` and `integrations`. `project_type` and `team_workload` are weak and may not stand out from noise. `requesting_unit` should rank last. A quick linear fit on the 2,000-case log (approved projects, cycle time up to go-live, seed 42) gives about 21 days per complexity step, 12 per security level and 5 per integration, with R² of only about 0.15. Most of the variation comes from the random number of rework loops and from queueing.
 - Test rework: `complexity`, `security_level`, `integrations`. Nothing else.
 - Plan rework: `project_type` only (`new_system`).
 - Release rework: `project_type` only (`regulatory`). Few releases are rejected, so this signal is weak.
