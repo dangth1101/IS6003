@@ -20,7 +20,7 @@ The scenario runner simulates all 16 combinations of the four changes. A combina
 From the baseline and the ML (ticket 14), seed 42:
 
 - The four QC checks are the main queue. Each waits about 2 days for a tester, a test round takes about 26 days, and QC is the busiest lane (0.87).
-- 37% of test rounds find defects, the highest rework rate, and every fix sends the case through all four checks again.
+- 37% of cases that reach testing go back for fixes at least once, the highest rework rate, and every fix sends the case through all four checks again.
 - The ML ranks complexity and security level first for both cycle time and test rework.
 
 ## C1: Run the four checks in parallel

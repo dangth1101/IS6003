@@ -6,8 +6,8 @@
 #
 # Baseline the changes target (web/results.json, 2,000 cases, seed 42): mean cycle time
 # 132.5 working days, P90 198; waiting 27.8 days per case, most of it in front of the four
-# QC checks; 37% of test rounds find defects, the highest rework rate. QC is the busiest
-# lane (0.87). The ML (ticket 14) ranks complexity, security_level and integrations first
+# QC checks; 37% of cases that reach testing go back for fixes at least once, the highest
+# rework rate. QC is the busiest lane (0.87). The ML (ticket 14) ranks complexity, security_level and integrations first
 # for both cycle time and test rework.
 #
 # Every override value is a proposed default, an assumption, not a measurement. The
