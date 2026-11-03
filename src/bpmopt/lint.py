@@ -387,7 +387,7 @@ KNOWN_VERBS = {
     "improve", "inform", "inspect", "install", "integrate", "issue", "launch", "log", "measure",
     "merge", "migrate", "monitor", "notify", "open", "operate", "pay", "plan", "prepare",
     "prioritise", "prioritize", "record", "refine", "register", "reject", "release", "renew",
-    "repair", "report", "request", "resolve", "review", "revise", "run", "schedule", "send", "ship",
+    "repair", "report", "request", "resolve", "retest", "review", "revise", "run", "schedule", "send", "ship",
     "sign", "specify", "start", "store", "submit", "test", "train", "update", "validate", "verify",
     "write",
 }  # fmt: skip
