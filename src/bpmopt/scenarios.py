@@ -224,6 +224,9 @@ def run_scenarios(catalog: Catalog, *, n_cases: int, seed: int, replications: in
     per scenario; the estimate is their average over replications, with a 95%
     t-interval. The saving is the as-is mean cycle time minus the scenario's,
     paired by replication, so the CI only reflects how the difference varies.
+    saving_share is the same saving as a share of that replication's as-is
+    mean, and replication_means keeps each replication's mean cycle time, so
+    any two scenarios can be compared pair by pair later (see ablation).
     Cycle times stop at the as-is parameters' cut-off (cycle_time_end), which no
     change can override, so every scenario is measured over the same span.
     """
@@ -245,6 +248,8 @@ def run_scenarios(catalog: Catalog, *, n_cases: int, seed: int, replications: in
             "changes": list(combo),
             "cycle_time": {name: _estimate(values) for name, values in s.items()},
             "saving": _estimate(as_is - s["mean"]),
+            "saving_share": _estimate((as_is - s["mean"]) / as_is),
+            "replication_means": [float(m) for m in s["mean"]],
         }
         for combo, s in stats.items()
     ]
@@ -253,21 +258,39 @@ def run_scenarios(catalog: Catalog, *, n_cases: int, seed: int, replications: in
 def ablation(scenarios: list[dict]) -> list[dict]:
     """Per change: its saving alone (with CI), and what it adds to the full design.
 
-    Both views are read off the full factorial, the same way the page does it:
-    `alone` is the saving of the scenario with only that change, `full_minus` is
-    the saving of the full design minus the saving of the full design without it.
+    Both views are read off the full factorial (the `ablation` section of the
+    results file): `alone` is the saving of the scenario with only that change,
+    `full_minus` is how many days longer the mean cycle time gets when the change
+    is dropped from the full design. Its CI pairs the two scenarios by
+    replication, like the saving does. A negative full_minus means the full
+    design is faster without that change.
     """
-    by_changes = {frozenset(s["changes"]): s["saving"] for s in scenarios}
+    by_changes = {frozenset(s["changes"]): s for s in scenarios}
     full_ids = max((s["changes"] for s in scenarios), key=len)
-    full = by_changes[frozenset(full_ids)]["value"]
+    full = np.array(by_changes[frozenset(full_ids)]["replication_means"])
     return [
         {
             "change": change_id,
-            "alone": by_changes[frozenset({change_id})],
-            "full_minus": full - by_changes[frozenset(full_ids) - {change_id}]["value"],
+            "alone": by_changes[frozenset({change_id})]["saving"],
+            "full_minus": _estimate(np.array(by_changes[frozenset(full_ids) - {change_id}]["replication_means"]) - full),
         }
         for change_id in full_ids
     ]
+
+
+def headline(scenarios: list[dict], ablation_rows: list[dict]) -> dict:
+    """The `headline` section: the proposed design, the change it needs most, and the best combination.
+
+    The proposed design is the full design, every change in the catalog. The
+    change it needs most is the one with the largest full_minus: dropping it
+    costs the full design the most days. The best combination is the scenario
+    with the largest mean saving, which can be smaller than the full design when
+    changes get in each other's way.
+    """
+    full = max((s["changes"] for s in scenarios), key=len)
+    best = max(scenarios, key=lambda s: s["saving"]["value"])
+    top = max(ablation_rows, key=lambda row: row["full_minus"]["value"])
+    return {"changes": list(full), "top_change": top["change"], "best": list(best["changes"])}
 
 
 def _estimate(values: np.ndarray) -> dict[str, float]:

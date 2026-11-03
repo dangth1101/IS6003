@@ -12,7 +12,7 @@ paragraphs = [
   "Our app development process runs from a business request through approvals, specification, planning, build, testing and deployment. Nobody knows how long it takes end to end, or where the time goes.",
   "We can't use real company data. So we simulate the process straight from its BPMN model and treat the simulated event log as our data. Every parameter is an estimate, and all of them are listed under Assumptions at the bottom.",
   "The work follows Design Science Research (Peffers et al., 2007): find the problem, set an objective, design a fix, show it and evaluate it. The process analysis follows Fundamentals of Business Process Management, 2nd ed. (Dumas et al.).",
-  "The objective is a shorter mean cycle time, with the saving backed by a confidence interval.",
+  "The objective, set in the qualitative analysis, is to cut the mean cycle time by at least 20%, with the 95% confidence interval of the saving above zero.",
 ]
 
 [sections.as_is]
@@ -36,15 +36,21 @@ paragraphs = [
 [sections.redesign]
 heading = "Redesign"
 paragraphs = [
-  "The to-be model applies a few changes, picked from the drivers above and the book's redesign heuristics (Appendix A). Each change says what it targets and what it costs on the Devil's Quadrangle (§8.1.3).",
+  "The to-be model applies four changes, picked from the baseline, the drivers above and the book's redesign heuristics (Appendix A). Each change says what it targets and what it costs on the Devil's Quadrangle (§8.1.3, p.303).",
+  "The baseline points at quality control. Its four checks are the longest queue, a test round finds defects in about a third of cases, and every fix sends the case through all four checks again. C1 runs the checks in parallel and C2 retests only what was fixed. C3 targets the two strongest drivers, complexity and security level, with a longer requirements step for risky cases. C4 adds a tester.",
+  "C1 and C2 change the model, and the diagram shows both. C3 and C4 only change parameters, so they don't appear in it. The to-be model has no rule errors, but with 33 elements it is just over the 30 of guideline G7 (§5.4.4, p.193). The book's fix is a sub-process, which our simulator doesn't support, so we accept the warning.",
   "The redesign is a human decision. Machine learning shows where time is lost. It doesn't draw the new process.",
 ]
 
 [sections.evaluation]
 heading = "Evaluation"
 paragraphs = [
-  "Switch changes on and off to see the simulated cycle time of that design. Every combination ran with the same random seeds, so differences come from the design and not from luck.",
-  "Ranges are 95% confidence intervals over the replications. The ablation shows each change on its own and what the full design loses without it.",
+  "Every combination of the four changes was simulated 30 times, with the same parameters, case count and warm-up as the baseline. Run r of every combination used the same seed, so differences come from the design and not from luck. Ranges are 95% confidence intervals over the 30 runs. Savings are compared run by run, so their ranges are much narrower than those of the cycle times themselves.",
+  "With all four changes the process is about a quarter faster, and the whole range sits above the 20% target. The objective is met.",
+  "Which change matters most depends on how you ask. On its own, C2 saves the most, about 27 days. In the full design, C1 matters most: without it the design takes about 11 days longer, without C2 only about 3. Both shrink the same QC queue, so once one of them is in, the other has less left to remove.",
+  "C3 helps on its own, about 16 days, but it makes the full design about 3 days slower, and that range is clearly below zero. Once C1 and C2 have emptied the QC queue, fewer defects buy little time, while the longer requirements step still loads the business unit. C4 adds only half a day on top of C1 and C2, for the cost of a salary. So the fastest combination is C1, C2 and C4, and C1 and C2 alone get almost all of it.",
+  "The headline still reports the full design, because that is the design the student approved. Reporting the best of 16 combinations, picked after looking at all of them, would overstate the gain. Dropping C3 is a real option: it would trade the fewer defects C3 aims for against about 3 days. The model counts a defect only by the rework time it causes, so it can't settle that trade-off.",
+  "Switch changes on and off below to see the cycle time of any combination. The ablation shows each change on its own and how much longer the full design takes without it. A negative value means the full design is faster without that change.",
 ]
 
 [sections.assumptions]
@@ -57,7 +63,12 @@ paragraphs = [
 fake_notice = "Fake data. These numbers are made up so the page could be built before the real results exist."
 pending = "Not available yet."
 diagram_error = "Couldn't draw this model: {error}"
-run_summary = "Seed: {seed}. Replications: {replications}. Cases per run: {cases}. Warm-up: {warm_up} days. Parameters: {version}. Generated {date}."
+run_summary = "Seed: {seed}. Cases per run: {cases}, after a warm-up of {warm_up} days. Each scenario ran {replications} times. Parameters: {version}. Generated {date}."
+headline = "The to-be process is {share} faster than the as-is process (95% CI {low} to {high})."
+headline_detail = "With all changes on ({changes}), the mean cycle time drops from {as_is} to {to_be} working days, a saving of {days} days (95% CI {low} to {high})."
+headline_top = "{change} contributes most. Without it, the full design takes {days} days longer (95% CI {low} to {high})."
+headline_best = "The full design isn't the fastest combination. With only {changes}, the process is {share} faster (95% CI {low} to {high}). See the ablation below."
+baseline_one_run = "These numbers come from one run (seed {seed}), with a mean cycle time of {mean} days. The evaluation runs the same as-is process {replications} times, with the same parameters, case count and warm-up but a new seed each time. Over those runs the mean is {runs_mean} days (95% CI {low} to {high}), and single runs range from {min} to {max}. QC is busy most of the time, so a run that happens to build long queues pulls its mean up. Read this baseline for where time goes, and the evaluation for how much the redesign saves."
 as_is_model = "As-is model"
 to_be_model = "To-be model"
 to_be_missing = "There is no to-be model yet."
@@ -132,10 +143,11 @@ toggles = "Changes to apply"
 scenario_as_is = "As-is"
 scenario_selected = "With the selected changes"
 saving = "Saved vs as-is"
+saving_share = "Faster than as-is"
 scenario_missing = "This combination wasn't simulated."
 ablation = "Ablation"
 ablation_alone = "Saving on its own"
-ablation_full_minus = "Lost if dropped from the full design"
+ablation_full_minus = "Days added if dropped from the full design"
 assumptions = "Assumptions"
 parameter = "Parameter"
 value = "Value"
@@ -149,3 +161,32 @@ integrations = "Number of integrations"
 security_level = "Security level"
 requesting_unit = "Requesting unit"
 team_workload = "Team workload at start"
+
+# Threats to validity, shown under Assumptions. build_results copies them into `threats`.
+[[threats]]
+title = "The data is synthetic"
+detail = "The event log comes from our own simulator, so the machine learning partly finds effects we put in ourselves. It finds the strong ones (complexity, security level, integrations) and never ranks the attribute with no effect first. That shows the method works. It doesn't show these are the drivers in the real process."
+
+[[threats]]
+title = "Parameters are estimates"
+detail = "Durations, branch probabilities, the arrival rate and lane capacities are proposed defaults and the student's answers, not measurements. The book says simulation inputs should come from observation where possible and be checked with the people who run the process (§7.3.4, p.287)."
+
+[[threats]]
+title = "The effects of the changes are assumed"
+detail = "C3 is the least certain. How much longer the extended requirements take, and how many fewer defects they lead to, are both guesses. C2 assumes a retest takes 1 to 4 days and finds new defects as often as a full test round. Other values in models/to_be.catalog.toml could change which change helps most."
+
+[[threats]]
+title = "No working calendar"
+detail = "Time runs on a continuous clock of working days, with no weekends, holidays or working hours."
+
+[[threats]]
+title = "Identical resources"
+detail = "Each lane is a pool of identical people who are always available and work on one case at a time. Real people differ in speed, take leave and split their time across projects, which is where much waiting comes from in practice (p.261). So the waiting here is a lower bound."
+
+[[threats]]
+title = "Quality control runs close to its limit"
+detail = "QC is busy about 87% of the time in the as-is process, and close to 100% a queue grows fast (§7.2.2, p.276). A few runs build long queues, so as-is runs differ a lot. The book advises checking how results change when one resource is added (§7.3.4, p.287). C4 is that check for QC: one more tester saves about 13 days on its own, so the as-is numbers depend a lot on QC capacity. The to-be numbers depend much less on it: on top of C1 and C2 the same tester saves half a day."
+
+[[threats]]
+title = "The to-be models break the 30-element guideline"
+detail = "The to-be models have 31 to 33 flow nodes, just over the limit of 7PMG G7 (§5.4.4, p.193). The book's fix is a sub-process, which our simulator doesn't support. The rule check shows this as a warning, not an error."

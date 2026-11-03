@@ -59,6 +59,10 @@
     .small { font-size: 0.875rem; }
     .notice { background: var(--notice-bg); color: var(--notice-text); padding: 10px 14px; border-radius: 8px; margin: 16px 0; }
     #error { color: var(--error); white-space: pre-wrap; }
+    .headline { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 14px 16px; margin: 16px 0; }
+    .headline p { margin: 0 0 6px; }
+    .headline p:last-child { margin-bottom: 0; }
+    .headline-main { font-size: 1.2rem; font-weight: 600; }
 
     .diagram-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--canvas); }
     .diagram { min-width: 720px; height: 380px; }
@@ -198,7 +202,46 @@
           seed: meta.seed, replications: meta.replications, cases: meta.case_count,
           warm_up: fmt(meta.warm_up, 0), version: meta.parameter_version, date,
         })),
+        headlineBlock(results),
       ];
+    }
+
+    /** Scenarios keyed by their change IDs in catalog order, e.g. "C1|C3". */
+    function scenarioIndex(results) {
+      const ids = (results.changes ?? []).map((c) => c.id);
+      const keyOf = (list) => ids.filter((id) => list.includes(id)).join("|");
+      const byKey = new Map((results.scenarios ?? []).map((s) => [keyOf(s.changes), s]));
+      return { ids, get: (list) => byKey.get(keyOf(list)) };
+    }
+
+    function pct(value) {
+      return NUM(1, "percent").format(value);
+    }
+
+    /** The result in one box: the full design's saving, the change it needs most, and the best combination. */
+    function headlineBlock(results) {
+      const h = results.headline;
+      if (!h || !results.scenarios) return null;
+      const index = scenarioIndex(results);
+      const full = index.get(h.changes), asIs = index.get([]), best = index.get(h.best);
+      const top = results.ablation?.find((row) => row.change === h.top_change);
+      const title = (id) => results.changes.find((c) => c.id === id)?.title ?? id;
+      const sameSet = (a, b) => a.length === b.length && a.every((id) => b.includes(id));
+      const share = full.saving_share;
+      return el("div", { class: "headline", role: "note" },
+        el("p", { class: "headline-main" }, t("headline", { share: pct(share.value), low: pct(share.ci_low), high: pct(share.ci_high) })),
+        el("p", {}, t("headline_detail", {
+          as_is: fmt(asIs.cycle_time.mean.value), to_be: fmt(full.cycle_time.mean.value),
+          days: fmt(full.saving.value), low: fmt(full.saving.ci_low), high: fmt(full.saving.ci_high), changes: h.changes.join(", "),
+        })),
+        top ? el("p", {}, t("headline_top", {
+          change: `${top.change} (${title(top.change)})`,
+          days: fmt(top.full_minus.value), low: fmt(top.full_minus.ci_low), high: fmt(top.full_minus.ci_high),
+        })) : null,
+        sameSet(h.best, h.changes) ? null : el("p", {}, t("headline_best", {
+          changes: h.best.join(", "), share: pct(best.saving_share.value),
+          low: pct(best.saving_share.ci_low), high: pct(best.saving_share.ci_high),
+        })));
     }
 
     function prose(key) {
@@ -255,6 +298,17 @@
         b.cycle_time_efficiency === undefined ? null
           : el("div", { class: "tile" }, el("dt", {}, t("cycle_time_efficiency")),
               el("dd", {}, NUM(0, "percent").format(b.cycle_time_efficiency)))));
+
+      // The baseline is one run; the evaluation's as-is scenario averages R runs. Say how far apart they are.
+      const asIsRuns = scenarioIndex(results).get([]);
+      if (asIsRuns) {
+        const e = asIsRuns.cycle_time.mean;
+        out.push(el("p", { class: "small muted" }, t("baseline_one_run", {
+          seed: results.meta.seed, mean: fmt(b.cycle_time.mean), replications: results.meta.replications,
+          runs_mean: fmt(e.value), low: fmt(e.ci_low), high: fmt(e.ci_high),
+          min: fmt(Math.min(...asIsRuns.replication_means)), max: fmt(Math.max(...asIsRuns.replication_means)),
+        })));
+      }
 
       if (b.by_outcome) {
         out.push(el("h3", {}, t("by_outcome")));
@@ -374,15 +428,14 @@
       const { changes, scenarios } = results;
       if (!changes || !scenarios) return [...out, pending()];
 
-      const ids = changes.map((c) => c.id);
-      const keyOf = (set) => ids.filter((id) => set.has(id)).join("|");
-      const byKey = new Map(scenarios.map((s) => [keyOf(new Set(s.changes)), s]));
-      const asIs = byKey.get("");
+      const index = scenarioIndex(results);
+      const asIs = index.get([]);
       const selected = new Set();
+      out.push(headlineBlock(results));
 
       const result = el("div", {});
       const render = () => {
-        const s = byKey.get(keyOf(selected));
+        const s = index.get([...selected]);
         if (!s) { result.replaceChildren(el("p", { class: "muted" }, t("scenario_missing"))); return; }
         const stats = [["mean", t("mean")], ["median", t("median")], ["p90", t("p90")]];
         const all = [asIs, s].flatMap((x) => [x.cycle_time.mean.ci_low, x.cycle_time.mean.ci_high]);
@@ -400,10 +453,15 @@
           el("div", { class: "ci-plot", "aria-hidden": "true" },
             ciRow(t("scenario_as_is"), asIs.cycle_time.mean, "as-is"),
             ciRow(t("scenario_selected"), s.cycle_time.mean, "")),
-          el("div", { class: "tiles" }, el("div", { class: "tile" },
-            el("dt", {}, `${t("saving")} (${t("mean")}, ${t("ci")})`),
-            el("dd", {}, fmt(s.saving.value), " ", el("span", {}, t("days")),
-              el("div", { class: "sub" }, `${fmt(s.saving.ci_low)} – ${fmt(s.saving.ci_high)}`)))),
+          el("div", { class: "tiles" },
+            el("div", { class: "tile" },
+              el("dt", {}, `${t("saving")} (${t("mean")}, ${t("ci")})`),
+              el("dd", {}, fmt(s.saving.value), " ", el("span", {}, t("days")),
+                el("div", { class: "sub" }, `${fmt(s.saving.ci_low)} – ${fmt(s.saving.ci_high)}`))),
+            el("div", { class: "tile" },
+              el("dt", {}, `${t("saving_share")} (${t("ci")})`),
+              el("dd", {}, pct(s.saving_share.value),
+                el("div", { class: "sub" }, `${pct(s.saving_share.ci_low)} – ${pct(s.saving_share.ci_high)}`)))),
         );
       };
 
@@ -417,15 +475,13 @@
       out.push(result);
       render();
 
-      // Ablation, derived from the full factorial: each change alone, and the full design without it.
-      const full = byKey.get(keyOf(new Set(ids)));
+      // Ablation, as the notebook computed it from the full factorial: each change alone, and the full design without it.
       out.push(el("h3", {}, t("ablation")));
-      out.push(table([t("change_id"), `${t("ablation_alone")} (${t("ci")})`, t("ablation_full_minus")],
-        changes.map((c) => {
-          const alone = byKey.get(keyOf(new Set([c.id])));
-          const without = byKey.get(keyOf(new Set(ids.filter((id) => id !== c.id))));
-          return [`${c.id}. ${c.title}`, alone ? ciCell(alone.saving) : "", full && without ? fmt(full.saving.value - without.saving.value) : ""];
-        }), { numeric: [1, 2] }));
+      if (!results.ablation) return [...out, pending()];
+      const title = (id) => changes.find((c) => c.id === id)?.title ?? id;
+      out.push(table([t("change_id"), `${t("ablation_alone")} (${t("ci")})`, `${t("ablation_full_minus")} (${t("ci")})`],
+        results.ablation.map((row) => [`${row.change}. ${title(row.change)}`, ciCell(row.alone), ciCell(row.full_minus)]),
+        { numeric: [1, 2] }));
       return out;
     }
 

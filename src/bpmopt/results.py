@@ -5,6 +5,7 @@ notebook and the page. Every export is validated against it.
 """
 
 import json
+import math
 import shutil
 import tomllib
 from collections import Counter
@@ -24,25 +25,29 @@ from bpmopt.bpmn import ProcessModel, read_bpmn
 from bpmopt.lint import lint
 from bpmopt.parameters import Parameters, assumptions
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
-def build_results(*, log: pd.DataFrame, model: ProcessModel, params: Parameters, seed: int, lang: str = "en") -> dict:
+def build_results(
+    *, log: pd.DataFrame, model: ProcessModel, params: Parameters, seed: int, replications: int = 1, lang: str = "en"
+) -> dict:
     """Results without the `models` section, which export_results fills in.
 
-    `log` is the simulation of `model` with `params` and `seed`. The flow
+    `log` is the simulation of `model` with `params` and `seed`. `replications`
+    is the R the scenarios ran with (1 when there are no scenarios). The flow
     analysis check simulates the model once more with unlimited capacity, with
     the same seed and case count. Every cycle time stops at the parameters'
     cut-off (cycle_time_end), if they set one.
 
-    The notebook adds the other sections (value_added, ml, changes,
-    scenarios, threats) to this dict before export.
+    The threats to validity come from the page content file, like the page
+    text. The notebook adds the other sections (value_added, ml, changes,
+    scenarios, ablation, headline) to this dict before export.
     """
     return {
         "meta": {
             "schema_version": SCHEMA_VERSION,
             "seed": seed,
-            "replications": 1,  # one baseline run; run_scenarios runs R replications per scenario
+            "replications": replications,
             "case_count": int(log.case_id.nunique()),
             "warm_up": params.warm_up,
             "parameter_version": params.version,
@@ -50,6 +55,7 @@ def build_results(*, log: pd.DataFrame, model: ProcessModel, params: Parameters,
         },
         "text": load_page_text(lang),
         "assumptions": assumptions(params),
+        "threats": _page_content(lang)["threats"],
         "baseline": {
             "time_unit": "working days",
             **baseline_metrics(log, model, ends_at=params.cycle_time_end),
@@ -59,7 +65,11 @@ def build_results(*, log: pd.DataFrame, model: ProcessModel, params: Parameters,
 
 
 def load_page_text(lang: str = "en") -> dict:
-    """Page text from content/page.<lang>.toml. Translating the page means adding a file there."""
+    """Page text from content/page.<lang>.toml, without the threats. Translating the page means adding a file there."""
+    return {key: value for key, value in _page_content(lang).items() if key != "threats"}
+
+
+def _page_content(lang: str) -> dict:
     source = resources.files("bpmopt").joinpath(f"content/page.{lang}.toml")
     return tomllib.loads(source.read_text(encoding="utf-8"))
 
@@ -113,7 +123,8 @@ def validate_results(results: dict) -> None:
     """Raise jsonschema.ValidationError if results break the contract.
 
     First the JSON schema, then the rules a schema can't express: the scenarios
-    are the full factorial of the change catalog, and every CI holds its estimate.
+    are the full factorial of the change catalog, every CI holds its estimate,
+    and each scenario has one mean per replication that average to its estimate.
     """
     error = jsonschema.exceptions.best_match(_validator().iter_errors(results))
     if error is not None:
@@ -136,11 +147,52 @@ def _cross_field_errors(results: dict) -> Iterator[str]:
                     count = seen[frozenset(combo)]
                     yield f"expected one scenario for changes [{', '.join(combo)}], found {count}"
 
+    replications = results["meta"]["replications"]
     for i, scenario in enumerate(scenarios):
-        estimates = {f"cycle_time.{k}": v for k, v in scenario["cycle_time"].items()} | {"saving": scenario["saving"]}
+        estimates = {f"cycle_time.{k}": v for k, v in scenario["cycle_time"].items()}
+        estimates |= {"saving": scenario["saving"], "saving_share": scenario["saving_share"]}
         for name, e in estimates.items():
             if not e["ci_low"] <= e["value"] <= e["ci_high"]:
                 yield f"scenarios[{i}].{name}: interval [{e['ci_low']}, {e['ci_high']}] doesn't contain {e['value']}"
+        runs = scenario["replication_means"]
+        if len(runs) != replications:
+            yield f"scenarios[{i}].replication_means: {len(runs)} values, but meta.replications is {replications}"
+        elif not _close(sum(runs) / len(runs), scenario["cycle_time"]["mean"]["value"]):
+            yield f"scenarios[{i}].replication_means: their average isn't cycle_time.mean.value"
+
+    yield from _summary_errors(results, scenarios)
+
+
+def _summary_errors(results: dict, scenarios: list[dict]) -> Iterator[str]:
+    """The ablation and the headline are derived from the scenarios, so they must match them."""
+    from bpmopt.scenarios import ablation  # scenarios imports this module
+
+    if ("ablation" in results or "headline" in results) and not scenarios:
+        yield "ablation and headline need scenarios"
+        return
+    if "ablation" in results:
+        expected = ablation(scenarios)
+        for i, (row, want) in enumerate(zip(results["ablation"], expected, strict=False)):
+            same = row["change"] == want["change"] and all(
+                _close(row[view][k], want[view][k]) for view in ("alone", "full_minus") for k in ("value", "ci_low", "ci_high")
+            )
+            if not same:
+                yield f"ablation[{i}] doesn't match the scenarios: expected {want}"
+        if len(results["ablation"]) != len(expected):
+            yield f"ablation has {len(results['ablation'])} rows, expected one per change ({len(expected)})"
+    if "headline" in results:
+        summary = results["headline"]
+        combos = {frozenset(s["changes"]) for s in scenarios}
+        catalog = {change["id"] for change in results.get("changes", [])}
+        for field in ("changes", "best"):
+            if frozenset(summary[field]) not in combos:
+                yield f"headline.{field}: no scenario has changes [{', '.join(summary[field])}]"
+        if summary["top_change"] not in catalog:
+            yield f"headline.top_change: {summary['top_change']} isn't in the change catalog"
+
+
+def _close(a: float, b: float) -> bool:
+    return math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-9)
 
 
 def validate_changes(changes: list[dict]) -> None:

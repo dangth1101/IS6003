@@ -1,5 +1,6 @@
 import json
 import re
+import tomllib
 from pathlib import Path
 
 import jsonschema
@@ -8,6 +9,8 @@ import pytest
 from bpmopt.bpmn import read_bpmn
 from bpmopt.parameters import assumptions, load_parameters
 from bpmopt.results import build_results, element_names, export_results, validate_results
+from bpmopt.scenarios import ablation, headline, load_catalog, run_scenarios
+from bpmopt.simulation import simulate
 
 
 @pytest.fixture
@@ -172,10 +175,10 @@ def test_the_committed_page_results_validate_against_the_schema():
 
 
 def test_fake_results_fill_every_section_of_the_spec(fake):
-    # Spec, "Results contract", plus `text` for the page wording.
+    # Spec, "Results contract", plus `text` for the page wording and the ablation and headline derived from the scenarios.
     spec_sections = {"meta", "assumptions", "models", "value_added", "baseline", "ml", "changes", "scenarios", "threats"}
 
-    assert set(fake) == spec_sections | {"text"}
+    assert set(fake) == spec_sections | {"text", "ablation", "headline"}
     assert set(fake["models"]) == {"as_is", "to_be"}
 
 
@@ -288,3 +291,75 @@ def test_a_lint_violation_names_an_element_even_for_model_level_rules(fake):
 
     with pytest.raises(jsonschema.ValidationError):
         validate_results(fake)
+
+
+def test_results_report_the_replications_the_scenarios_ran_with(simulate_fixture, fixtures_dir):
+    log = simulate_fixture("sequence", n_cases=10, seed=3)
+    params = load_parameters(fixtures_dir / "sequence.params.toml")
+
+    results = build_results(log=log, model=read_bpmn(fixtures_dir / "sequence.bpmn"), params=params, seed=3, replications=30)
+
+    assert results["meta"]["replications"] == 30
+
+
+def test_threats_to_validity_come_from_the_page_content_file(exported):
+    # Threats are page text, so a translation edits the content file, not the notebook.
+    content = tomllib.loads((Path(__file__).parents[1] / "src/bpmopt/content/page.en.toml").read_text(encoding="utf-8"))
+
+    assert exported["threats"] == content["threats"]
+    assert "threats" not in exported["text"]
+
+
+@pytest.fixture
+def with_scenarios(fixtures_dir):
+    """Results with the fixture catalog's full factorial, 3 replications, built the way the notebook does it."""
+    model = read_bpmn(fixtures_dir / "sequence.bpmn")
+    params = load_parameters(fixtures_dir / "sequence.scenarios.params.toml")
+    catalog = load_catalog(fixtures_dir / "sequence.catalog.toml", model=model, params=params)
+    log = simulate(model, params, n_cases=30, seed=5)
+    results = build_results(log=log, model=model, params=params, seed=5, replications=3)
+    as_is = {"bpmn": "models/as_is.bpmn", "names": element_names(model)}
+    scenarios = run_scenarios(catalog, n_cases=30, replications=3, seed=5)
+    rows = ablation(scenarios)
+    return results | {
+        "models": {"as_is": as_is},
+        "changes": catalog.entries(),
+        "scenarios": scenarios,
+        "ablation": rows,
+        "headline": headline(scenarios, rows),
+    }
+
+
+def test_results_with_scenarios_an_ablation_and_a_headline_validate(with_scenarios):
+    validate_results(with_scenarios)
+
+
+def test_the_ablation_must_agree_with_the_scenarios(with_scenarios):
+    # The page reads the ablation as written, so a stale one would show wrong numbers.
+    with_scenarios["ablation"][0]["full_minus"]["value"] += 1.0
+    with_scenarios["ablation"][0]["full_minus"]["ci_high"] += 1.0
+
+    with pytest.raises(jsonschema.ValidationError, match="ablation"):
+        validate_results(with_scenarios)
+
+
+@pytest.mark.parametrize(("field", "value"), [("changes", ["C1", "C9"]), ("best", ["C9"]), ("top_change", "C9")])
+def test_the_headline_must_name_scenarios_and_changes_that_exist(with_scenarios, field, value):
+    with_scenarios["headline"][field] = value
+
+    with pytest.raises(jsonschema.ValidationError, match="headline"):
+        validate_results(with_scenarios)
+
+
+def test_every_scenario_needs_one_mean_per_replication(with_scenarios):
+    with_scenarios["meta"]["replications"] = 30
+
+    with pytest.raises(jsonschema.ValidationError, match="replication_means"):
+        validate_results(with_scenarios)
+
+
+def test_the_replication_means_must_average_to_the_mean_estimate(with_scenarios):
+    with_scenarios["scenarios"][2]["replication_means"][0] += 5.0
+
+    with pytest.raises(jsonschema.ValidationError, match="replication_means"):
+        validate_results(with_scenarios)

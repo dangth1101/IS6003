@@ -13,7 +13,7 @@ from bpmopt.analysis import mean_cycle_time
 from bpmopt.bpmn import read_bpmn
 from bpmopt.parameters import load_parameters
 from bpmopt.results import build_results, element_names, validate_results
-from bpmopt.scenarios import ablation, load_catalog, replication_seeds, run_scenarios
+from bpmopt.scenarios import ablation, headline, load_catalog, replication_seeds, run_scenarios
 from bpmopt.simulation import simulate
 
 
@@ -92,7 +92,7 @@ def test_every_combination_of_changes_is_simulated_and_the_results_validate(load
     assert {frozenset(s["changes"]) for s in scenarios} == {
         frozenset(c) for c in [(), ("C1",), ("C2",), ("C3",), ("C1", "C2"), ("C1", "C3"), ("C2", "C3"), ("C1", "C2", "C3")]
     }
-    results = build_results(log=log, model=model, params=params, seed=5)
+    results = build_results(log=log, model=model, params=params, seed=5, replications=3)
     as_is = {"bpmn": "models/as_is.bpmn", "names": element_names(model)}
     results |= {"models": {"as_is": as_is}, "changes": catalog.entries(), "scenarios": scenarios}
     validate_results(results)
@@ -160,9 +160,9 @@ def test_ablation_views_come_straight_from_the_factorial_results(load):
     for change_id, row in rows.items():
         assert row["alone"] == by_changes[frozenset({change_id})]["saving"]
         without = by_changes[frozenset({"C1", "C2", "C3"} - {change_id})]["saving"]["value"]
-        assert row["full_minus"] == pytest.approx(full - without)
+        assert row["full_minus"]["value"] == pytest.approx(full - without)
     # Every change shortens the cycle time here, on its own and in the full design.
-    assert all(row["alone"]["value"] > 0 and row["full_minus"] > 0 for row in rows.values())
+    assert all(row["alone"]["value"] > 0 and row["full_minus"]["value"] > 0 for row in rows.values())
 
 
 # Small catalogs written per test. Descriptive fields are placeholders.
@@ -205,7 +205,38 @@ def test_with_no_interaction_the_ablation_views_agree(write_catalog):
     rows = ablation(run_scenarios(catalog, n_cases=20, replications=3, seed=2))
 
     for row in rows:
-        assert row["full_minus"] == pytest.approx(row["alone"]["value"])
+        assert row["full_minus"]["value"] == pytest.approx(row["alone"]["value"])
+
+
+def test_what_the_full_design_loses_without_a_change_has_a_paired_confidence_interval(write_catalog):
+    # C1 makes every case exactly 2 days faster, with or without C2, so dropping it
+    # from the full design costs exactly 2 days in every replication: a zero-width CI.
+    # Removing Write specification saves a random amount per case, so C2's CI has width.
+    catalog = write_catalog(_change("C1", FASTER_BUILD) + _change("C2") + '[models]\nC2 = "without_spec.bpmn"\n', params="sequence.triangular")
+
+    rows = {row["change"]: row for row in ablation(run_scenarios(catalog, n_cases=20, replications=4, seed=2))}
+
+    assert rows["C1"]["full_minus"] == pytest.approx({"value": 2.0, "ci_low": 2.0, "ci_high": 2.0})
+    c2 = rows["C2"]["full_minus"]
+    assert c2["ci_low"] < c2["value"] < c2["ci_high"]
+
+
+def test_the_headline_names_the_change_the_full_design_needs_most_and_the_best_combination(write_catalog):
+    # Unlimited capacity, so the effects add up: C1 makes Build application a fixed
+    # 1 day (saves about 5 of its 6), C2 removes Write specification (saves about 2),
+    # C3 makes Test application slower (costs time). The full design is C1+C2+C3,
+    # C1 matters most in it, and the best combination leaves C3 out.
+    much_faster_build = '[changes.C1.overrides.tasks.Task_BuildApp]\nduration = { fixed = 1.0 }\nrationale = "Fixed."\n'
+    slower_test = '[changes.C3.overrides.tasks.Task_TestApp]\nduration = { triangular = [2.0, 4.0, 8.0] }\nrationale = "Slower."\n'
+    catalog = write_catalog(
+        _change("C1", much_faster_build) + _change("C2") + _change("C3", slower_test) + '[models]\nC2 = "without_spec.bpmn"\n',
+        params="sequence.triangular",
+    )
+    scenarios = run_scenarios(catalog, n_cases=20, replications=3, seed=2)
+
+    summary = headline(scenarios, ablation(scenarios))
+
+    assert summary == {"changes": ["C1", "C2", "C3"], "top_change": "C1", "best": ["C1", "C2"]}
 
 
 def test_two_structural_changes_need_a_model_for_their_combination(write_catalog):
@@ -270,3 +301,31 @@ def test_a_gateway_override_on_an_xor_join_is_an_error(tmp_path, fixtures_dir):
 
     with pytest.raises(ValueError, match="Gateway_LoopJoin"):
         load_catalog(tmp_path / "catalog.toml", model=model, params=params)
+
+
+def test_each_scenario_keeps_the_mean_cycle_time_of_every_replication(load):
+    # The page and the ablation pair scenarios by replication, so they need the runs, not only the summary.
+    catalog = load("sequence.scenarios")
+
+    scenarios = _by_changes(run_scenarios(catalog, n_cases=30, replications=3, seed=5))
+
+    for combo in [(), ("C2",), ("C1", "C3")]:
+        model, params = catalog.resolve(combo)
+        expected = [mean_cycle_time(simulate(model, params, n_cases=30, seed=s)) for s in replication_seeds(5, 3)]
+        assert scenarios[frozenset(combo)]["replication_means"] == pytest.approx(expected, abs=1e-12)
+
+
+def test_the_relative_saving_is_paired_by_replication(load):
+    # C1 makes every case exactly 2 days faster (unlimited capacity, common random
+    # numbers), so in replication r it saves 2 / (as-is mean of r) of the cycle time.
+    catalog = load("sequence.triangular")
+
+    scenarios = _by_changes(run_scenarios(catalog, n_cases=20, replications=4, seed=1))
+
+    model, params = catalog.resolve([])
+    as_is = [mean_cycle_time(simulate(model, params, n_cases=20, seed=s)) for s in replication_seeds(1, 4)]
+    shares = [2.0 / m for m in as_is]
+    share = scenarios[frozenset({"C1"})]["saving_share"]
+    assert share["value"] == pytest.approx(sum(shares) / 4)
+    assert share["ci_low"] < share["value"] < share["ci_high"]
+    assert scenarios[frozenset()]["saving_share"] == {"value": 0.0, "ci_low": 0.0, "ci_high": 0.0}

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "schema_version": 3,
+    "schema_version": 4,
     "seed": 42,
     "replications": 30,
     "case_count": 400,
@@ -20,21 +20,22 @@
           "Our app development process runs from a business request through approvals, specification, planning, build, testing and deployment. Nobody knows how long it takes end to end, or where the time goes.",
           "We can't use real company data. So we simulate the process straight from its BPMN model and treat the simulated event log as our data. Every parameter is an estimate, and all of them are listed under Assumptions at the bottom.",
           "The work follows Design Science Research (Peffers et al., 2007): find the problem, set an objective, design a fix, show it and evaluate it. The process analysis follows Fundamentals of Business Process Management, 2nd ed. (Dumas et al.).",
-          "The objective is a shorter mean cycle time, with the saving backed by a confidence interval."
+          "The objective, set in the qualitative analysis, is to cut the mean cycle time by at least 20%, with the 95% confidence interval of the saving above zero."
         ]
       },
       "as_is": {
         "heading": "As-is process and baseline",
         "paragraphs": [
           "This is the process as it runs today, checked against the book's modeling rules (§5.4). Activity colors show the value-added class from the qualitative analysis (§6.1).",
-          "The numbers come from the simulated event log. Cycle time runs from the request to the end event (§7.1). Waiting time is time an activity spends ready while nobody works on it.",
+          "The numbers come from the simulated event log. Cycle time runs from the request to go-live, the end of “Start live operation” (§7.1). Monitoring and the project evaluation come after go-live, so they stay in the model but don't count. A proposal that is rejected ends there. Waiting time is time an activity spends ready while nobody works on it.",
+          "The headline counts every case. The table by outcome shows approved projects and rejected proposals apart, as a check.",
           "The flow analysis check compares the simulation with the book's formula (§7.1.1), with unlimited capacity. The two should agree."
         ]
       },
       "ml": {
         "heading": "What machine learning found",
         "paragraphs": [
-          "We trained models on the event log, using only what is known when a request comes in. One model predicts the cycle time. The others predict, for each gateway that can send work back, whether a case loops back at least once.",
+          "We trained models on the event log, using only what is known when a request comes in. One model predicts the cycle time of approved projects. The others predict, for each gateway that can send work back, whether a case loops back at least once.",
           "Each model is compared with a reference that ignores the inputs. The data is split by start date, so no model learns from the future.",
           "Drivers are ranked by the mean absolute SHAP value of the gradient boosting model. A longer bar means that attribute moves the prediction more.",
           "Expect low scores. Much of a case's cycle time depends on luck, such as how often work is sent back and how long the queues are when it arrives. No attribute known at the start can predict that. The ranking of the drivers matters more here than the scores."
@@ -43,15 +44,21 @@
       "redesign": {
         "heading": "Redesign",
         "paragraphs": [
-          "The to-be model applies a few changes, picked from the drivers above and the book's redesign heuristics (Appendix A). Each change says what it targets and what it costs on the Devil's Quadrangle (§8.1.3).",
+          "The to-be model applies four changes, picked from the baseline, the drivers above and the book's redesign heuristics (Appendix A). Each change says what it targets and what it costs on the Devil's Quadrangle (§8.1.3, p.303).",
+          "The baseline points at quality control. Its four checks are the longest queue, a test round finds defects in about a third of cases, and every fix sends the case through all four checks again. C1 runs the checks in parallel and C2 retests only what was fixed. C3 targets the two strongest drivers, complexity and security level, with a longer requirements step for risky cases. C4 adds a tester.",
+          "C1 and C2 change the model, and the diagram shows both. C3 and C4 only change parameters, so they don't appear in it. The to-be model has no rule errors, but with 33 elements it is just over the 30 of guideline G7 (§5.4.4, p.193). The book's fix is a sub-process, which our simulator doesn't support, so we accept the warning.",
           "The redesign is a human decision. Machine learning shows where time is lost. It doesn't draw the new process."
         ]
       },
       "evaluation": {
         "heading": "Evaluation",
         "paragraphs": [
-          "Switch changes on and off to see the simulated cycle time of that design. Every combination ran with the same random seeds, so differences come from the design and not from luck.",
-          "Ranges are 95% confidence intervals over the replications. The ablation shows each change on its own and what the full design loses without it."
+          "Every combination of the four changes was simulated 30 times, with the same parameters, case count and warm-up as the baseline. Run r of every combination used the same seed, so differences come from the design and not from luck. Ranges are 95% confidence intervals over the 30 runs. Savings are compared run by run, so their ranges are much narrower than those of the cycle times themselves.",
+          "With all four changes the process is about a quarter faster, and the whole range sits above the 20% target. The objective is met.",
+          "Which change matters most depends on how you ask. On its own, C2 saves the most, about 27 days. In the full design, C1 matters most: without it the design takes about 11 days longer, without C2 only about 3. Both shrink the same QC queue, so once one of them is in, the other has less left to remove.",
+          "C3 helps on its own, about 16 days, but it makes the full design about 3 days slower, and that range is clearly below zero. Once C1 and C2 have emptied the QC queue, fewer defects buy little time, while the longer requirements step still loads the business unit. C4 adds only half a day on top of C1 and C2, for the cost of a salary. So the fastest combination is C1, C2 and C4, and C1 and C2 alone get almost all of it.",
+          "The headline still reports the full design, because that is the design the student approved. Reporting the best of 16 combinations, picked after looking at all of them, would overstate the gain. Dropping C3 is a real option: it would trade the fewer defects C3 aims for against about 3 days. The model counts a defect only by the rework time it causes, so it can't settle that trade-off.",
+          "Switch changes on and off below to see the cycle time of any combination. The ablation shows each change on its own and how much longer the full design takes without it. A negative value means the full design is faster without that change."
         ]
       },
       "assumptions": {
@@ -65,7 +72,12 @@
       "fake_notice": "Fake data. These numbers are made up so the page could be built before the real results exist.",
       "pending": "Not available yet.",
       "diagram_error": "Couldn't draw this model: {error}",
-      "run_summary": "Seed: {seed}. Replications: {replications}. Cases per run: {cases}. Warm-up: {warm_up} days. Parameters: {version}. Generated {date}.",
+      "run_summary": "Seed: {seed}. Cases per run: {cases}, after a warm-up of {warm_up} days. Each scenario ran {replications} times. Parameters: {version}. Generated {date}.",
+      "headline": "The to-be process is {share} faster than the as-is process (95% CI {low} to {high}).",
+      "headline_detail": "With all changes on ({changes}), the mean cycle time drops from {as_is} to {to_be} working days, a saving of {days} days (95% CI {low} to {high}).",
+      "headline_top": "{change} contributes most. Without it, the full design takes {days} days longer (95% CI {low} to {high}).",
+      "headline_best": "The full design isn't the fastest combination. With only {changes}, the process is {share} faster (95% CI {low} to {high}). See the ablation below.",
+      "baseline_one_run": "These numbers come from one run (seed {seed}), with a mean cycle time of {mean} days. The evaluation runs the same as-is process {replications} times, with the same parameters, case count and warm-up but a new seed each time. Over those runs the mean is {runs_mean} days (95% CI {low} to {high}), and single runs range from {min} to {max}. QC is busy most of the time, so a run that happens to build long queues pulls its mean up. Read this baseline for where time goes, and the evaluation for how much the redesign saves.",
       "as_is_model": "As-is model",
       "to_be_model": "To-be model",
       "to_be_missing": "There is no to-be model yet.",
@@ -139,10 +151,11 @@
       "scenario_as_is": "As-is",
       "scenario_selected": "With the selected changes",
       "saving": "Saved vs as-is",
+      "saving_share": "Faster than as-is",
       "scenario_missing": "This combination wasn't simulated.",
       "ablation": "Ablation",
       "ablation_alone": "Saving on its own",
-      "ablation_full_minus": "Lost if dropped from the full design",
+      "ablation_full_minus": "Days added if dropped from the full design",
       "assumptions": "Assumptions",
       "parameter": "Parameter",
       "value": "Value",
@@ -656,9 +669,9 @@
       "changes": [],
       "cycle_time": {
         "mean": {
-          "value": 118.4,
-          "ci_low": 115.3,
-          "ci_high": 121.5
+          "value": 118.39999996666666,
+          "ci_low": 115.9019381453963,
+          "ci_high": 120.89806178793701
         },
         "median": {
           "value": 109.7,
@@ -672,7 +685,44 @@
         }
       },
       "saving": {
-        "value": 0,
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0
+      },
+      "replication_means": [
+        121.722399,
+        124.102522,
+        119.519455,
+        114.587823,
+        118.075191,
+        113.779385,
+        122.193706,
+        132.43428,
+        117.774905,
+        116.748758,
+        125.631294,
+        124.567654,
+        122.555872,
+        114.268813,
+        121.478543,
+        127.274983,
+        110.958841,
+        118.051631,
+        106.502776,
+        111.396256,
+        106.978677,
+        119.831828,
+        111.572986,
+        123.882672,
+        122.966566,
+        120.21711,
+        101.57848,
+        117.403014,
+        121.32455,
+        122.619029
+      ],
+      "saving_share": {
+        "value": 0.0,
         "ci_low": 0.0,
         "ci_high": 0.0
       }
@@ -683,9 +733,9 @@
       ],
       "cycle_time": {
         "mean": {
-          "value": 109.8,
-          "ci_low": 106.7,
-          "ci_high": 112.9
+          "value": 109.80000006666666,
+          "ci_low": 107.49049247626563,
+          "ci_high": 112.10950765706768
         },
         "median": {
           "value": 102.0,
@@ -699,9 +749,46 @@
         }
       },
       "saving": {
-        "value": 8.6,
-        "ci_low": 6.7,
-        "ci_high": 10.5
+        "value": 8.5999999,
+        "ci_low": 8.039809517204432,
+        "ci_high": 9.160190282795568
+      },
+      "replication_means": [
+        110.592809,
+        114.378625,
+        109.377301,
+        105.058401,
+        111.097068,
+        104.310638,
+        113.276304,
+        124.148419,
+        108.351845,
+        108.10808,
+        116.678681,
+        115.622274,
+        111.823362,
+        106.090029,
+        114.700104,
+        115.716567,
+        104.195341,
+        109.662903,
+        97.811663,
+        106.312535,
+        100.358593,
+        109.335831,
+        103.587578,
+        115.756409,
+        113.758636,
+        112.516426,
+        94.107474,
+        109.883238,
+        114.676845,
+        112.706023
+      ],
+      "saving_share": {
+        "value": 0.07255315031446664,
+        "ci_low": 0.0682691902843632,
+        "ci_high": 0.0768371103445701
       }
     },
     {
@@ -711,8 +798,8 @@
       "cycle_time": {
         "mean": {
           "value": 104.2,
-          "ci_low": 101.1,
-          "ci_high": 107.3
+          "ci_low": 101.88089834027622,
+          "ci_high": 106.51910165972379
         },
         "median": {
           "value": 96.9,
@@ -726,9 +813,46 @@
         }
       },
       "saving": {
-        "value": 14.2,
-        "ci_low": 12.3,
-        "ci_high": 16.1
+        "value": 14.199999966666667,
+        "ci_low": 13.696094627388124,
+        "ci_high": 14.70390530594521
+      },
+      "replication_means": [
+        107.528589,
+        108.623589,
+        105.476044,
+        99.16418,
+        103.14514,
+        99.939198,
+        108.986809,
+        118.368893,
+        101.764528,
+        101.654778,
+        111.634328,
+        106.739268,
+        107.262639,
+        100.518292,
+        108.894794,
+        113.144636,
+        97.260403,
+        103.440494,
+        93.454291,
+        100.421471,
+        93.606372,
+        105.104531,
+        98.820595,
+        108.943912,
+        108.022906,
+        104.228024,
+        89.478589,
+        102.757159,
+        108.622939,
+        108.992609
+      ],
+      "saving_share": {
+        "value": 0.12001874101347708,
+        "ci_low": 0.11620858432470713,
+        "ci_high": 0.12382889770224703
       }
     },
     {
@@ -737,9 +861,9 @@
       ],
       "cycle_time": {
         "mean": {
-          "value": 113.3,
-          "ci_low": 110.2,
-          "ci_high": 116.4
+          "value": 113.29999993333335,
+          "ci_low": 110.92722392257524,
+          "ci_high": 115.67277594409147
         },
         "median": {
           "value": 105.1,
@@ -753,9 +877,46 @@
         }
       },
       "saving": {
-        "value": 5.1,
-        "ci_low": 3.2,
-        "ci_high": 7.0
+        "value": 5.100000033333331,
+        "ci_low": 4.579201092137994,
+        "ci_high": 5.620798974528668
+      },
+      "replication_means": [
+        116.593645,
+        119.910033,
+        114.012003,
+        111.380791,
+        113.131655,
+        109.90406,
+        115.144527,
+        127.400354,
+        110.320097,
+        108.817463,
+        119.913667,
+        118.002667,
+        117.673511,
+        112.864468,
+        115.148924,
+        121.007356,
+        106.638042,
+        113.856729,
+        101.801203,
+        106.439614,
+        103.574909,
+        115.600587,
+        105.367113,
+        118.57831,
+        117.873367,
+        113.607684,
+        97.743386,
+        111.209596,
+        117.707249,
+        117.776988
+      ],
+      "saving_share": {
+        "value": 0.04298089295042818,
+        "ci_low": 0.03874851030974508,
+        "ci_high": 0.047213275591111284
       }
     },
     {
@@ -765,9 +926,9 @@
       ],
       "cycle_time": {
         "mean": {
-          "value": 95.6,
-          "ci_low": 92.5,
-          "ci_high": 98.7
+          "value": 95.60000003333333,
+          "ci_low": 93.5143756358968,
+          "ci_high": 97.68562443076986
         },
         "median": {
           "value": 89.2,
@@ -781,9 +942,46 @@
         }
       },
       "saving": {
-        "value": 22.8,
-        "ci_low": 20.4,
-        "ci_high": 25.2
+        "value": 22.799999933333332,
+        "ci_low": 22.060784042878744,
+        "ci_high": 23.53921582378792
+      },
+      "replication_means": [
+        98.717802,
+        99.619088,
+        96.627199,
+        89.826535,
+        93.941858,
+        92.714655,
+        95.771541,
+        108.502875,
+        92.777364,
+        95.703072,
+        100.471766,
+        102.04968,
+        99.453242,
+        90.260323,
+        100.260668,
+        105.22974,
+        89.79429,
+        95.209071,
+        86.055225,
+        88.783451,
+        88.327164,
+        96.242997,
+        90.312092,
+        99.138173,
+        98.649314,
+        95.451836,
+        84.204593,
+        94.8651,
+        99.711489,
+        99.327798
+      ],
+      "saving_share": {
+        "value": 0.19253248626436575,
+        "ci_low": 0.18780573982586127,
+        "ci_high": 0.19725923270287024
       }
     },
     {
@@ -794,8 +992,8 @@
       "cycle_time": {
         "mean": {
           "value": 107.0,
-          "ci_low": 103.9,
-          "ci_high": 110.1
+          "ci_low": 104.76261262495791,
+          "ci_high": 109.23738737504209
         },
         "median": {
           "value": 99.4,
@@ -809,9 +1007,46 @@
         }
       },
       "saving": {
-        "value": 11.4,
-        "ci_low": 9.0,
-        "ci_high": 13.8
+        "value": 11.399999966666666,
+        "ci_low": 10.846760527924687,
+        "ci_high": 11.953239405408645
+      },
+      "replication_means": [
+        109.373456,
+        112.075989,
+        107.583878,
+        103.979368,
+        106.55612,
+        102.786948,
+        108.773127,
+        118.885293,
+        109.328734,
+        104.913452,
+        112.366452,
+        113.492354,
+        113.279192,
+        101.498098,
+        109.881902,
+        114.484943,
+        98.04633,
+        108.200119,
+        96.625675,
+        101.190321,
+        95.962454,
+        109.388698,
+        100.433926,
+        112.152981,
+        109.877044,
+        107.230553,
+        94.213973,
+        105.750906,
+        110.493039,
+        111.174675
+      ],
+      "saving_share": {
+        "value": 0.09619197464448105,
+        "ci_low": 0.0921806807580132,
+        "ci_high": 0.10020326853094891
       }
     },
     {
@@ -821,9 +1056,9 @@
       ],
       "cycle_time": {
         "mean": {
-          "value": 99.1,
-          "ci_low": 96.0,
-          "ci_high": 102.2
+          "value": 99.10000003333334,
+          "ci_low": 96.7911077227784,
+          "ci_high": 101.40889234388828
         },
         "median": {
           "value": 92.3,
@@ -837,9 +1072,46 @@
         }
       },
       "saving": {
-        "value": 19.3,
-        "ci_low": 16.9,
-        "ci_high": 21.7
+        "value": 19.299999933333332,
+        "ci_low": 18.746149406470956,
+        "ci_high": 19.85385046019571
+      },
+      "replication_means": [
+        100.880675,
+        102.772598,
+        100.643667,
+        95.118,
+        98.262539,
+        94.927476,
+        103.701637,
+        111.528931,
+        98.812268,
+        96.534132,
+        102.741159,
+        105.348147,
+        103.689675,
+        95.09273,
+        102.151113,
+        107.362033,
+        93.780145,
+        99.852061,
+        88.120245,
+        95.17194,
+        87.332108,
+        101.252583,
+        93.788301,
+        104.660956,
+        105.402265,
+        102.509145,
+        82.964304,
+        95.39409,
+        102.43473,
+        100.770348
+      ],
+      "saving_share": {
+        "value": 0.1632263077282408,
+        "ci_low": 0.15874665294062376,
+        "ci_high": 0.16770596251585781
       }
     },
     {
@@ -850,9 +1122,9 @@
       ],
       "cycle_time": {
         "mean": {
-          "value": 92.8,
-          "ci_low": 89.7,
-          "ci_high": 95.9
+          "value": 92.80000006666668,
+          "ci_low": 90.75329629193774,
+          "ci_high": 94.84670384139562
         },
         "median": {
           "value": 86.7,
@@ -866,9 +1138,46 @@
         }
       },
       "saving": {
-        "value": 25.6,
-        "ci_low": 22.7,
-        "ci_high": 28.5
+        "value": 25.599999900000004,
+        "ci_low": 24.871603111056086,
+        "ci_high": 26.328396688943922
+      },
+      "replication_means": [
+        95.915083,
+        99.058784,
+        91.741363,
+        87.176755,
+        93.464017,
+        89.774664,
+        95.93439,
+        104.387292,
+        91.548936,
+        89.765191,
+        98.747437,
+        96.706193,
+        94.121731,
+        90.850213,
+        95.650463,
+        100.895509,
+        86.013447,
+        92.069515,
+        82.506233,
+        86.510265,
+        84.670913,
+        93.277431,
+        88.512845,
+        98.136512,
+        99.946591,
+        92.664686,
+        81.477068,
+        92.413996,
+        95.600819,
+        94.46166
+      ],
+      "saving_share": {
+        "value": 0.21622904246286936,
+        "ci_low": 0.21187234435769234,
+        "ci_high": 0.2205857405680464
       }
     }
   ],
@@ -889,5 +1198,59 @@
       "title": "Identical resources",
       "detail": "Everyone in a lane is treated as equally fast and always available."
     }
-  ]
+  ],
+  "ablation": [
+    {
+      "change": "C1",
+      "alone": {
+        "value": 8.5999999,
+        "ci_low": 8.039809517204432,
+        "ci_high": 9.160190282795568
+      },
+      "full_minus": {
+        "value": 6.299999966666666,
+        "ci_low": 5.519847001475921,
+        "ci_high": 7.080152931857412
+      }
+    },
+    {
+      "change": "C2",
+      "alone": {
+        "value": 14.199999966666667,
+        "ci_low": 13.696094627388124,
+        "ci_high": 14.70390530594521
+      },
+      "full_minus": {
+        "value": 14.199999933333329,
+        "ci_low": 13.41443583405318,
+        "ci_high": 14.985564032613478
+      }
+    },
+    {
+      "change": "C3",
+      "alone": {
+        "value": 5.100000033333331,
+        "ci_low": 4.579201092137994,
+        "ci_high": 5.620798974528668
+      },
+      "full_minus": {
+        "value": 2.7999999666666677,
+        "ci_low": 2.1114817889889466,
+        "ci_high": 3.488518144344389
+      }
+    }
+  ],
+  "headline": {
+    "changes": [
+      "C1",
+      "C2",
+      "C3"
+    ],
+    "top_change": "C2",
+    "best": [
+      "C1",
+      "C2",
+      "C3"
+    ]
+  }
 }
