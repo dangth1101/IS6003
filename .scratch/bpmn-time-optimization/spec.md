@@ -97,14 +97,15 @@ A small Python package, one notebook and one static HTML page, organised by the 
   - *Scenarios:* a change catalog (ID, title, driver it targets, Appendix A heuristic, expected effect, Devil's Quadrangle trade-off). A scenario is a set of change IDs and resolves to a (process model, parameter overrides) pair. The runner simulates all 2^k scenarios with common random numbers (same seed per replication across scenarios), with R replications each (default 30), and reports mean, median and P90 cycle time with 95% CIs. The ablation views (each alone, full minus each) are derived from the full factorial results. How structural changes combine into one model per scenario is decided in the redesign ticket, which must make every change independently switchable.
   - *Results export:* writes one results file (JSON) that the page reads.
 - **Results contract (JSON, validated by a JSON schema):**
-  - `meta`: seed, replications, case count, warm-up, parameter file version, generated-at time
+  - `meta`: schema version, seed, replications, case count, warm-up, parameter file version, generated-at time
+  - `text`: every page string (title, section prose, labels), copied from a content file per language
   - `assumptions`: rows of parameter, value, rationale
   - `models`: as-is and to-be BPMN file references, plus lint results for each
   - `value_added`: activity ID → VA / BVA / NVA
   - `baseline`: the metrics above, plus the flow analysis cross-check
   - `ml`: for each task, the metrics of each model next to the reference baseline, plus the ranked drivers with mean |SHAP|
   - `changes`: the change catalog
-  - `scenarios`: a list of {change IDs, cycle time mean / median / P90 with CI bounds}
+  - `scenarios`: a list of {change IDs, cycle time mean / median / P90 with CI bounds, saving vs as-is with CI}
   - `threats`: a list of threats to validity
   All human-readable text lives in this file or in the BPMN labels, so a translation later is a content change.
 - **HTML page:** a single static page that loads the results file and both BPMN files and renders the models with bpmn-js (pinned version from a CDN) and the charts with a pinned chart library. Sections follow DSRM: problem and method, as-is model and baseline, ML findings, redesign (to-be model + change catalog), evaluation (toggles + ablation), assumptions and threats. Served from GitHub Pages or a local static server. Opening it as a plain file isn't supported, because browsers block file fetches.
@@ -146,4 +147,4 @@ A small Python package, one notebook and one static HTML page, organised by the 
 - **Default parameter values** are proposals the student will correct. Their rationale fields should say "proposed default" until then.
 - **Redesign (Phase 5) is a human ticket.** It depends on the ML drivers and the baseline, so its changes can't be specified ahead of time.
 - The repo is public at github.com/dangth1101/IS6003, so GitHub Pages can host the page.
-- Book page references in this spec use the book's printed page numbers. The PDF page is the printed page + 24.
+- Book page references in this spec use the book's printed page numbers. The offset to the PDF page differs by part of the book: printed page + 26 in chapter 3, + 24 in chapters 5 to 8, + 22 in chapter 11 and + 21 in Appendix A.

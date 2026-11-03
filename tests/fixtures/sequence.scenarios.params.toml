@@ -1,0 +1,24 @@
+# sequence.bpmn with triangular durations, Poisson arrivals and two developers.
+# Work per case is 11 days on average, so utilisation = 0.15 x 11 / 2, about 0.83.
+
+version = "fixture-1"
+
+[arrivals]
+rate = 0.15
+rationale = "Fixture value."
+
+[lanes.Lane_Dev]
+capacity = 2
+rationale = "Fixture value."
+
+[tasks.Task_WriteSpec]
+duration = { triangular = [1.0, 2.0, 3.0] }
+rationale = "Fixture value."
+
+[tasks.Task_BuildApp]
+duration = { triangular = [3.0, 5.0, 10.0] }
+rationale = "Fixture value."
+
+[tasks.Task_TestApp]
+duration = { triangular = [1.0, 2.0, 6.0] }
+rationale = "Fixture value."

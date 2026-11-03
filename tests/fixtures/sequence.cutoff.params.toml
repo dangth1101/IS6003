@@ -1,0 +1,21 @@
+# sequence.bpmn with the cycle time cut off at the end of Build application.
+# Fixed durations 2 + 5.5 + 3, so a case runs 10.5 days but its cycle time is 2 + 5.5 = 7.5.
+# Test application comes after the cut-off and doesn't count.
+
+version = "fixture-1"
+
+[cycle_time]
+ends_at = "Task_BuildApp"
+rationale = "Fixture value."
+
+[tasks.Task_WriteSpec]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[tasks.Task_BuildApp]
+duration = { fixed = 5.5 }
+rationale = "Fixture value."
+
+[tasks.Task_TestApp]
+duration = { fixed = 3.0 }
+rationale = "Fixture value."

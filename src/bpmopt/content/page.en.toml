@@ -1,0 +1,208 @@
+# Page text, English. Copied into the `text` section of every results file.
+# To translate the page, copy this file (e.g. page.vi.toml) and edit the strings.
+# Labels may contain {name} placeholders. Keep the placeholder names as they are.
+#
+# Section paragraphs and threats may use these placeholders too. The page fills them
+# from the results file (index.html, proseVars), so no result is typed in here:
+#   {replications} {change_count} {scenario_count}    runs per scenario, changes, scenarios
+#   {share_K} {share_K_ci} {saving_K}                  saving share, its 95% CI, saving in days of
+#                                                      scenario K: change IDs in catalog order joined
+#                                                      by _ (C1_C2), or full / best from the headline
+#   {best_changes}                                     the best combination's change IDs, as a list
+#   {alone_C1} {full_minus_C1} {full_minus_C1_abs} {full_minus_C1_ci}
+#                                                      ablation of a change: saving alone, days added
+#                                                      if dropped from the full design, its absolute
+#                                                      value, and its 95% CI
+#   {rework_Gateway_X}                                 baseline rework rate of a gateway
+
+lang = "en"
+title = "Making app development faster"
+subtitle = "IS6003 final assignment. A simulation and machine learning study of how long our app development process takes, and how to shorten it."
+
+[sections.problem]
+heading = "Problem and method"
+paragraphs = [
+  "Our app development process runs from a business request through approvals, specification, planning, build, testing and deployment. Nobody knows how long it takes end to end, or where the time goes.",
+  "We can't use real company data. So we simulate the process straight from its BPMN model and treat the simulated event log as our data. Every parameter is an estimate, and all of them are listed under Assumptions at the bottom.",
+  "The work follows Design Science Research (Peffers et al., 2007): find the problem, set an objective, design a fix, show it and evaluate it. The process analysis follows Fundamentals of Business Process Management, 2nd ed. (Dumas et al.).",
+  "The objective, set in the qualitative analysis, is to cut the mean cycle time by at least 20%, with the 95% confidence interval of the saving above zero.",
+]
+
+[sections.as_is]
+heading = "As-is process and baseline"
+paragraphs = [
+  "This is the process as it runs today, checked against the book's modeling rules (§5.4). Activity colors show the value-added class from the qualitative analysis (§6.1).",
+  "The numbers come from the simulated event log. Cycle time runs from the request to go-live, the end of “Start live operation” (§7.1). Monitoring and the project evaluation come after go-live, so they stay in the model but don't count. A proposal that is rejected ends there. Waiting time is time an activity spends ready while nobody works on it.",
+  "The headline counts every case. The table by outcome shows approved projects and rejected proposals apart, as a check.",
+  "The flow analysis check compares the simulation with the book's formula (§7.1.1), with unlimited capacity. The two should agree.",
+]
+
+[sections.ml]
+heading = "What machine learning found"
+paragraphs = [
+  "We trained models on the event log, using only what is known when a request comes in. One model predicts the cycle time of approved projects. The others predict, for each gateway that can send work back, whether a case loops back at least once.",
+  "Each model is compared with a reference that ignores the inputs. The data is split by start date, so no model learns from the future.",
+  "Drivers are ranked by the mean absolute SHAP value of the gradient boosting model. A longer bar means that attribute moves the prediction more.",
+  "Expect low scores. Much of a case's cycle time depends on luck, such as how often work is sent back and how long the queues are when it arrives. No attribute known at the start can predict that. The ranking of the drivers matters more here than the scores.",
+]
+
+[sections.redesign]
+heading = "Redesign"
+paragraphs = [
+  "The to-be model applies {change_count} changes, picked from the baseline, the drivers above and the book's redesign heuristics (Appendix A). Each change says what it targets and what it costs on the Devil's Quadrangle (§8.1.3, p.303).",
+  "The baseline points at quality control. Its four checks are the longest queue, {rework_Gateway_TestSplit} of the cases that reach testing are sent back for fixes at least once, and every fix sends the case through all four checks again. C1 runs the checks in parallel and C2 retests only what was fixed. C3 targets the two strongest drivers, complexity and security level, with a longer requirements step for risky cases. C4 adds a tester.",
+  "C1 and C2 change the model, and the diagram shows both. C3 and C4 only change parameters, so they don't appear in it. The to-be model has no rule errors, but it is just over the 30 elements of guideline G7 (§5.4.4, p.193); the rule check below gives the count. The book's fix is a sub-process, which our simulator doesn't support, so we accept the warning.",
+  "The redesign is a human decision. Machine learning shows where time is lost. It doesn't draw the new process.",
+]
+
+[sections.evaluation]
+heading = "Evaluation"
+paragraphs = [
+  "Every combination of the {change_count} changes was simulated {replications} times, with the same parameters, case count and warm-up as the baseline. Run r of every combination used the same seed, so differences come from the design and not from luck. Ranges are 95% confidence intervals over the {replications} runs. Savings are compared run by run, so their ranges are much narrower than those of the cycle times themselves.",
+  "With all {change_count} changes the whole range of the saving, {share_full_ci} faster, sits above the 20% target. The objective is met.",
+  "Which change matters most depends on how you ask. On its own, C2 saves the most, {alone_C2} days. In the full design, C1 matters most: without it the design takes {full_minus_C1} days longer, without C2 only {full_minus_C2}. Both shrink the same QC queue, so once one of them is in, the other has less left to remove.",
+  "C3 helps on its own, {alone_C3} days, but the full design is {full_minus_C3_abs} days faster without it (95% CI of the days added if dropped: {full_minus_C3_ci}). Once C1 and C2 have emptied the QC queue, fewer defects buy little time, while the longer requirements step still loads the business unit. C4 adds only {full_minus_C4} days to the full design, for the cost of a salary. So the fastest combination is {best_changes}, {share_best} faster, and C1 and C2 alone get {share_C1_C2}.",
+  "The headline still reports the full design, because that is the design the student approved. Reporting the best of {scenario_count} combinations, picked after looking at all of them, would overstate the gain. Dropping C3 is a real option: it would trade the fewer defects C3 aims for against {full_minus_C3_abs} days. The model counts a defect only by the rework time it causes, so it can't settle that trade-off.",
+  "Switch changes on and off below to see the cycle time of any combination. The ablation shows each change on its own and how much longer the full design takes without it. A negative value means the full design is faster without that change.",
+]
+
+[sections.assumptions]
+heading = "Assumptions and threats to validity"
+paragraphs = [
+  "Every number on this page comes from the parameters below. They are estimates, not measurements, and can be changed in the parameter file. Rows marked with a change ID are the values that change adds or replaces, from the change catalog.",
+]
+
+[labels]
+fake_notice = "Fake data. These numbers are made up so the page could be built before the real results exist."
+pending = "Not available yet."
+diagram_error = "Couldn't draw this model: {error}"
+run_summary = "Seed: {seed}. Cases per run: {cases}, after a warm-up of {warm_up} days. Each scenario ran {replications} times. Parameters: {version}. Generated {date}."
+headline = "The to-be process is {share} faster than the as-is process (95% CI {low} to {high})."
+headline_detail = "With all changes on ({changes}), the mean cycle time drops from {as_is} to {to_be} working days, a saving of {days} days (95% CI {low} to {high})."
+headline_top = "{change} contributes most. Without it, the full design takes {days} days longer (95% CI {low} to {high})."
+headline_best = "The full design isn't the fastest combination. With only {changes}, the process is {share} faster (95% CI {low} to {high}). See the ablation below."
+share_method = "“Faster” is the mean saving divided by the as-is mean cycle time. Its 95% CI is the saving's CI divided by the same mean."
+range = "{low} to {high}"
+baseline_one_run = "These numbers come from one run (seed {seed}), with a mean cycle time of {mean} days. The evaluation runs the same as-is process {replications} times, with the same parameters, case count and warm-up but a new seed each time. Over those runs the mean is {runs_mean} days (95% CI {low} to {high}), and single runs range from {min} to {max}. QC is busy most of the time, so a run that happens to build long queues pulls its mean up. Read this baseline for where time goes, and the evaluation for how much the redesign saves."
+as_is_model = "As-is model"
+to_be_model = "To-be model"
+to_be_missing = "There is no to-be model yet."
+lint = "Rule check"
+lint_clean = "No rule violations."
+lint_not_checked = "Not checked yet."
+lint_rule = "Rule"
+lint_element = "Element"
+lint_message = "Problem"
+severity_error = "Error"
+severity_warning = "Warning"
+mean = "Mean"
+median = "Median"
+p90 = "90th percentile"
+ci = "95% CI"
+cycle_time = "Cycle time"
+processing_time = "Processing time"
+waiting_time = "Waiting time"
+cycle_time_efficiency = "Cycle time efficiency"
+days = "days"
+by_outcome = "Cycle time by outcome"
+outcome = "Outcome"
+cases = "Cases"
+ml_outcome = "Trained and tested only on cases that end at “{outcome}”."
+rework = "Rework"
+gateway = "Gateway"
+# Not read by the page: export_results uses it to name unnamed gateways in models.*.names.
+gateway_after = "Decision after {task}"
+rework_rate = "Cases that loop back"
+waiting_by_activity = "Waiting time per activity"
+activity = "Activity"
+mean_waiting = "Mean waiting (days)"
+flow_analysis = "Flow analysis check"
+flow_theoretical = "Book formula"
+flow_simulated = "Simulation, unlimited capacity"
+flow_difference = "Difference"
+value_added = "Value-added analysis"
+va_class = "Class"
+va_reason = "Why"
+va_VA = "Value-adding"
+va_BVA = "Business value-adding"
+va_NVA = "Non-value-adding"
+ml_split = "Split by start date: tested on the last cases, trained on the first {train}% minus any case still open when the test cases began."
+ml_task_cycle_time = "Predicting cycle time"
+ml_task_rework = "Predicting a loop back at: {gateway}"
+ml_model = "Model"
+model_reference_regression = "Reference: always predict the mean"
+model_reference_classification = "Reference: always predict the most common outcome"
+model_linear_regression = "Linear regression"
+model_linear_classification = "Logistic regression"
+model_gradient_boosting = "Gradient boosting"
+metric_mae = "MAE (days)"
+metric_r2 = "R²"
+metric_roc_auc = "ROC-AUC"
+metric_f1 = "F1"
+drivers = "Drivers"
+mean_abs_shap = "Mean |SHAP|"
+change_catalog = "Change catalog"
+change_id = "ID"
+driver = "Targets"
+heuristic = "Heuristic"
+expected_effect = "Expected effect"
+trade_off = "Trade-off"
+dq_time = "Time"
+dq_cost = "Cost"
+dq_quality = "Quality"
+dq_flexibility = "Flexibility"
+effect_better = "better"
+effect_worse = "worse"
+effect_neutral = "no change"
+toggles = "Changes to apply"
+scenario_as_is = "As-is"
+scenario_selected = "With the selected changes"
+saving = "Saved vs as-is"
+saving_share = "Faster than as-is"
+scenario_missing = "This combination wasn't simulated."
+ablation = "Ablation"
+ablation_alone = "Saving on its own"
+ablation_full_minus = "Days added if dropped from the full design"
+assumptions = "Assumptions"
+parameter = "Parameter"
+value = "Value"
+rationale = "Rationale"
+assumption_change = "Applies to"
+threats = "Threats to validity"
+
+[features]
+project_type = "Project type"
+complexity = "Complexity"
+integrations = "Number of integrations"
+security_level = "Security level"
+requesting_unit = "Requesting unit"
+team_workload = "Team workload at start"
+
+# Threats to validity, shown under Assumptions. build_results copies them into `threats`.
+[[threats]]
+title = "The data is synthetic"
+detail = "The event log comes from our own simulator, so the machine learning partly finds effects we put in ourselves. It finds the strong ones (complexity, security level, integrations) and never ranks the attribute with no effect first. That shows the method works. It doesn't show these are the drivers in the real process."
+
+[[threats]]
+title = "Parameters are estimates"
+detail = "Durations, branch probabilities, the arrival rate and lane capacities are proposed defaults and the student's answers, not measurements. The book says simulation inputs should come from observation where possible and be checked with the people who run the process (§7.3.4, p.287)."
+
+[[threats]]
+title = "The effects of the changes are assumed"
+detail = "C3 is the least certain. How much longer the extended requirements take, and how many fewer defects they lead to, are both guesses. C2 assumes how long a retest takes, and that it finds new defects as often as a full test round. These values are in the assumptions table, marked with their change. Other values in models/to_be.catalog.toml could change which change helps most."
+
+[[threats]]
+title = "No working calendar"
+detail = "Time runs on a continuous clock of working days, with no weekends, holidays or working hours."
+
+[[threats]]
+title = "Identical resources"
+detail = "Each lane is a pool of identical people who are always available and work on one case at a time. Real people differ in speed, take leave and split their time across projects. The model also has no handoff delays or batching, which the book names as common sources of waiting (§7.1.2, p.261). So the waiting here is a lower bound."
+
+[[threats]]
+title = "Quality control runs close to its limit"
+detail = "The arrival rate is set so that QC, the busiest lane, runs close to its limit in the as-is process (see arrivals.rate under Assumptions), and the closer a lane gets to full use, the faster its queue grows (§7.2.2, p.276). A few runs build long queues, so as-is runs differ a lot. The book advises checking how results change when one resource is added (§7.3.4, p.287). C4 is that check for QC: one more tester saves {alone_C4} days on its own, so the as-is numbers depend a lot on QC capacity. The to-be numbers depend much less on it: in the full design the same tester saves {full_minus_C4} days."
+
+[[threats]]
+title = "The to-be models break the 30-element guideline"
+detail = "The to-be models are just over the limit of 7PMG G7 (§5.4.4, p.193); the rule check gives each count. The book's fix is a sub-process, which our simulator doesn't support. The rule check shows this as a warning, not an error."

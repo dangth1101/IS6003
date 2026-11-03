@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lint fixture: breaks only ARC-LABEL. XOR split arcs labeled "Yes" and "No". -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_YesNo" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_1" name="App development" processRef="Process_YesNo" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_YesNo" isExecutable="false">
+    <bpmn:startEvent id="Start_RequestReceived" name="Request received" />
+    <bpmn:task id="Task_ReviewRequest" name="Review request" />
+    <bpmn:exclusiveGateway id="Gateway_Approved" />
+    <bpmn:endEvent id="End_RequestRejected" name="Request rejected" />
+    <bpmn:endEvent id="End_RequestApproved" name="Request approved" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_RequestReceived" targetRef="Task_ReviewRequest" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_ReviewRequest" targetRef="Gateway_Approved" />
+    <bpmn:sequenceFlow id="Flow_Yes" name="Yes" sourceRef="Gateway_Approved" targetRef="End_RequestApproved" />
+    <bpmn:sequenceFlow id="Flow_No" name="No" sourceRef="Gateway_Approved" targetRef="End_RequestRejected" />
+  </bpmn:process>
+</bpmn:definitions>

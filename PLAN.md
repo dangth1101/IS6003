@@ -6,13 +6,13 @@ Process work follows *Fundamentals of BPM*, 2nd ed. (Dumas et al.). Page numbers
 Deliverables: one Python notebook (data, training, evaluation) and one static HTML page that shows the results.
 
 ## Phase 0: Fix the as-is model (book §5.4, p.189–193)
-- [ ] Wrap lanes in a pool (§3.4)
-- [ ] Label start and end events as object + past participle
-- [ ] Replace Có/Không with explicit conditions on the outgoing arcs (p.190)
-- [ ] Split compound activities, especially the test task (code review, testing, security, acceptance)
-- [ ] Add an end event for a rejected proposal (G3)
-- [ ] Check which lane "Bổ sung / điều chỉnh đề xuất" belongs in
-- [ ] Run the 7PMG checklist (G1–G7)
+- [x] Wrap lanes in a pool (§3.4)
+- [x] Label start and end events as object + past participle
+- [x] Replace Có/Không with explicit conditions on the outgoing arcs (p.190)
+- [x] Split compound activities, especially the test task (code review, testing, security, acceptance)
+- [x] Add an end event for a rejected proposal (G3)
+- [x] Check which lane "Bổ sung / điều chỉnh đề xuất" belongs in (answered: stays in IT operations, `models/as_is_changelog.md`)
+- [x] Run the 7PMG checklist (G1–G7)
 
 Done when: `models/as_is.bpmn` passes the checklist.
 

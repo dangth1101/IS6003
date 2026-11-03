@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Not from the book: an XOR-block whose upper branch holds a decision that can end the case early.
+     The inner split has no join of its own: its remaining branch runs on to the outer join. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_early_exit_in_block" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration>
+    <bpmn:participant id="Participant_early_exit_in_block" name="Fixture" processRef="Process_EarlyExitInBlock" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_EarlyExitInBlock" isExecutable="false">
+    <bpmn:laneSet>
+      <bpmn:lane id="Lane_Worker" name="Worker">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Outer</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Inner</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_B</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_D</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_OuterJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_E</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Done</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Rejected</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Case started" />
+    <bpmn:exclusiveGateway id="Gateway_Outer" />
+    <bpmn:exclusiveGateway id="Gateway_Inner" />
+    <bpmn:task id="Task_B" name="B" />
+    <bpmn:task id="Task_D" name="D" />
+    <bpmn:exclusiveGateway id="Gateway_OuterJoin" />
+    <bpmn:task id="Task_E" name="E" />
+    <bpmn:endEvent id="End_Done" name="Case completed" />
+    <bpmn:endEvent id="End_Rejected" name="Case rejected" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start" targetRef="Gateway_Outer" />
+    <bpmn:sequenceFlow id="Flow_X" sourceRef="Gateway_Outer" targetRef="Gateway_Inner" name="x" />
+    <bpmn:sequenceFlow id="Flow_Y" sourceRef="Gateway_Outer" targetRef="Task_D" name="y" />
+    <bpmn:sequenceFlow id="Flow_Ok" sourceRef="Gateway_Inner" targetRef="Task_B" name="ok" />
+    <bpmn:sequenceFlow id="Flow_No" sourceRef="Gateway_Inner" targetRef="End_Rejected" name="not ok" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_B" targetRef="Gateway_OuterJoin" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_D" targetRef="Gateway_OuterJoin" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Gateway_OuterJoin" targetRef="Task_E" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_E" targetRef="End_Done" />
+  </bpmn:process>
+</bpmn:definitions>

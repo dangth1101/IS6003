@@ -1,0 +1,19 @@
+# Book Fig. 7.9 (p.260): B reworked at most once, 20% of the time.
+
+version = "fixture-1"
+
+[tasks.Task_A]
+duration = { fixed = 10.0 }
+rationale = "Book Fig. 7.9."
+
+[tasks.Task_B]
+duration = { fixed = 20.0 }
+rationale = "Book Fig. 7.9."
+
+[tasks.Task_BAgain]
+duration = { fixed = 20.0 }
+rationale = "Book Fig. 7.9."
+
+[gateways.Gateway_Split]
+branches = { Flow_Again = 0.2, Flow_Skip = 0.8 }
+rationale = "Book Fig. 7.9."

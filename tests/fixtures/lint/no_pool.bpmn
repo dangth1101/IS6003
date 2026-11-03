@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lint fixture: breaks only POOL. Lanes with no pool around them. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_NoPool" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:process id="Process_NoPool" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_Dev" name="Development team">
+        <bpmn:flowNodeRef>Start_RequestReceived</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_BuildApp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_AppReleased</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_RequestReceived" name="Request received" />
+    <bpmn:task id="Task_BuildApp" name="Build application" />
+    <bpmn:endEvent id="End_AppReleased" name="Application released" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_RequestReceived" targetRef="Task_BuildApp" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_BuildApp" targetRef="End_AppReleased" />
+  </bpmn:process>
+</bpmn:definitions>

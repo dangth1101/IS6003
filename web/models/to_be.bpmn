@@ -1,0 +1,571 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_ToBe" targetNamespace="https://example.org/is6003/models">
+  <bpmn:collaboration id="Collaboration_ToBe">
+    <bpmn:participant id="Participant_Bank" name="Bank" processRef="Process_AppDevelopment_ToBe" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_AppDevelopment_ToBe" name="Develop application (to-be)" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_ToBe">
+      <bpmn:lane id="Lane_BusinessUnit" name="Business unit / PMO">
+        <bpmn:flowNodeRef>Start_RequestReceived</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RegisterRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_HoldKickOff</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SpecifyRequirements</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_ITManagement" name="IT management">
+        <bpmn:flowNodeRef>Gateway_ProposalJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ApproveProposal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ProposalSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_ProposalRejected</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ApprovePlan</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_PlanSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ApproveRelease</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ReleaseSplit</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Development" name="Application development">
+        <bpmn:flowNodeRef>Gateway_PlanJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_DraftPlan</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_BuildApplication</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_FixDefects</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RefineApplication</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_QualityControl" name="QC / Acceptance unit">
+        <bpmn:flowNodeRef>Gateway_ReleaseJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ChecksSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReviewSourceCode</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RunFunctionalTests</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RunSecurityTests</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RunAcceptanceTests</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ChecksJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_RetestJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_TestSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RetestFixedDefects</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_ITOperations" name="IT operations / App support / PMO">
+        <bpmn:flowNodeRef>Task_ReviseProposal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_DeployApplication</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_StartOperation</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_MonitorOperation</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_EvaluateProject</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_ProjectClosed</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_RequestReceived" name="Development request received">
+      <bpmn:outgoing>Flow_RequestReceived</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_RegisterRequest" name="Register development request">
+      <bpmn:incoming>Flow_RequestReceived</bpmn:incoming>
+      <bpmn:outgoing>Flow_RequestRegistered</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="Gateway_ProposalJoin">
+      <bpmn:incoming>Flow_RequestRegistered</bpmn:incoming>
+      <bpmn:incoming>Flow_ProposalRevised</bpmn:incoming>
+      <bpmn:outgoing>Flow_ProposalSubmitted</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="Task_ApproveProposal" name="Approve project proposal">
+      <bpmn:incoming>Flow_ProposalSubmitted</bpmn:incoming>
+      <bpmn:outgoing>Flow_ProposalDecided</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="Gateway_ProposalSplit">
+      <bpmn:incoming>Flow_ProposalDecided</bpmn:incoming>
+      <bpmn:outgoing>Flow_ProposalApproved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ProposalChangesRequested</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ProposalRejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="Task_ReviseProposal" name="Revise project proposal">
+      <bpmn:incoming>Flow_ProposalChangesRequested</bpmn:incoming>
+      <bpmn:outgoing>Flow_ProposalRevised</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:endEvent id="End_ProposalRejected" name="Proposal rejected">
+      <bpmn:incoming>Flow_ProposalRejected</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:task id="Task_HoldKickOff" name="Hold project kick-off">
+      <bpmn:incoming>Flow_ProposalApproved</bpmn:incoming>
+      <bpmn:outgoing>Flow_KickOffHeld</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_SpecifyRequirements" name="Specify business and technical requirements">
+      <bpmn:incoming>Flow_KickOffHeld</bpmn:incoming>
+      <bpmn:outgoing>Flow_RequirementsSpecified</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="Gateway_PlanJoin">
+      <bpmn:incoming>Flow_RequirementsSpecified</bpmn:incoming>
+      <bpmn:incoming>Flow_PlanChangesRequested</bpmn:incoming>
+      <bpmn:outgoing>Flow_PlanStarted</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="Task_DraftPlan" name="Draft detailed project plan">
+      <bpmn:incoming>Flow_PlanStarted</bpmn:incoming>
+      <bpmn:outgoing>Flow_PlanDrafted</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_ApprovePlan" name="Approve project plan">
+      <bpmn:incoming>Flow_PlanDrafted</bpmn:incoming>
+      <bpmn:outgoing>Flow_PlanDecided</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="Gateway_PlanSplit">
+      <bpmn:incoming>Flow_PlanDecided</bpmn:incoming>
+      <bpmn:outgoing>Flow_PlanApproved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_PlanChangesRequested</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="Task_BuildApplication" name="Build application">
+      <bpmn:incoming>Flow_PlanApproved</bpmn:incoming>
+      <bpmn:outgoing>Flow_ApplicationBuilt</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="Gateway_ReleaseJoin">
+      <bpmn:incoming>Flow_ApplicationBuilt</bpmn:incoming>
+      <bpmn:incoming>Flow_ApplicationRefined</bpmn:incoming>
+      <bpmn:outgoing>Flow_ReleaseCandidateReady</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:parallelGateway id="Gateway_ChecksSplit">
+      <bpmn:incoming>Flow_ReleaseCandidateReady</bpmn:incoming>
+      <bpmn:outgoing>Flow_CodeReviewStarted</bpmn:outgoing>
+      <bpmn:outgoing>Flow_FunctionalTestsStarted</bpmn:outgoing>
+      <bpmn:outgoing>Flow_SecurityTestsStarted</bpmn:outgoing>
+      <bpmn:outgoing>Flow_AcceptanceTestsStarted</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:task id="Task_ReviewSourceCode" name="Review source code">
+      <bpmn:incoming>Flow_CodeReviewStarted</bpmn:incoming>
+      <bpmn:outgoing>Flow_CodeReviewed</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_RunFunctionalTests" name="Run functional tests">
+      <bpmn:incoming>Flow_FunctionalTestsStarted</bpmn:incoming>
+      <bpmn:outgoing>Flow_FunctionsTested</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_RunSecurityTests" name="Run security tests">
+      <bpmn:incoming>Flow_SecurityTestsStarted</bpmn:incoming>
+      <bpmn:outgoing>Flow_SecurityTested</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_RunAcceptanceTests" name="Run acceptance tests">
+      <bpmn:incoming>Flow_AcceptanceTestsStarted</bpmn:incoming>
+      <bpmn:outgoing>Flow_AcceptanceTested</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:parallelGateway id="Gateway_ChecksJoin">
+      <bpmn:incoming>Flow_CodeReviewed</bpmn:incoming>
+      <bpmn:incoming>Flow_FunctionsTested</bpmn:incoming>
+      <bpmn:incoming>Flow_SecurityTested</bpmn:incoming>
+      <bpmn:incoming>Flow_AcceptanceTested</bpmn:incoming>
+      <bpmn:outgoing>Flow_ChecksCompleted</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:exclusiveGateway id="Gateway_RetestJoin">
+      <bpmn:incoming>Flow_ChecksCompleted</bpmn:incoming>
+      <bpmn:incoming>Flow_DefectsRetested</bpmn:incoming>
+      <bpmn:outgoing>Flow_TestRoundCompleted</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gateway_TestSplit">
+      <bpmn:incoming>Flow_TestRoundCompleted</bpmn:incoming>
+      <bpmn:outgoing>Flow_TestsPassed</bpmn:outgoing>
+      <bpmn:outgoing>Flow_DefectsFound</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="Task_FixDefects" name="Fix defects">
+      <bpmn:incoming>Flow_DefectsFound</bpmn:incoming>
+      <bpmn:outgoing>Flow_DefectsFixed</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_RetestFixedDefects" name="Retest fixed defects">
+      <bpmn:incoming>Flow_DefectsFixed</bpmn:incoming>
+      <bpmn:outgoing>Flow_DefectsRetested</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_ApproveRelease" name="Approve application release">
+      <bpmn:incoming>Flow_TestsPassed</bpmn:incoming>
+      <bpmn:outgoing>Flow_ReleaseDecided</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="Gateway_ReleaseSplit">
+      <bpmn:incoming>Flow_ReleaseDecided</bpmn:incoming>
+      <bpmn:outgoing>Flow_ReleaseApproved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ReleaseRejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="Task_RefineApplication" name="Refine application">
+      <bpmn:incoming>Flow_ReleaseRejected</bpmn:incoming>
+      <bpmn:outgoing>Flow_ApplicationRefined</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_DeployApplication" name="Deploy application to production">
+      <bpmn:incoming>Flow_ReleaseApproved</bpmn:incoming>
+      <bpmn:outgoing>Flow_ApplicationDeployed</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_StartOperation" name="Start live operation">
+      <bpmn:incoming>Flow_ApplicationDeployed</bpmn:incoming>
+      <bpmn:outgoing>Flow_OperationStarted</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_MonitorOperation" name="Monitor live operation">
+      <bpmn:incoming>Flow_OperationStarted</bpmn:incoming>
+      <bpmn:outgoing>Flow_OperationMonitored</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_EvaluateProject" name="Evaluate project results">
+      <bpmn:incoming>Flow_OperationMonitored</bpmn:incoming>
+      <bpmn:outgoing>Flow_ProjectEvaluated</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:endEvent id="End_ProjectClosed" name="Project closed">
+      <bpmn:incoming>Flow_ProjectEvaluated</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_RequestReceived" sourceRef="Start_RequestReceived" targetRef="Task_RegisterRequest" />
+    <bpmn:sequenceFlow id="Flow_RequestRegistered" sourceRef="Task_RegisterRequest" targetRef="Gateway_ProposalJoin" />
+    <bpmn:sequenceFlow id="Flow_ProposalSubmitted" sourceRef="Gateway_ProposalJoin" targetRef="Task_ApproveProposal" />
+    <bpmn:sequenceFlow id="Flow_ProposalDecided" sourceRef="Task_ApproveProposal" targetRef="Gateway_ProposalSplit" />
+    <bpmn:sequenceFlow id="Flow_ProposalApproved" name="proposal approved" sourceRef="Gateway_ProposalSplit" targetRef="Task_HoldKickOff" />
+    <bpmn:sequenceFlow id="Flow_ProposalChangesRequested" name="changes requested" sourceRef="Gateway_ProposalSplit" targetRef="Task_ReviseProposal" />
+    <bpmn:sequenceFlow id="Flow_ProposalRejected" name="proposal rejected" sourceRef="Gateway_ProposalSplit" targetRef="End_ProposalRejected" />
+    <bpmn:sequenceFlow id="Flow_ProposalRevised" sourceRef="Task_ReviseProposal" targetRef="Gateway_ProposalJoin" />
+    <bpmn:sequenceFlow id="Flow_KickOffHeld" sourceRef="Task_HoldKickOff" targetRef="Task_SpecifyRequirements" />
+    <bpmn:sequenceFlow id="Flow_RequirementsSpecified" sourceRef="Task_SpecifyRequirements" targetRef="Gateway_PlanJoin" />
+    <bpmn:sequenceFlow id="Flow_PlanStarted" sourceRef="Gateway_PlanJoin" targetRef="Task_DraftPlan" />
+    <bpmn:sequenceFlow id="Flow_PlanDrafted" sourceRef="Task_DraftPlan" targetRef="Task_ApprovePlan" />
+    <bpmn:sequenceFlow id="Flow_PlanDecided" sourceRef="Task_ApprovePlan" targetRef="Gateway_PlanSplit" />
+    <bpmn:sequenceFlow id="Flow_PlanApproved" name="plan approved" sourceRef="Gateway_PlanSplit" targetRef="Task_BuildApplication" />
+    <bpmn:sequenceFlow id="Flow_PlanChangesRequested" name="plan needs changes" sourceRef="Gateway_PlanSplit" targetRef="Gateway_PlanJoin" />
+    <bpmn:sequenceFlow id="Flow_ApplicationBuilt" sourceRef="Task_BuildApplication" targetRef="Gateway_ReleaseJoin" />
+    <bpmn:sequenceFlow id="Flow_ReleaseCandidateReady" sourceRef="Gateway_ReleaseJoin" targetRef="Gateway_ChecksSplit" />
+    <bpmn:sequenceFlow id="Flow_CodeReviewStarted" sourceRef="Gateway_ChecksSplit" targetRef="Task_ReviewSourceCode" />
+    <bpmn:sequenceFlow id="Flow_FunctionalTestsStarted" sourceRef="Gateway_ChecksSplit" targetRef="Task_RunFunctionalTests" />
+    <bpmn:sequenceFlow id="Flow_SecurityTestsStarted" sourceRef="Gateway_ChecksSplit" targetRef="Task_RunSecurityTests" />
+    <bpmn:sequenceFlow id="Flow_AcceptanceTestsStarted" sourceRef="Gateway_ChecksSplit" targetRef="Task_RunAcceptanceTests" />
+    <bpmn:sequenceFlow id="Flow_CodeReviewed" sourceRef="Task_ReviewSourceCode" targetRef="Gateway_ChecksJoin" />
+    <bpmn:sequenceFlow id="Flow_FunctionsTested" sourceRef="Task_RunFunctionalTests" targetRef="Gateway_ChecksJoin" />
+    <bpmn:sequenceFlow id="Flow_SecurityTested" sourceRef="Task_RunSecurityTests" targetRef="Gateway_ChecksJoin" />
+    <bpmn:sequenceFlow id="Flow_AcceptanceTested" sourceRef="Task_RunAcceptanceTests" targetRef="Gateway_ChecksJoin" />
+    <bpmn:sequenceFlow id="Flow_ChecksCompleted" sourceRef="Gateway_ChecksJoin" targetRef="Gateway_RetestJoin" />
+    <bpmn:sequenceFlow id="Flow_TestRoundCompleted" sourceRef="Gateway_RetestJoin" targetRef="Gateway_TestSplit" />
+    <bpmn:sequenceFlow id="Flow_TestsPassed" name="all tests passed" sourceRef="Gateway_TestSplit" targetRef="Task_ApproveRelease" />
+    <bpmn:sequenceFlow id="Flow_DefectsFound" name="defects found" sourceRef="Gateway_TestSplit" targetRef="Task_FixDefects" />
+    <bpmn:sequenceFlow id="Flow_DefectsFixed" sourceRef="Task_FixDefects" targetRef="Task_RetestFixedDefects" />
+    <bpmn:sequenceFlow id="Flow_DefectsRetested" sourceRef="Task_RetestFixedDefects" targetRef="Gateway_RetestJoin" />
+    <bpmn:sequenceFlow id="Flow_ReleaseDecided" sourceRef="Task_ApproveRelease" targetRef="Gateway_ReleaseSplit" />
+    <bpmn:sequenceFlow id="Flow_ReleaseApproved" name="release approved" sourceRef="Gateway_ReleaseSplit" targetRef="Task_DeployApplication" />
+    <bpmn:sequenceFlow id="Flow_ReleaseRejected" name="release rejected" sourceRef="Gateway_ReleaseSplit" targetRef="Task_RefineApplication" />
+    <bpmn:sequenceFlow id="Flow_ApplicationRefined" sourceRef="Task_RefineApplication" targetRef="Gateway_ReleaseJoin" />
+    <bpmn:sequenceFlow id="Flow_ApplicationDeployed" sourceRef="Task_DeployApplication" targetRef="Task_StartOperation" />
+    <bpmn:sequenceFlow id="Flow_OperationStarted" sourceRef="Task_StartOperation" targetRef="Task_MonitorOperation" />
+    <bpmn:sequenceFlow id="Flow_OperationMonitored" sourceRef="Task_MonitorOperation" targetRef="Task_EvaluateProject" />
+    <bpmn:sequenceFlow id="Flow_ProjectEvaluated" sourceRef="Task_EvaluateProject" targetRef="End_ProjectClosed" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_ToBe">
+    <bpmndi:BPMNPlane id="Plane_ToBe" bpmnElement="Collaboration_ToBe">
+      <bpmndi:BPMNShape id="Participant_Bank_di" bpmnElement="Participant_Bank" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="3240" height="1000" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_BusinessUnit_di" bpmnElement="Lane_BusinessUnit" isHorizontal="true">
+        <dc:Bounds x="190" y="80" width="3210" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_ITManagement_di" bpmnElement="Lane_ITManagement" isHorizontal="true">
+        <dc:Bounds x="190" y="230" width="3210" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Development_di" bpmnElement="Lane_Development" isHorizontal="true">
+        <dc:Bounds x="190" y="380" width="3210" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_QualityControl_di" bpmnElement="Lane_QualityControl" isHorizontal="true">
+        <dc:Bounds x="190" y="530" width="3210" height="400" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_ITOperations_di" bpmnElement="Lane_ITOperations" isHorizontal="true">
+        <dc:Bounds x="190" y="930" width="3210" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_RequestReceived_di" bpmnElement="Start_RequestReceived">
+        <dc:Bounds x="227" y="137" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="200" y="177" width="90" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RegisterRequest_di" bpmnElement="Task_RegisterRequest">
+        <dc:Bounds x="280" y="115" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_ProposalJoin_di" bpmnElement="Gateway_ProposalJoin" isMarkerVisible="true">
+        <dc:Bounds x="425" y="280" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ApproveProposal_di" bpmnElement="Task_ApproveProposal">
+        <dc:Bounds x="510" y="265" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_ProposalSplit_di" bpmnElement="Gateway_ProposalSplit" isMarkerVisible="true">
+        <dc:Bounds x="665" y="280" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReviseProposal_di" bpmnElement="Task_ReviseProposal">
+        <dc:Bounds x="640" y="965" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_ProposalRejected_di" bpmnElement="End_ProposalRejected">
+        <dc:Bounds x="822" y="287" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="795" y="327" width="90" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_HoldKickOff_di" bpmnElement="Task_HoldKickOff">
+        <dc:Bounds x="740" y="115" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SpecifyRequirements_di" bpmnElement="Task_SpecifyRequirements">
+        <dc:Bounds x="870" y="115" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_PlanJoin_di" bpmnElement="Gateway_PlanJoin" isMarkerVisible="true">
+        <dc:Bounds x="1015" y="430" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_DraftPlan_di" bpmnElement="Task_DraftPlan">
+        <dc:Bounds x="1100" y="415" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ApprovePlan_di" bpmnElement="Task_ApprovePlan">
+        <dc:Bounds x="1230" y="265" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_PlanSplit_di" bpmnElement="Gateway_PlanSplit" isMarkerVisible="true">
+        <dc:Bounds x="1375" y="280" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_BuildApplication_di" bpmnElement="Task_BuildApplication">
+        <dc:Bounds x="1470" y="415" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_ReleaseJoin_di" bpmnElement="Gateway_ReleaseJoin" isMarkerVisible="true">
+        <dc:Bounds x="1615" y="705" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_ChecksSplit_di" bpmnElement="Gateway_ChecksSplit">
+        <dc:Bounds x="1805" y="705" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReviewSourceCode_di" bpmnElement="Task_ReviewSourceCode">
+        <dc:Bounds x="1890" y="555" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RunFunctionalTests_di" bpmnElement="Task_RunFunctionalTests">
+        <dc:Bounds x="1890" y="645" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RunSecurityTests_di" bpmnElement="Task_RunSecurityTests">
+        <dc:Bounds x="1890" y="735" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RunAcceptanceTests_di" bpmnElement="Task_RunAcceptanceTests">
+        <dc:Bounds x="1890" y="825" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_ChecksJoin_di" bpmnElement="Gateway_ChecksJoin">
+        <dc:Bounds x="2035" y="705" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_RetestJoin_di" bpmnElement="Gateway_RetestJoin" isMarkerVisible="true">
+        <dc:Bounds x="2335" y="705" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_TestSplit_di" bpmnElement="Gateway_TestSplit" isMarkerVisible="true">
+        <dc:Bounds x="2435" y="705" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_FixDefects_di" bpmnElement="Task_FixDefects">
+        <dc:Bounds x="2410" y="415" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RetestFixedDefects_di" bpmnElement="Task_RetestFixedDefects">
+        <dc:Bounds x="2310" y="545" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ApproveRelease_di" bpmnElement="Task_ApproveRelease">
+        <dc:Bounds x="2530" y="265" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_ReleaseSplit_di" bpmnElement="Gateway_ReleaseSplit" isMarkerVisible="true">
+        <dc:Bounds x="2675" y="280" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RefineApplication_di" bpmnElement="Task_RefineApplication">
+        <dc:Bounds x="2650" y="415" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_DeployApplication_di" bpmnElement="Task_DeployApplication">
+        <dc:Bounds x="2770" y="965" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_StartOperation_di" bpmnElement="Task_StartOperation">
+        <dc:Bounds x="2900" y="965" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_MonitorOperation_di" bpmnElement="Task_MonitorOperation">
+        <dc:Bounds x="3030" y="965" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_EvaluateProject_di" bpmnElement="Task_EvaluateProject">
+        <dc:Bounds x="3160" y="965" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_ProjectClosed_di" bpmnElement="End_ProjectClosed">
+        <dc:Bounds x="3312" y="987" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3285" y="1027" width="90" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_RequestReceived_di" bpmnElement="Flow_RequestReceived">
+        <di:waypoint x="263" y="155" />
+        <di:waypoint x="280" y="155" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RequestRegistered_di" bpmnElement="Flow_RequestRegistered">
+        <di:waypoint x="380" y="155" />
+        <di:waypoint x="450" y="155" />
+        <di:waypoint x="450" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ProposalSubmitted_di" bpmnElement="Flow_ProposalSubmitted">
+        <di:waypoint x="475" y="305" />
+        <di:waypoint x="510" y="305" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ProposalDecided_di" bpmnElement="Flow_ProposalDecided">
+        <di:waypoint x="610" y="305" />
+        <di:waypoint x="665" y="305" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ProposalApproved_di" bpmnElement="Flow_ProposalApproved">
+        <di:waypoint x="690" y="280" />
+        <di:waypoint x="690" y="155" />
+        <di:waypoint x="740" y="155" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="696" y="238" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ProposalChangesRequested_di" bpmnElement="Flow_ProposalChangesRequested">
+        <di:waypoint x="690" y="330" />
+        <di:waypoint x="690" y="965" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="696" y="334" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ProposalRejected_di" bpmnElement="Flow_ProposalRejected">
+        <di:waypoint x="715" y="305" />
+        <di:waypoint x="822" y="305" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="722" y="287" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ProposalRevised_di" bpmnElement="Flow_ProposalRevised">
+        <di:waypoint x="640" y="1005" />
+        <di:waypoint x="450" y="1005" />
+        <di:waypoint x="450" y="330" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_KickOffHeld_di" bpmnElement="Flow_KickOffHeld">
+        <di:waypoint x="840" y="155" />
+        <di:waypoint x="870" y="155" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RequirementsSpecified_di" bpmnElement="Flow_RequirementsSpecified">
+        <di:waypoint x="920" y="195" />
+        <di:waypoint x="920" y="455" />
+        <di:waypoint x="1015" y="455" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PlanStarted_di" bpmnElement="Flow_PlanStarted">
+        <di:waypoint x="1065" y="455" />
+        <di:waypoint x="1100" y="455" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PlanDrafted_di" bpmnElement="Flow_PlanDrafted">
+        <di:waypoint x="1200" y="455" />
+        <di:waypoint x="1280" y="455" />
+        <di:waypoint x="1280" y="345" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PlanDecided_di" bpmnElement="Flow_PlanDecided">
+        <di:waypoint x="1330" y="305" />
+        <di:waypoint x="1375" y="305" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PlanApproved_di" bpmnElement="Flow_PlanApproved">
+        <di:waypoint x="1425" y="305" />
+        <di:waypoint x="1520" y="305" />
+        <di:waypoint x="1520" y="415" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1432" y="312" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PlanChangesRequested_di" bpmnElement="Flow_PlanChangesRequested">
+        <di:waypoint x="1400" y="280" />
+        <di:waypoint x="1400" y="250" />
+        <di:waypoint x="1040" y="250" />
+        <di:waypoint x="1040" y="430" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1408" y="252" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ApplicationBuilt_di" bpmnElement="Flow_ApplicationBuilt">
+        <di:waypoint x="1570" y="455" />
+        <di:waypoint x="1640" y="455" />
+        <di:waypoint x="1640" y="705" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReleaseCandidateReady_di" bpmnElement="Flow_ReleaseCandidateReady">
+        <di:waypoint x="1665" y="730" />
+        <di:waypoint x="1805" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CodeReviewStarted_di" bpmnElement="Flow_CodeReviewStarted">
+        <di:waypoint x="1830" y="705" />
+        <di:waypoint x="1830" y="595" />
+        <di:waypoint x="1890" y="595" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FunctionalTestsStarted_di" bpmnElement="Flow_FunctionalTestsStarted">
+        <di:waypoint x="1830" y="705" />
+        <di:waypoint x="1830" y="685" />
+        <di:waypoint x="1890" y="685" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SecurityTestsStarted_di" bpmnElement="Flow_SecurityTestsStarted">
+        <di:waypoint x="1830" y="755" />
+        <di:waypoint x="1830" y="775" />
+        <di:waypoint x="1890" y="775" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AcceptanceTestsStarted_di" bpmnElement="Flow_AcceptanceTestsStarted">
+        <di:waypoint x="1830" y="755" />
+        <di:waypoint x="1830" y="865" />
+        <di:waypoint x="1890" y="865" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CodeReviewed_di" bpmnElement="Flow_CodeReviewed">
+        <di:waypoint x="1990" y="595" />
+        <di:waypoint x="2060" y="595" />
+        <di:waypoint x="2060" y="705" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FunctionsTested_di" bpmnElement="Flow_FunctionsTested">
+        <di:waypoint x="1990" y="685" />
+        <di:waypoint x="2060" y="685" />
+        <di:waypoint x="2060" y="705" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SecurityTested_di" bpmnElement="Flow_SecurityTested">
+        <di:waypoint x="1990" y="775" />
+        <di:waypoint x="2060" y="775" />
+        <di:waypoint x="2060" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AcceptanceTested_di" bpmnElement="Flow_AcceptanceTested">
+        <di:waypoint x="1990" y="865" />
+        <di:waypoint x="2060" y="865" />
+        <di:waypoint x="2060" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ChecksCompleted_di" bpmnElement="Flow_ChecksCompleted">
+        <di:waypoint x="2085" y="730" />
+        <di:waypoint x="2335" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_TestRoundCompleted_di" bpmnElement="Flow_TestRoundCompleted">
+        <di:waypoint x="2385" y="730" />
+        <di:waypoint x="2435" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_TestsPassed_di" bpmnElement="Flow_TestsPassed">
+        <di:waypoint x="2485" y="730" />
+        <di:waypoint x="2580" y="730" />
+        <di:waypoint x="2580" y="345" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2490" y="735" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DefectsFound_di" bpmnElement="Flow_DefectsFound">
+        <di:waypoint x="2460" y="705" />
+        <di:waypoint x="2460" y="495" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2466" y="665" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DefectsFixed_di" bpmnElement="Flow_DefectsFixed">
+        <di:waypoint x="2410" y="455" />
+        <di:waypoint x="2360" y="455" />
+        <di:waypoint x="2360" y="545" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DefectsRetested_di" bpmnElement="Flow_DefectsRetested">
+        <di:waypoint x="2360" y="625" />
+        <di:waypoint x="2360" y="705" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReleaseDecided_di" bpmnElement="Flow_ReleaseDecided">
+        <di:waypoint x="2630" y="305" />
+        <di:waypoint x="2675" y="305" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReleaseApproved_di" bpmnElement="Flow_ReleaseApproved">
+        <di:waypoint x="2725" y="305" />
+        <di:waypoint x="2820" y="305" />
+        <di:waypoint x="2820" y="965" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2729" y="287" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReleaseRejected_di" bpmnElement="Flow_ReleaseRejected">
+        <di:waypoint x="2700" y="330" />
+        <di:waypoint x="2700" y="415" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2706" y="334" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ApplicationRefined_di" bpmnElement="Flow_ApplicationRefined">
+        <di:waypoint x="2700" y="495" />
+        <di:waypoint x="2700" y="915" />
+        <di:waypoint x="1640" y="915" />
+        <di:waypoint x="1640" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ApplicationDeployed_di" bpmnElement="Flow_ApplicationDeployed">
+        <di:waypoint x="2870" y="1005" />
+        <di:waypoint x="2900" y="1005" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_OperationStarted_di" bpmnElement="Flow_OperationStarted">
+        <di:waypoint x="3000" y="1005" />
+        <di:waypoint x="3030" y="1005" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_OperationMonitored_di" bpmnElement="Flow_OperationMonitored">
+        <di:waypoint x="3130" y="1005" />
+        <di:waypoint x="3160" y="1005" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ProjectEvaluated_di" bpmnElement="Flow_ProjectEvaluated">
+        <di:waypoint x="3260" y="1005" />
+        <di:waypoint x="3312" y="1005" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -1,0 +1,16 @@
+# single_task.bpmn as an M/D/1 queue: Poisson arrivals, fixed 1-day service, one reviewer.
+# Utilisation rho = rate x service time = 0.5.
+
+version = "fixture-1"
+
+[arrivals]
+rate = 0.5
+rationale = "Fixture value."
+
+[lanes.Lane_Review]
+capacity = 1
+rationale = "Fixture value."
+
+[tasks.Task_ReviewRequest]
+duration = { fixed = 1.0 }
+rationale = "Fixture value."

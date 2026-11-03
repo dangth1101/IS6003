@@ -1,0 +1,31 @@
+# Book Example 7.1 (p.258-259): credit application (Fig. 7.6), cycle times of Table 7.1. Days.
+
+version = "fixture-1"
+
+[tasks.Task_CheckCompleteness]
+duration = { fixed = 1.0 }
+rationale = "Book Table 7.1."
+
+[tasks.Task_CheckCreditHistory]
+duration = { fixed = 1.0 }
+rationale = "Book Table 7.1."
+
+[tasks.Task_CheckIncomeSources]
+duration = { fixed = 3.0 }
+rationale = "Book Table 7.1."
+
+[tasks.Task_AssessApplication]
+duration = { fixed = 3.0 }
+rationale = "Book Table 7.1."
+
+[tasks.Task_MakeCreditOffer]
+duration = { fixed = 1.0 }
+rationale = "Book Table 7.1."
+
+[tasks.Task_NotifyRejection]
+duration = { fixed = 2.0 }
+rationale = "Book Table 7.1."
+
+[gateways.Gateway_Decision]
+branches = { Flow_Granted = 0.6, Flow_Denied = 0.4 }
+rationale = "Book Example 7.1: 60% of applications are granted."

@@ -1,20 +1,2186 @@
 {
   "meta": {
-    "schema_version": 1,
+    "schema_version": 4,
     "seed": 42,
-    "case_count": 100,
-    "parameter_version": "fixture-1",
-    "generated_at": "2026-11-01T06:11:53+00:00"
+    "replications": 30,
+    "case_count": 2000,
+    "warm_up": 250.0,
+    "parameter_version": "proposed-3",
+    "generated_at": "2026-11-03T03:59:30+00:00"
   },
+  "text": {
+    "lang": "en",
+    "title": "Making app development faster",
+    "subtitle": "IS6003 final assignment. A simulation and machine learning study of how long our app development process takes, and how to shorten it.",
+    "sections": {
+      "problem": {
+        "heading": "Problem and method",
+        "paragraphs": [
+          "Our app development process runs from a business request through approvals, specification, planning, build, testing and deployment. Nobody knows how long it takes end to end, or where the time goes.",
+          "We can't use real company data. So we simulate the process straight from its BPMN model and treat the simulated event log as our data. Every parameter is an estimate, and all of them are listed under Assumptions at the bottom.",
+          "The work follows Design Science Research (Peffers et al., 2007): find the problem, set an objective, design a fix, show it and evaluate it. The process analysis follows Fundamentals of Business Process Management, 2nd ed. (Dumas et al.).",
+          "The objective, set in the qualitative analysis, is to cut the mean cycle time by at least 20%, with the 95% confidence interval of the saving above zero."
+        ]
+      },
+      "as_is": {
+        "heading": "As-is process and baseline",
+        "paragraphs": [
+          "This is the process as it runs today, checked against the book's modeling rules (§5.4). Activity colors show the value-added class from the qualitative analysis (§6.1).",
+          "The numbers come from the simulated event log. Cycle time runs from the request to go-live, the end of “Start live operation” (§7.1). Monitoring and the project evaluation come after go-live, so they stay in the model but don't count. A proposal that is rejected ends there. Waiting time is time an activity spends ready while nobody works on it.",
+          "The headline counts every case. The table by outcome shows approved projects and rejected proposals apart, as a check.",
+          "The flow analysis check compares the simulation with the book's formula (§7.1.1), with unlimited capacity. The two should agree."
+        ]
+      },
+      "ml": {
+        "heading": "What machine learning found",
+        "paragraphs": [
+          "We trained models on the event log, using only what is known when a request comes in. One model predicts the cycle time of approved projects. The others predict, for each gateway that can send work back, whether a case loops back at least once.",
+          "Each model is compared with a reference that ignores the inputs. The data is split by start date, so no model learns from the future.",
+          "Drivers are ranked by the mean absolute SHAP value of the gradient boosting model. A longer bar means that attribute moves the prediction more.",
+          "Expect low scores. Much of a case's cycle time depends on luck, such as how often work is sent back and how long the queues are when it arrives. No attribute known at the start can predict that. The ranking of the drivers matters more here than the scores."
+        ]
+      },
+      "redesign": {
+        "heading": "Redesign",
+        "paragraphs": [
+          "The to-be model applies {change_count} changes, picked from the baseline, the drivers above and the book's redesign heuristics (Appendix A). Each change says what it targets and what it costs on the Devil's Quadrangle (§8.1.3, p.303).",
+          "The baseline points at quality control. Its four checks are the longest queue, {rework_Gateway_TestSplit} of the cases that reach testing are sent back for fixes at least once, and every fix sends the case through all four checks again. C1 runs the checks in parallel and C2 retests only what was fixed. C3 targets the two strongest drivers, complexity and security level, with a longer requirements step for risky cases. C4 adds a tester.",
+          "C1 and C2 change the model, and the diagram shows both. C3 and C4 only change parameters, so they don't appear in it. The to-be model has no rule errors, but it is just over the 30 elements of guideline G7 (§5.4.4, p.193); the rule check below gives the count. The book's fix is a sub-process, which our simulator doesn't support, so we accept the warning.",
+          "The redesign is a human decision. Machine learning shows where time is lost. It doesn't draw the new process."
+        ]
+      },
+      "evaluation": {
+        "heading": "Evaluation",
+        "paragraphs": [
+          "Every combination of the {change_count} changes was simulated {replications} times, with the same parameters, case count and warm-up as the baseline. Run r of every combination used the same seed, so differences come from the design and not from luck. Ranges are 95% confidence intervals over the {replications} runs. Savings are compared run by run, so their ranges are much narrower than those of the cycle times themselves.",
+          "With all {change_count} changes the whole range of the saving, {share_full_ci} faster, sits above the 20% target. The objective is met.",
+          "Which change matters most depends on how you ask. On its own, C2 saves the most, {alone_C2} days. In the full design, C1 matters most: without it the design takes {full_minus_C1} days longer, without C2 only {full_minus_C2}. Both shrink the same QC queue, so once one of them is in, the other has less left to remove.",
+          "C3 helps on its own, {alone_C3} days, but the full design is {full_minus_C3_abs} days faster without it (95% CI of the days added if dropped: {full_minus_C3_ci}). Once C1 and C2 have emptied the QC queue, fewer defects buy little time, while the longer requirements step still loads the business unit. C4 adds only {full_minus_C4} days to the full design, for the cost of a salary. So the fastest combination is {best_changes}, {share_best} faster, and C1 and C2 alone get {share_C1_C2}.",
+          "The headline still reports the full design, because that is the design the student approved. Reporting the best of {scenario_count} combinations, picked after looking at all of them, would overstate the gain. Dropping C3 is a real option: it would trade the fewer defects C3 aims for against {full_minus_C3_abs} days. The model counts a defect only by the rework time it causes, so it can't settle that trade-off.",
+          "Switch changes on and off below to see the cycle time of any combination. The ablation shows each change on its own and how much longer the full design takes without it. A negative value means the full design is faster without that change."
+        ]
+      },
+      "assumptions": {
+        "heading": "Assumptions and threats to validity",
+        "paragraphs": [
+          "Every number on this page comes from the parameters below. They are estimates, not measurements, and can be changed in the parameter file. Rows marked with a change ID are the values that change adds or replaces, from the change catalog."
+        ]
+      }
+    },
+    "labels": {
+      "fake_notice": "Fake data. These numbers are made up so the page could be built before the real results exist.",
+      "pending": "Not available yet.",
+      "diagram_error": "Couldn't draw this model: {error}",
+      "run_summary": "Seed: {seed}. Cases per run: {cases}, after a warm-up of {warm_up} days. Each scenario ran {replications} times. Parameters: {version}. Generated {date}.",
+      "headline": "The to-be process is {share} faster than the as-is process (95% CI {low} to {high}).",
+      "headline_detail": "With all changes on ({changes}), the mean cycle time drops from {as_is} to {to_be} working days, a saving of {days} days (95% CI {low} to {high}).",
+      "headline_top": "{change} contributes most. Without it, the full design takes {days} days longer (95% CI {low} to {high}).",
+      "headline_best": "The full design isn't the fastest combination. With only {changes}, the process is {share} faster (95% CI {low} to {high}). See the ablation below.",
+      "share_method": "“Faster” is the mean saving divided by the as-is mean cycle time. Its 95% CI is the saving's CI divided by the same mean.",
+      "range": "{low} to {high}",
+      "baseline_one_run": "These numbers come from one run (seed {seed}), with a mean cycle time of {mean} days. The evaluation runs the same as-is process {replications} times, with the same parameters, case count and warm-up but a new seed each time. Over those runs the mean is {runs_mean} days (95% CI {low} to {high}), and single runs range from {min} to {max}. QC is busy most of the time, so a run that happens to build long queues pulls its mean up. Read this baseline for where time goes, and the evaluation for how much the redesign saves.",
+      "as_is_model": "As-is model",
+      "to_be_model": "To-be model",
+      "to_be_missing": "There is no to-be model yet.",
+      "lint": "Rule check",
+      "lint_clean": "No rule violations.",
+      "lint_not_checked": "Not checked yet.",
+      "lint_rule": "Rule",
+      "lint_element": "Element",
+      "lint_message": "Problem",
+      "severity_error": "Error",
+      "severity_warning": "Warning",
+      "mean": "Mean",
+      "median": "Median",
+      "p90": "90th percentile",
+      "ci": "95% CI",
+      "cycle_time": "Cycle time",
+      "processing_time": "Processing time",
+      "waiting_time": "Waiting time",
+      "cycle_time_efficiency": "Cycle time efficiency",
+      "days": "days",
+      "by_outcome": "Cycle time by outcome",
+      "outcome": "Outcome",
+      "cases": "Cases",
+      "ml_outcome": "Trained and tested only on cases that end at “{outcome}”.",
+      "rework": "Rework",
+      "gateway": "Gateway",
+      "gateway_after": "Decision after {task}",
+      "rework_rate": "Cases that loop back",
+      "waiting_by_activity": "Waiting time per activity",
+      "activity": "Activity",
+      "mean_waiting": "Mean waiting (days)",
+      "flow_analysis": "Flow analysis check",
+      "flow_theoretical": "Book formula",
+      "flow_simulated": "Simulation, unlimited capacity",
+      "flow_difference": "Difference",
+      "value_added": "Value-added analysis",
+      "va_class": "Class",
+      "va_reason": "Why",
+      "va_VA": "Value-adding",
+      "va_BVA": "Business value-adding",
+      "va_NVA": "Non-value-adding",
+      "ml_split": "Split by start date: tested on the last cases, trained on the first {train}% minus any case still open when the test cases began.",
+      "ml_task_cycle_time": "Predicting cycle time",
+      "ml_task_rework": "Predicting a loop back at: {gateway}",
+      "ml_model": "Model",
+      "model_reference_regression": "Reference: always predict the mean",
+      "model_reference_classification": "Reference: always predict the most common outcome",
+      "model_linear_regression": "Linear regression",
+      "model_linear_classification": "Logistic regression",
+      "model_gradient_boosting": "Gradient boosting",
+      "metric_mae": "MAE (days)",
+      "metric_r2": "R²",
+      "metric_roc_auc": "ROC-AUC",
+      "metric_f1": "F1",
+      "drivers": "Drivers",
+      "mean_abs_shap": "Mean |SHAP|",
+      "change_catalog": "Change catalog",
+      "change_id": "ID",
+      "driver": "Targets",
+      "heuristic": "Heuristic",
+      "expected_effect": "Expected effect",
+      "trade_off": "Trade-off",
+      "dq_time": "Time",
+      "dq_cost": "Cost",
+      "dq_quality": "Quality",
+      "dq_flexibility": "Flexibility",
+      "effect_better": "better",
+      "effect_worse": "worse",
+      "effect_neutral": "no change",
+      "toggles": "Changes to apply",
+      "scenario_as_is": "As-is",
+      "scenario_selected": "With the selected changes",
+      "saving": "Saved vs as-is",
+      "saving_share": "Faster than as-is",
+      "scenario_missing": "This combination wasn't simulated.",
+      "ablation": "Ablation",
+      "ablation_alone": "Saving on its own",
+      "ablation_full_minus": "Days added if dropped from the full design",
+      "assumptions": "Assumptions",
+      "parameter": "Parameter",
+      "value": "Value",
+      "rationale": "Rationale",
+      "assumption_change": "Applies to",
+      "threats": "Threats to validity"
+    },
+    "features": {
+      "project_type": "Project type",
+      "complexity": "Complexity",
+      "integrations": "Number of integrations",
+      "security_level": "Security level",
+      "requesting_unit": "Requesting unit",
+      "team_workload": "Team workload at start"
+    }
+  },
+  "assumptions": [
+    {
+      "parameter": "arrivals.rate",
+      "value": 0.234,
+      "rationale": "Proposed default. About 58 new requests a year, a bit under one a week, plausible for the change portfolio of a mid-size bank's IT division. Chosen to keep the busiest lane, QC, near the 88% it had before rejections became rare, so the results aren't dominated by queueing close to saturation (§7.2, p.276). Resulting utilisation on the 2,000-case log (seed 42): business unit 0.78, IT management 0.77, development 0.81, IT operations 0.79, QC 0.87."
+    },
+    {
+      "parameter": "warm_up.length",
+      "value": 250.0,
+      "rationale": "Proposed default. One working year, long enough for every lane queue to fill from the empty start; cases arriving before it are dropped from the log."
+    },
+    {
+      "parameter": "cycle_time.ends_at",
+      "value": "Task_StartOperation",
+      "rationale": "Student decision. The cycle time ends at go-live, the end of Start live operation. Monitoring and the project evaluation come after it; they stay in the model and the log but don't count, since the users already have the application. A rejected proposal ends at its end event."
+    },
+    {
+      "parameter": "attributes.project_type.distribution",
+      "value": "choice(enhancement: 0.55, new_system: 0.25, regulatory: 0.2)",
+      "rationale": "Proposed default. Most requests change an existing system; new systems and regulatory changes (e.g. central bank reporting) are the rest."
+    },
+    {
+      "parameter": "attributes.complexity.distribution",
+      "value": "choice(1: 0.35, 2: 0.45, 3: 0.2)",
+      "rationale": "Proposed default. Ordinal scale 1 low, 2 medium, 3 high, as rated at intake. Medium is most common."
+    },
+    {
+      "parameter": "attributes.integrations.distribution",
+      "value": "poisson(2)",
+      "rationale": "Proposed default. Number of other systems the application connects to (core banking, CRM, payment gateway, ...). Two on average."
+    },
+    {
+      "parameter": "attributes.security_level.distribution",
+      "value": "choice(1: 0.4, 2: 0.4, 3: 0.2)",
+      "rationale": "Proposed default. Data classification: 1 internal data, 2 customer data, 3 payments or other critical data."
+    },
+    {
+      "parameter": "attributes.requesting_unit.distribution",
+      "value": "choice(retail: 0.35, corporate: 0.2, treasury: 0.1, operations: 0.2, risk_compliance: 0.15)",
+      "rationale": "Proposed default. Retail banking sends the most requests. Has no effect in the simulation on purpose: a negative control for the ML."
+    },
+    {
+      "parameter": "attributes.team_workload.distribution",
+      "value": "triangular(0.5, 0.8, 1)",
+      "rationale": "Proposed default. Share of the development team already allocated when the request arrives, as reported at intake. Usually high."
+    },
+    {
+      "parameter": "lanes.Lane_BusinessUnit.capacity",
+      "value": 5,
+      "rationale": "Proposed default. Five business analysts or PMO staff who register requests, run kick-offs and write requirements."
+    },
+    {
+      "parameter": "lanes.Lane_ITManagement.capacity",
+      "value": 3,
+      "rationale": "Proposed default. Three IT managers who review proposals, plans and releases."
+    },
+    {
+      "parameter": "lanes.Lane_Development.capacity",
+      "value": 13,
+      "rationale": "Proposed default. Thirteen development teams, each working on one task at a time."
+    },
+    {
+      "parameter": "lanes.Lane_QualityControl.capacity",
+      "value": 8,
+      "rationale": "Proposed default. Eight QC testers or test teams. Kept the tightest lane, since testing is a common bottleneck in bank IT."
+    },
+    {
+      "parameter": "lanes.Lane_ITOperations.capacity",
+      "value": 5,
+      "rationale": "Proposed default. Five operations and app support staff who also revise proposals and run hypercare."
+    },
+    {
+      "parameter": "tasks.Task_RegisterRequest.duration",
+      "value": "triangular(0.5, 1, 2)",
+      "rationale": "Proposed default. Filling in the request form and logging it, about a day."
+    },
+    {
+      "parameter": "tasks.Task_ApproveProposal.duration",
+      "value": "triangular(2, 4, 8)",
+      "rationale": "Proposed default. Reading the proposal, asking questions and deciding, about a week of a manager's attention."
+    },
+    {
+      "parameter": "tasks.Task_ReviseProposal.duration",
+      "value": "triangular(2, 4, 8)",
+      "rationale": "Proposed default. Reworking the proposal on the managers' comments, about as long as reviewing it."
+    },
+    {
+      "parameter": "tasks.Task_HoldKickOff.duration",
+      "value": "triangular(0.5, 1, 2)",
+      "rationale": "Proposed default. Preparing and holding one kick-off meeting."
+    },
+    {
+      "parameter": "tasks.Task_SpecifyRequirements.duration",
+      "value": "triangular(5, 8, 16) × (1 + 0.3 × complexity)",
+      "rationale": "Proposed default. Business and technical requirements take two to five weeks, 30% of the base more per complexity step. About 15 days on average."
+    },
+    {
+      "parameter": "tasks.Task_DraftPlan.duration",
+      "value": "triangular(2, 4, 7)",
+      "rationale": "Proposed default. Estimating and scheduling the work, about a week."
+    },
+    {
+      "parameter": "tasks.Task_ApprovePlan.duration",
+      "value": "triangular(1, 2, 4)",
+      "rationale": "Proposed default. Plan review is lighter than proposal review."
+    },
+    {
+      "parameter": "tasks.Task_BuildApplication.duration",
+      "value": "triangular(8, 14, 25) × (1 + 0.4 × complexity + 0.1 × integrations + 0.6 × team_workload)",
+      "rationale": "Proposed default. A base of two to five weeks, then 40% of the base more per complexity step, 10% per integration and 60% for a fully loaded team. About 38 days on average (about 27 for a simple app with no integrations and a light load, about 45 for a typical complex one), the longest task, as in most bank projects."
+    },
+    {
+      "parameter": "tasks.Task_ReviewSourceCode.duration",
+      "value": "triangular(1, 2, 4)",
+      "rationale": "Proposed default. A code review takes a few days."
+    },
+    {
+      "parameter": "tasks.Task_RunFunctionalTests.duration",
+      "value": "triangular(3, 6, 10)",
+      "rationale": "Proposed default. One to two weeks of functional testing per round, mostly manual regression testing."
+    },
+    {
+      "parameter": "tasks.Task_RunSecurityTests.duration",
+      "value": "triangular(1, 2, 4) × (1 + 0.5 × security_level)",
+      "rationale": "Proposed default. Vulnerability scan and review, 50% longer per security level step, since critical systems also get penetration testing."
+    },
+    {
+      "parameter": "tasks.Task_RunAcceptanceTests.duration",
+      "value": "triangular(2, 4, 8)",
+      "rationale": "Proposed default. User acceptance testing with the business unit, about a week per round."
+    },
+    {
+      "parameter": "tasks.Task_FixDefects.duration",
+      "value": "triangular(2, 4, 8)",
+      "rationale": "Proposed default. Fixing the defects found in one test round, about a week."
+    },
+    {
+      "parameter": "tasks.Task_ApproveRelease.duration",
+      "value": "triangular(0.5, 1, 2)",
+      "rationale": "Proposed default. Release approval at the change advisory board, about a day."
+    },
+    {
+      "parameter": "tasks.Task_RefineApplication.duration",
+      "value": "triangular(3, 5, 10)",
+      "rationale": "Proposed default. Changes asked for at release approval are larger than defect fixes."
+    },
+    {
+      "parameter": "tasks.Task_DeployApplication.duration",
+      "value": "triangular(0.5, 1, 2)",
+      "rationale": "Proposed default. One deployment window."
+    },
+    {
+      "parameter": "tasks.Task_StartOperation.duration",
+      "value": "triangular(0.5, 1, 2)",
+      "rationale": "Proposed default. Handover to operations and go-live checks."
+    },
+    {
+      "parameter": "tasks.Task_MonitorOperation.duration",
+      "value": "triangular(5, 10, 20)",
+      "rationale": "Proposed default, confirmed by the student. About two weeks of hypercare after go-live. Not part of the cycle time, which ends at go-live."
+    },
+    {
+      "parameter": "tasks.Task_EvaluateProject.duration",
+      "value": "triangular(1, 2, 4)",
+      "rationale": "Proposed default. Closing report and lessons learned."
+    },
+    {
+      "parameter": "gateways.Gateway_ProposalSplit.branches",
+      "value": "Flow_ProposalApproved: 0.77, Flow_ProposalChangesRequested: 0.2, Flow_ProposalRejected: 0.03",
+      "rationale": "Student: possible but rare. 3% of proposal decisions reject outright, so about 4% of requests end rejected. One decision in five asks for changes (proposed default). A three-way split can't be logistic, so no attribute effect here."
+    },
+    {
+      "parameter": "gateways.Gateway_PlanSplit.branches",
+      "value": "Flow_PlanApproved: rest, Flow_PlanChangesRequested: logistic(-1.8 + 1 × [project_type = new_system])",
+      "rationale": "Proposed default. 14% of plans sent back, 31% for a new system, whose estimates are least certain. About 18% overall."
+    },
+    {
+      "parameter": "gateways.Gateway_TestSplit.branches",
+      "value": "Flow_TestsPassed: rest, Flow_DefectsFound: logistic(-3 + 0.6 × complexity + 0.15 × integrations + 0.5 × security_level)",
+      "rationale": "Proposed default. About a third of test rounds find defects: 13% for a simple internal app, over 70% for a complex, highly integrated payments app. Security level acts here because the four checks share one decision."
+    },
+    {
+      "parameter": "gateways.Gateway_ReleaseSplit.branches",
+      "value": "Flow_ReleaseApproved: rest, Flow_ReleaseRejected: logistic(-2.6 + 1 × [project_type = regulatory])",
+      "rationale": "Proposed default. 7% of releases rejected, 17% for regulatory changes, which compliance signs off at release. About 9% overall."
+    },
+    {
+      "parameter": "tasks.Task_RetestFixedDefects.duration",
+      "value": "triangular(1, 2, 4)",
+      "rationale": "Proposed default, new task of C2. Rerun only the checks that found defects, on the fixed parts: about as long as a code review (the shortest check), a fraction of a full round (about 18 days of QC work). The chance that the retest finds new defects is the as-is one of Gateway_TestSplit, an assumption on the safe side for time.",
+      "change": "C2"
+    },
+    {
+      "parameter": "tasks.Task_SpecifyRequirements.duration",
+      "value": "triangular(4, 6.4, 12.8) × (1 + 0.5 × complexity + 0.125 × security_level)",
+      "rationale": "Proposed default, assumed effect. The as-is requirements step, plus 10% of its base for every complexity step and every security level step above 1. Written with the as-is base x 0.8 so that a case with complexity 1 and security level 1 takes exactly what it takes today: 0.8 x (1 + 0.5 x 1 + 0.125 x 1) = 1.3, the as-is factor. About 1.6 days more on average, 3.9 for the riskiest case. Kept at 10% so the business unit lane stays below about 0.9 busy.",
+      "change": "C3"
+    },
+    {
+      "parameter": "gateways.Gateway_TestSplit.branches",
+      "value": "Flow_TestsPassed: rest, Flow_DefectsFound: logistic(-2.6 + 0.4 × complexity + 0.15 × integrations + 0.3 × security_level)",
+      "rationale": "Proposed default, assumed effect. Complexity lowered from 0.6 to 0.4 and security level from 0.5 to 0.3 per step, because the threat model and the integration design catch some defects before the build. The intercept goes from -3.0 to -2.6 so a case with complexity 1 and security level 1 keeps the as-is defect rate; only steps above 1 get the benefit. For the riskiest case (complexity 3, security level 3, 2 integrations) the chance that a round finds defects falls from 65% to 45%; over all cases from about 35% to 27%.",
+      "change": "C3"
+    },
+    {
+      "parameter": "lanes.Lane_QualityControl.capacity",
+      "value": 9,
+      "rationale": "Proposed default. One tester or test team more than the as-is eight.",
+      "change": "C4"
+    }
+  ],
+  "threats": [
+    {
+      "title": "The data is synthetic",
+      "detail": "The event log comes from our own simulator, so the machine learning partly finds effects we put in ourselves. It finds the strong ones (complexity, security level, integrations) and never ranks the attribute with no effect first. That shows the method works. It doesn't show these are the drivers in the real process."
+    },
+    {
+      "title": "Parameters are estimates",
+      "detail": "Durations, branch probabilities, the arrival rate and lane capacities are proposed defaults and the student's answers, not measurements. The book says simulation inputs should come from observation where possible and be checked with the people who run the process (§7.3.4, p.287)."
+    },
+    {
+      "title": "The effects of the changes are assumed",
+      "detail": "C3 is the least certain. How much longer the extended requirements take, and how many fewer defects they lead to, are both guesses. C2 assumes how long a retest takes, and that it finds new defects as often as a full test round. These values are in the assumptions table, marked with their change. Other values in models/to_be.catalog.toml could change which change helps most."
+    },
+    {
+      "title": "No working calendar",
+      "detail": "Time runs on a continuous clock of working days, with no weekends, holidays or working hours."
+    },
+    {
+      "title": "Identical resources",
+      "detail": "Each lane is a pool of identical people who are always available and work on one case at a time. Real people differ in speed, take leave and split their time across projects. The model also has no handoff delays or batching, which the book names as common sources of waiting (§7.1.2, p.261). So the waiting here is a lower bound."
+    },
+    {
+      "title": "Quality control runs close to its limit",
+      "detail": "The arrival rate is set so that QC, the busiest lane, runs close to its limit in the as-is process (see arrivals.rate under Assumptions), and the closer a lane gets to full use, the faster its queue grows (§7.2.2, p.276). A few runs build long queues, so as-is runs differ a lot. The book advises checking how results change when one resource is added (§7.3.4, p.287). C4 is that check for QC: one more tester saves {alone_C4} days on its own, so the as-is numbers depend a lot on QC capacity. The to-be numbers depend much less on it: in the full design the same tester saves {full_minus_C4} days."
+    },
+    {
+      "title": "The to-be models break the 30-element guideline",
+      "detail": "The to-be models are just over the limit of 7PMG G7 (§5.4.4, p.193); the rule check gives each count. The book's fix is a sub-process, which our simulator doesn't support. The rule check shows this as a warning, not an error."
+    }
+  ],
   "baseline": {
     "time_unit": "working days",
     "cycle_time": {
-      "mean": 10.5
+      "mean": 132.51123174314924,
+      "median": 122.88215062428276,
+      "p90": 197.95814761617294
+    },
+    "processing_time": {
+      "mean": 104.7293275860765,
+      "median": 99.38728271771856,
+      "p90": 147.68445858135985
+    },
+    "waiting_time": {
+      "mean": 27.781904157072713,
+      "median": 20.44379316452023,
+      "p90": 61.263151329263714
+    },
+    "cycle_time_efficiency": 0.7903430238206275,
+    "by_outcome": [
+      {
+        "end_event_id": "End_ProjectClosed",
+        "case_count": 1924,
+        "cycle_time": {
+          "mean": 137.27172430863018,
+          "median": 124.3321161324775,
+          "p90": 200.2653777337232
+        },
+        "cycle_time_efficiency": 0.7908080188517053
+      },
+      {
+        "end_event_id": "End_ProposalRejected",
+        "case_count": 76,
+        "cycle_time": {
+          "mean": 11.995604164393788,
+          "median": 9.150632984998538,
+          "p90": 22.54130221242167
+        },
+        "cycle_time_efficiency": 0.6556333606622752
+      }
+    ],
+    "rework": [
+      {
+        "gateway_id": "Gateway_ReleaseSplit",
+        "rate": 0.08316008316008316
+      },
+      {
+        "gateway_id": "Gateway_TestSplit",
+        "rate": 0.37266112266112267
+      },
+      {
+        "gateway_id": "Gateway_PlanSplit",
+        "rate": 0.1943866943866944
+      },
+      {
+        "gateway_id": "Gateway_ProposalSplit",
+        "rate": 0.2045
+      }
+    ],
+    "waiting_by_activity": [
+      {
+        "activity_id": "Task_RunAcceptanceTests",
+        "mean": 1.9660456964600421
+      },
+      {
+        "activity_id": "Task_RunSecurityTests",
+        "mean": 1.962133410887549
+      },
+      {
+        "activity_id": "Task_RunFunctionalTests",
+        "mean": 1.9436690894429558
+      },
+      {
+        "activity_id": "Task_ReviewSourceCode",
+        "mean": 1.8932887088202581
+      },
+      {
+        "activity_id": "Task_ApprovePlan",
+        "mean": 1.6066474387643257
+      },
+      {
+        "activity_id": "Task_ApproveProposal",
+        "mean": 1.6056493835029715
+      },
+      {
+        "activity_id": "Task_HoldKickOff",
+        "mean": 1.5836769809166178
+      },
+      {
+        "activity_id": "Task_RegisterRequest",
+        "mean": 1.569169072134357
+      },
+      {
+        "activity_id": "Task_ApproveRelease",
+        "mean": 1.4927433920546238
+      },
+      {
+        "activity_id": "Task_RefineApplication",
+        "mean": 1.4166014332948642
+      },
+      {
+        "activity_id": "Task_ReviseProposal",
+        "mean": 1.1892509349135882
+      },
+      {
+        "activity_id": "Task_DeployApplication",
+        "mean": 1.1669682871399893
+      },
+      {
+        "activity_id": "Task_FixDefects",
+        "mean": 1.1244747354177422
+      },
+      {
+        "activity_id": "Task_StartOperation",
+        "mean": 1.0653982444389938
+      },
+      {
+        "activity_id": "Task_SpecifyRequirements",
+        "mean": 1.0104634188086417
+      },
+      {
+        "activity_id": "Task_DraftPlan",
+        "mean": 0.9993418300542074
+      },
+      {
+        "activity_id": "Task_BuildApplication",
+        "mean": 0.7620483105571912
+      }
+    ],
+    "flow_analysis": {
+      "theoretical": 105.36303528086376,
+      "simulated": 104.7293275860765
     }
+  },
+  "value_added": {
+    "Task_RegisterRequest": {
+      "class": "BVA",
+      "reason": "Logs the request so the PMO can track and prioritize it; the requester gets nothing from the record itself."
+    },
+    "Task_ApproveProposal": {
+      "class": "BVA",
+      "reason": "Control step (p.216): management checks budget and fit before money is spent."
+    },
+    "Task_ReviseProposal": {
+      "class": "NVA",
+      "reason": "Rework on a proposal that wasn't accepted the first time; defect waste (p.222)."
+    },
+    "Task_HoldKickOff": {
+      "class": "BVA",
+      "reason": "Aligns the business unit and IT on scope and roles, which lowers project risk; the customer doesn't pay for the meeting."
+    },
+    "Task_SpecifyRequirements": {
+      "class": "VA",
+      "reason": "Decides what the application will do; without it the customer gets a less useful result."
+    },
+    "Task_DraftPlan": {
+      "class": "BVA",
+      "reason": "Needed to book people and dates and to control the project; the plan itself adds nothing to the application."
+    },
+    "Task_ApprovePlan": {
+      "class": "BVA",
+      "reason": "Control step (p.216) on the plan."
+    },
+    "Task_BuildApplication": {
+      "class": "VA",
+      "reason": "Produces the application the customer asked for."
+    },
+    "Task_ReviewSourceCode": {
+      "class": "BVA",
+      "reason": "Control step (p.216): checks the code was written correctly."
+    },
+    "Task_RunFunctionalTests": {
+      "class": "BVA",
+      "reason": "Control step (p.216): checks the application works as specified."
+    },
+    "Task_RunSecurityTests": {
+      "class": "BVA",
+      "reason": "Control step required by the bank's security rules; reduces the risk of losses (p.214)."
+    },
+    "Task_RunAcceptanceTests": {
+      "class": "BVA",
+      "reason": "Control step (p.216): the acceptance unit confirms the application meets the request before release."
+    },
+    "Task_FixDefects": {
+      "class": "NVA",
+      "reason": "Repairs defects found in testing; rework is defect waste (p.222)."
+    },
+    "Task_ApproveRelease": {
+      "class": "BVA",
+      "reason": "Control step (p.216): management signs off the release before production."
+    },
+    "Task_RefineApplication": {
+      "class": "NVA",
+      "reason": "Rework after a rejected release (p.222). Could be VA if it adds missing scope, see answered question 6 in the change log."
+    },
+    "Task_DeployApplication": {
+      "class": "VA",
+      "reason": "Puts the application where users can use it; the customer gets no value before this."
+    },
+    "Task_StartOperation": {
+      "class": "BVA",
+      "reason": "Formal go-live and handover to operations; the application is already deployed, so this is mostly sign-off."
+    },
+    "Task_MonitorOperation": {
+      "class": "BVA",
+      "reason": "Keeps the application stable after go-live and lowers the risk of incidents (p.214)."
+    },
+    "Task_EvaluateProject": {
+      "class": "BVA",
+      "reason": "Archives project records and collects lessons learned; useful to the bank, not to the requester."
+    }
+  },
+  "ml": {
+    "split": {
+      "method": "chronological",
+      "train_share": 0.8
+    },
+    "tasks": [
+      {
+        "id": "cycle_time",
+        "kind": "regression",
+        "models": [
+          {
+            "id": "reference",
+            "metrics": {
+              "mae": 31.797721960328353,
+              "r2": -0.002001825501031007
+            }
+          },
+          {
+            "id": "linear",
+            "metrics": {
+              "mae": 30.098370692314752,
+              "r2": 0.10820256170328102
+            }
+          },
+          {
+            "id": "gradient_boosting",
+            "metrics": {
+              "mae": 30.216124618676027,
+              "r2": 0.10136963308570424
+            }
+          }
+        ],
+        "drivers": [
+          {
+            "feature": "complexity",
+            "mean_abs_shap": 11.042726616452901
+          },
+          {
+            "feature": "security_level",
+            "mean_abs_shap": 7.365810071890866
+          },
+          {
+            "feature": "integrations",
+            "mean_abs_shap": 4.939214454983588
+          },
+          {
+            "feature": "team_workload",
+            "mean_abs_shap": 3.008567218001237
+          },
+          {
+            "feature": "project_type",
+            "mean_abs_shap": 1.3798930117930557
+          },
+          {
+            "feature": "requesting_unit",
+            "mean_abs_shap": 0.764329511021398
+          }
+        ],
+        "outcome": "End_ProjectClosed"
+      },
+      {
+        "id": "rework_Gateway_ReleaseSplit",
+        "kind": "classification",
+        "gateway_id": "Gateway_ReleaseSplit",
+        "models": [
+          {
+            "id": "reference",
+            "metrics": {
+              "roc_auc": 0.5,
+              "f1": 0.0
+            }
+          },
+          {
+            "id": "linear",
+            "metrics": {
+              "roc_auc": 0.690296631473102,
+              "f1": 0.2360248447204969
+            }
+          },
+          {
+            "id": "gradient_boosting",
+            "metrics": {
+              "roc_auc": 0.5234623764035529,
+              "f1": 0.17177914110429449
+            }
+          }
+        ],
+        "drivers": [
+          {
+            "feature": "team_workload",
+            "mean_abs_shap": 0.3333103839495592
+          },
+          {
+            "feature": "project_type",
+            "mean_abs_shap": 0.23276898070273988
+          },
+          {
+            "feature": "complexity",
+            "mean_abs_shap": 0.1101357559188099
+          },
+          {
+            "feature": "requesting_unit",
+            "mean_abs_shap": 0.10408110485276516
+          },
+          {
+            "feature": "integrations",
+            "mean_abs_shap": 0.05750641426381153
+          },
+          {
+            "feature": "security_level",
+            "mean_abs_shap": 0.01495317673169333
+          }
+        ]
+      },
+      {
+        "id": "rework_Gateway_TestSplit",
+        "kind": "classification",
+        "gateway_id": "Gateway_TestSplit",
+        "models": [
+          {
+            "id": "reference",
+            "metrics": {
+              "roc_auc": 0.5,
+              "f1": 0.0
+            }
+          },
+          {
+            "id": "linear",
+            "metrics": {
+              "roc_auc": 0.6339941050684852,
+              "f1": 0.525
+            }
+          },
+          {
+            "id": "gradient_boosting",
+            "metrics": {
+              "roc_auc": 0.6405536612148183,
+              "f1": 0.5283018867924528
+            }
+          }
+        ],
+        "drivers": [
+          {
+            "feature": "complexity",
+            "mean_abs_shap": 0.3715605676996065
+          },
+          {
+            "feature": "security_level",
+            "mean_abs_shap": 0.2518206614496113
+          },
+          {
+            "feature": "integrations",
+            "mean_abs_shap": 0.22142127405340029
+          },
+          {
+            "feature": "team_workload",
+            "mean_abs_shap": 0.10288796628043462
+          },
+          {
+            "feature": "project_type",
+            "mean_abs_shap": 0.05707820905108721
+          },
+          {
+            "feature": "requesting_unit",
+            "mean_abs_shap": 0.034575572115877716
+          }
+        ]
+      },
+      {
+        "id": "rework_Gateway_PlanSplit",
+        "kind": "classification",
+        "gateway_id": "Gateway_PlanSplit",
+        "models": [
+          {
+            "id": "reference",
+            "metrics": {
+              "roc_auc": 0.5,
+              "f1": 0.0
+            }
+          },
+          {
+            "id": "linear",
+            "metrics": {
+              "roc_auc": 0.5509255235943339,
+              "f1": 0.32323232323232326
+            }
+          },
+          {
+            "id": "gradient_boosting",
+            "metrics": {
+              "roc_auc": 0.5646997479794907,
+              "f1": 0.32075471698113206
+            }
+          }
+        ],
+        "drivers": [
+          {
+            "feature": "project_type",
+            "mean_abs_shap": 0.2916096628835492
+          },
+          {
+            "feature": "team_workload",
+            "mean_abs_shap": 0.2043132549560861
+          },
+          {
+            "feature": "requesting_unit",
+            "mean_abs_shap": 0.07335087005965518
+          },
+          {
+            "feature": "complexity",
+            "mean_abs_shap": 0.06772235513697472
+          },
+          {
+            "feature": "integrations",
+            "mean_abs_shap": 0.06387712592400813
+          },
+          {
+            "feature": "security_level",
+            "mean_abs_shap": 0.027785528884008245
+          }
+        ]
+      },
+      {
+        "id": "rework_Gateway_ProposalSplit",
+        "kind": "classification",
+        "gateway_id": "Gateway_ProposalSplit",
+        "models": [
+          {
+            "id": "reference",
+            "metrics": {
+              "roc_auc": 0.5,
+              "f1": 0.0
+            }
+          },
+          {
+            "id": "linear",
+            "metrics": {
+              "roc_auc": 0.46634487476720765,
+              "f1": 0.291044776119403
+            }
+          },
+          {
+            "id": "gradient_boosting",
+            "metrics": {
+              "roc_auc": 0.5088556117213332,
+              "f1": 0.2869198312236287
+            }
+          }
+        ],
+        "drivers": [
+          {
+            "feature": "team_workload",
+            "mean_abs_shap": 0.19759958847806927
+          },
+          {
+            "feature": "integrations",
+            "mean_abs_shap": 0.10327023766351587
+          },
+          {
+            "feature": "security_level",
+            "mean_abs_shap": 0.08949985050798304
+          },
+          {
+            "feature": "requesting_unit",
+            "mean_abs_shap": 0.06109917175767198
+          },
+          {
+            "feature": "project_type",
+            "mean_abs_shap": 0.029499342464678512
+          },
+          {
+            "feature": "complexity",
+            "mean_abs_shap": 0.014417307850896921
+          }
+        ]
+      }
+    ]
+  },
+  "changes": [
+    {
+      "id": "C1",
+      "title": "Run the four checks in parallel",
+      "driver": "Baseline: the test block is the main queue. A test round runs four checks one after the other (about 18 days of QC work) and each check waits about 2 days for a tester, so a round takes about 26 days; QC is the busiest lane (0.87).",
+      "heuristic": {
+        "name": "Parallelism",
+        "ref": "Appendix A.3"
+      },
+      "expected_effect": "Code review, functional, security and acceptance tests start at the same time after the build, so a test round lasts as long as its longest check (functional tests, about 6 days) plus waiting, instead of the sum of all four. The QC work per round stays the same.",
+      "trade_off": {
+        "time": "better",
+        "cost": "worse",
+        "quality": "worse",
+        "flexibility": "neutral",
+        "note": "Four testers are busy on one case at the same time, so the QC lane needs more coordination. A defect the code review finds can make a functional or acceptance test that ran next to it worthless, so some test work is wasted and has to be redone after the fix."
+      }
+    },
+    {
+      "id": "C2",
+      "title": "Retest only what was fixed",
+      "driver": "Baseline: Gateway_TestSplit has the highest rework rate, 37% of test rounds find defects, and after every fix all four checks run again. Student's own idea (models/as_is_changelog.md, answered questions 3 and 4).",
+      "heuristic": {
+        "name": "Activity elimination",
+        "ref": "Appendix A.2"
+      },
+      "expected_effect": "After Fix defects, a short Retest fixed defects (about 2 days) replaces a full second round of all four checks (about 18 days of QC work plus waiting). Fewer QC hours per case also shortens the queue for everyone.",
+      "trade_off": {
+        "time": "better",
+        "cost": "better",
+        "quality": "worse",
+        "flexibility": "neutral",
+        "note": "The checks that passed are not repeated after a fix, so a fix that breaks something they would have caught (a regression) reaches release approval. Mitigation outside the model: automated regression tests, or a full rerun for security-relevant fixes."
+      }
+    },
+    {
+      "id": "C3",
+      "title": "Triage risky cases into an extended requirements version",
+      "driver": "ML (ticket 14): complexity and security_level are the top two drivers of both cycle time and test rework, and Gateway_TestSplit is the loop that costs most.",
+      "heuristic": {
+        "name": "Triage",
+        "ref": "Appendix A.2"
+      },
+      "expected_effect": "Complex and highly classified cases get a longer requirements step with a threat model and an integration design. That extra work up front makes defects found in testing less likely for exactly those cases, so there are fewer test rounds and fixes. A simple internal app keeps today's requirements step and today's defect rate.",
+      "trade_off": {
+        "time": "better",
+        "cost": "worse",
+        "quality": "better",
+        "flexibility": "neutral",
+        "note": "More analyst time up front (about 1.6 days per case on average, up to 4 days for the riskiest), and the business unit lane gets busier. The size of the defect reduction is an assumption, not measured: it belongs in the threats to validity."
+      }
+    },
+    {
+      "id": "C4",
+      "title": "Add one QC tester",
+      "driver": "Baseline: QC is the busiest lane (0.87) and its four checks have the longest waits of all tasks, about 2 days each.",
+      "heuristic": {
+        "name": "Extra resources",
+        "ref": "Appendix A.4"
+      },
+      "expected_effect": "Nine testers instead of eight bring QC utilisation from about 0.87 to about 0.77, so cases wait less for every check.",
+      "trade_off": {
+        "time": "better",
+        "cost": "worse",
+        "quality": "neutral",
+        "flexibility": "better",
+        "note": "One more tester's salary. The extra capacity also gives some slack for peaks and absences."
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "changes": [],
+      "cycle_time": {
+        "mean": {
+          "value": 140.8009907950097,
+          "ci_low": 135.3465539955645,
+          "ci_high": 146.25542759445491
+        },
+        "median": {
+          "value": 127.7101911162893,
+          "ci_low": 124.07502971645086,
+          "ci_high": 131.34535251612772
+        },
+        "p90": {
+          "value": 212.82028985298902,
+          "ci_low": 201.16388904595814,
+          "ci_high": 224.4766906600199
+        }
+      },
+      "saving": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0
+      },
+      "saving_share": {
+        "value": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0
+      },
+      "replication_means": [
+        147.02068767998117,
+        200.51986013876817,
+        123.96210969940587,
+        132.69365630797446,
+        160.72017284788018,
+        137.9229366462115,
+        142.40560462992764,
+        135.3131031268131,
+        130.90732616011832,
+        142.13404506880696,
+        135.14685697325464,
+        129.66604953174382,
+        136.29061347716035,
+        140.6039432943411,
+        149.05779803567467,
+        155.32437046022835,
+        135.9623866856253,
+        126.41390211670169,
+        151.69715527974853,
+        140.39183136956876,
+        133.1619723585056,
+        142.6961309785211,
+        159.3206474292698,
+        140.41258756349066,
+        138.1678178939548,
+        127.35303500962176,
+        131.13426046277758,
+        132.93781214759392,
+        132.0224575602556,
+        132.66859291636692
+      ]
+    },
+    {
+      "changes": [
+        "C1"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 120.4377875545153,
+          "ci_low": 115.8793389958009,
+          "ci_high": 124.9962361132297
+        },
+        "median": {
+          "value": 111.6728620680188,
+          "ci_low": 108.63875198781403,
+          "ci_high": 114.70697214822357
+        },
+        "p90": {
+          "value": 176.9098853741277,
+          "ci_low": 167.29879295762922,
+          "ci_high": 186.52097779062618
+        }
+      },
+      "saving": {
+        "value": 20.363203240494446,
+        "ci_low": 19.37019100846903,
+        "ci_high": 21.356215472519864
+      },
+      "saving_share": {
+        "value": 0.1446240053107365,
+        "ci_low": 0.1375714112457478,
+        "ci_high": 0.15167659937572522
+      },
+      "replication_means": [
+        124.91301185780321,
+        169.11398592893522,
+        106.03482921597717,
+        113.53483856309204,
+        136.0389585552451,
+        117.12588228867675,
+        122.13345621980127,
+        116.60060091512803,
+        111.09609356146511,
+        121.13036228208554,
+        114.02050277193918,
+        110.68252705894582,
+        117.74344370415079,
+        121.63308577655926,
+        129.0219182019749,
+        131.80596586938168,
+        116.05278883781119,
+        107.8417564699567,
+        132.68177452627586,
+        120.40516722052867,
+        114.08571102043845,
+        122.68011295557606,
+        135.8863682835676,
+        121.84671910577377,
+        117.00021369780552,
+        108.3964570474839,
+        112.55611937576958,
+        113.74617267022832,
+        113.25343701084238,
+        114.0713656422399
+      ]
+    },
+    {
+      "changes": [
+        "C2"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 113.28205595337722,
+          "ci_low": 111.69406318420644,
+          "ci_high": 114.870048722548
+        },
+        "median": {
+          "value": 111.01301310582156,
+          "ci_low": 109.68113315447451,
+          "ci_high": 112.3448930571686
+        },
+        "p90": {
+          "value": 152.29020218315816,
+          "ci_low": 149.45492733279005,
+          "ci_high": 155.12547703352627
+        }
+      },
+      "saving": {
+        "value": 27.51893484163251,
+        "ci_low": 23.276910749020214,
+        "ci_high": 31.760958934244808
+      },
+      "saving_share": {
+        "value": 0.19544560507885178,
+        "ci_low": 0.16531780506366436,
+        "ci_high": 0.2255734050940392
+      },
+      "replication_means": [
+        111.71232116976354,
+        122.5227247810181,
+        106.84734266290687,
+        112.25088576404481,
+        119.81228649424774,
+        111.77466250390547,
+        115.61092204001545,
+        112.49273488161525,
+        110.05190580361217,
+        114.74207767988878,
+        111.29774099997553,
+        109.82393195513205,
+        112.95958482893059,
+        118.81137813577392,
+        117.35066317743674,
+        116.22719495201174,
+        110.21936998454972,
+        106.48889230323108,
+        120.58890900274322,
+        113.75655530109601,
+        113.40609059190837,
+        114.4835329926422,
+        120.54526991518087,
+        115.35287797736112,
+        113.9654905427396,
+        110.03958309748822,
+        108.49209905238303,
+        109.59063045339089,
+        108.30202577688065,
+        108.94199377944332
+      ]
+    },
+    {
+      "changes": [
+        "C3"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 125.1919219262034,
+          "ci_low": 123.13792906771386,
+          "ci_high": 127.24591478469296
+        },
+        "median": {
+          "value": 120.84786863489666,
+          "ci_low": 119.04741453840172,
+          "ci_high": 122.64832273139159
+        },
+        "p90": {
+          "value": 175.07451169113207,
+          "ci_low": 171.22728820379814,
+          "ci_high": 178.921735178466
+        }
+      },
+      "saving": {
+        "value": 15.609068868806332,
+        "ci_low": 11.719948339355938,
+        "ci_high": 19.498189398256727
+      },
+      "saving_share": {
+        "value": 0.1108590840211584,
+        "ci_low": 0.08323768372069806,
+        "ci_high": 0.13848048432161875
+      },
+      "replication_means": [
+        123.4792352943954,
+        137.5392323806073,
+        116.10679147537451,
+        123.58257489479928,
+        135.45057798972815,
+        123.59675150166512,
+        127.29572394951262,
+        123.32726165557834,
+        121.53836653657504,
+        125.62381406520659,
+        122.26962916650132,
+        120.84462106838805,
+        125.44116778632565,
+        128.2553928340117,
+        130.7413303183572,
+        128.5448498832851,
+        120.64253047310419,
+        116.85314268529153,
+        135.65916463166897,
+        124.46121115081458,
+        124.36045888218966,
+        129.33323752606555,
+        134.1961953506602,
+        128.31201911236695,
+        125.79261208845963,
+        122.82644192692422,
+        118.99653582475803,
+        120.80719369792406,
+        119.2021239886318,
+        120.67746964693157
+      ]
+    },
+    {
+      "changes": [
+        "C4"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 127.80254397755033,
+          "ci_low": 125.6146425477027,
+          "ci_high": 129.99044540739794
+        },
+        "median": {
+          "value": 119.59342275829951,
+          "ci_low": 117.78876499564004,
+          "ci_high": 121.39808052095898
+        },
+        "p90": {
+          "value": 185.33232199530968,
+          "ci_low": 181.27409418282087,
+          "ci_high": 189.3905498077985
+        }
+      },
+      "saving": {
+        "value": 12.998446817459403,
+        "ci_low": 9.414170667630374,
+        "ci_high": 16.58272296728843
+      },
+      "saving_share": {
+        "value": 0.09231786469729938,
+        "ci_low": 0.0668615370848941,
+        "ci_high": 0.11777419230970466
+      },
+      "replication_means": [
+        128.80111423210806,
+        142.85514974961114,
+        118.76801723206518,
+        126.1286415411336,
+        139.41584471197575,
+        127.3707849447906,
+        130.36014418160147,
+        126.74814340117379,
+        121.856521083103,
+        129.79761860134371,
+        124.3601478097856,
+        122.30569476871288,
+        126.73971701367522,
+        131.76600907184417,
+        132.72153951698314,
+        134.13357931646576,
+        124.2002481207301,
+        119.31116358595737,
+        136.3647694142838,
+        127.38541936739256,
+        125.96898509118374,
+        130.0398165986077,
+        136.98374031624192,
+        128.4798243167997,
+        127.25939701136407,
+        122.76802879812632,
+        122.1122911012873,
+        122.85137563061302,
+        122.83943003105946,
+        123.38316276649006
+      ]
+    },
+    {
+      "changes": [
+        "C1",
+        "C2"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 102.40685820411204,
+          "ci_low": 100.7932333789158,
+          "ci_high": 104.02048302930828
+        },
+        "median": {
+          "value": 99.90488347192208,
+          "ci_low": 98.59512075721798,
+          "ci_high": 101.21464618662617
+        },
+        "p90": {
+          "value": 140.35365109886297,
+          "ci_low": 137.15955054123765,
+          "ci_high": 143.5477516564883
+        }
+      },
+      "saving": {
+        "value": 38.39413259089769,
+        "ci_low": 34.12906111333929,
+        "ci_high": 42.65920406845609
+      },
+      "saving_share": {
+        "value": 0.27268368194081244,
+        "ci_low": 0.24239219426394049,
+        "ci_high": 0.30297516961768445
+      },
+      "replication_means": [
+        101.28389988927276,
+        111.36657707695392,
+        95.85573448482768,
+        101.26099851347745,
+        108.48317887045178,
+        100.39633043761056,
+        104.64391953612069,
+        101.53383207845226,
+        99.1153545934313,
+        104.13828594022698,
+        99.8831223937755,
+        98.74124766769708,
+        102.69304701519835,
+        107.5252003835816,
+        106.20200680326391,
+        105.31466558965634,
+        99.07994057056105,
+        95.6648488383278,
+        111.91329125540844,
+        102.20636677680808,
+        102.50074125131503,
+        103.12655587595292,
+        109.20793527139205,
+        105.5640825204507,
+        102.48611201766079,
+        99.61717633206062,
+        97.56686941016343,
+        98.6275298484375,
+        97.93461870790723,
+        98.27227617291763
+      ]
+    },
+    {
+      "changes": [
+        "C1",
+        "C3"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 109.39680658890559,
+          "ci_low": 107.42301693500346,
+          "ci_high": 111.37059624280772
+        },
+        "median": {
+          "value": 106.81345389987366,
+          "ci_low": 105.17734137166208,
+          "ci_high": 108.44956642808525
+        },
+        "p90": {
+          "value": 151.24984661007633,
+          "ci_low": 147.4734783284708,
+          "ci_high": 155.02621489168186
+        }
+      },
+      "saving": {
+        "value": 31.404184206104155,
+        "ci_low": 27.407757430710507,
+        "ci_high": 35.400610981497806
+      },
+      "saving_share": {
+        "value": 0.22303951150333232,
+        "ci_low": 0.19465599834175243,
+        "ci_high": 0.25142302466491223
+      },
+      "replication_means": [
+        107.45543623978526,
+        120.68828710829153,
+        101.47071374703424,
+        107.21814551004118,
+        118.18808127277053,
+        106.73842556934804,
+        112.54194538766009,
+        107.5825184762299,
+        106.51076631314557,
+        110.06881423171909,
+        105.91990316781965,
+        105.52681535422558,
+        109.69675382240298,
+        112.16203752590287,
+        115.13719186866287,
+        112.93068090226201,
+        105.12086381301977,
+        101.27577880308544,
+        120.76053552270692,
+        108.55804888809716,
+        108.23956999510268,
+        113.16770087849025,
+        117.96811234216051,
+        112.68205056813726,
+        109.67242044467054,
+        107.50026140549156,
+        103.67570007417898,
+        105.35372131958091,
+        103.3420272796927,
+        104.75088983545152
+      ]
+    },
+    {
+      "changes": [
+        "C1",
+        "C4"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 109.23683196761182,
+          "ci_low": 107.21603673599768,
+          "ci_high": 111.25762719922596
+        },
+        "median": {
+          "value": 104.34859542262339,
+          "ci_low": 102.73577741125004,
+          "ci_high": 105.96141343399674
+        },
+        "p90": {
+          "value": 154.11959817314315,
+          "ci_low": 150.3119153174566,
+          "ci_high": 157.9272810288297
+        }
+      },
+      "saving": {
+        "value": 31.564158827397925,
+        "ci_low": 27.735876097854423,
+        "ci_high": 35.39244155694143
+      },
+      "saving_share": {
+        "value": 0.2241756868980543,
+        "ci_low": 0.1969863702041324,
+        "ci_high": 0.2513650035919762
+      },
+      "replication_means": [
+        109.46542129629752,
+        121.69873659360485,
+        101.27559452772326,
+        107.46704151038936,
+        120.64593611848541,
+        107.8536972094712,
+        112.21315962356734,
+        108.56640330057131,
+        103.87777498078205,
+        110.71313066782936,
+        105.87031241206111,
+        103.98820112030653,
+        108.50333361380541,
+        114.48468142557998,
+        114.28379645627606,
+        113.91750608411337,
+        105.8387759873559,
+        101.1290784375697,
+        118.60503735980016,
+        109.00089939029863,
+        107.63354015968353,
+        111.53746709756675,
+        116.6535950494842,
+        110.3798362782165,
+        108.9042637945285,
+        104.48457960449203,
+        104.20890765263441,
+        104.75193935561254,
+        104.45057830171686,
+        104.70173361853088
+      ]
+    },
+    {
+      "changes": [
+        "C2",
+        "C3"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 116.04792513621652,
+          "ci_low": 114.27056910672086,
+          "ci_high": 117.82528116571218
+        },
+        "median": {
+          "value": 114.43554016404137,
+          "ci_low": 112.9537471106734,
+          "ci_high": 115.91733321740934
+        },
+        "p90": {
+          "value": 155.46822349072823,
+          "ci_low": 151.98177901702815,
+          "ci_high": 158.95466796442832
+        }
+      },
+      "saving": {
+        "value": 24.753065658793197,
+        "ci_low": 20.513695738586154,
+        "ci_high": 28.99243557900024
+      },
+      "saving_share": {
+        "value": 0.17580178604588698,
+        "ci_low": 0.14569283655433768,
+        "ci_high": 0.20591073553743625
+      },
+      "replication_means": [
+        113.72402481804707,
+        124.91026569011333,
+        108.59423303317222,
+        115.00655283183309,
+        123.56111849954154,
+        113.15839628682158,
+        118.51794680210212,
+        115.10130928770263,
+        113.96301533724227,
+        116.2144293521246,
+        112.70334913370094,
+        112.44409958127895,
+        115.5335910273036,
+        120.20233384252244,
+        121.71737187352169,
+        118.05197100308845,
+        112.18713877875294,
+        108.39255436984435,
+        126.60439398354117,
+        115.53238357048096,
+        116.06799920452147,
+        118.94784476869701,
+        123.89572179358217,
+        119.3509824255637,
+        117.66232721522259,
+        113.91392286581792,
+        111.01647509015008,
+        112.42625613795967,
+        110.7932687793343,
+        111.2424767029116
+      ]
+    },
+    {
+      "changes": [
+        "C2",
+        "C4"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 113.02753735352755,
+          "ci_low": 111.48004983297578,
+          "ci_high": 114.57502487407932
+        },
+        "median": {
+          "value": 110.7600201605619,
+          "ci_low": 109.44188553746125,
+          "ci_high": 112.07815478366254
+        },
+        "p90": {
+          "value": 151.88073368949406,
+          "ci_low": 149.04066390702604,
+          "ci_high": 154.72080347196209
+        }
+      },
+      "saving": {
+        "value": 27.773453441482193,
+        "ci_low": 23.48222211065401,
+        "ci_high": 32.06468477231038
+      },
+      "saving_share": {
+        "value": 0.19725325286891762,
+        "ci_low": 0.16677597208702505,
+        "ci_high": 0.22773053365081022
+      },
+      "replication_means": [
+        111.73033699580165,
+        121.7250146409256,
+        106.85972041648907,
+        112.31699254007611,
+        119.14240846644275,
+        111.6784918200345,
+        114.72314386112961,
+        112.2429863061102,
+        109.83203505672992,
+        114.47195688566103,
+        110.57603486501664,
+        109.48105024632545,
+        113.2540133096232,
+        118.2558817725775,
+        117.21111961256153,
+        115.84598469831504,
+        109.96476646279902,
+        106.26378510107618,
+        120.6160191201198,
+        113.69694210165486,
+        113.21563355748034,
+        113.86039200114928,
+        120.07436337539883,
+        115.35173820678186,
+        113.77225822092869,
+        110.07458721104081,
+        108.27945120569609,
+        109.22241991391562,
+        108.15101918526486,
+        108.93557344870047
+      ]
+    },
+    {
+      "changes": [
+        "C3",
+        "C4"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 123.27807342007107,
+          "ci_low": 121.38692630786312,
+          "ci_high": 125.16922053227901
+        },
+        "median": {
+          "value": 119.36211050674197,
+          "ci_low": 117.6710471132669,
+          "ci_high": 121.05317390021705
+        },
+        "p90": {
+          "value": 171.47485105102004,
+          "ci_low": 168.00850024472868,
+          "ci_high": 174.9412018573114
+        }
+      },
+      "saving": {
+        "value": 17.52291737493869,
+        "ci_low": 13.453525861699848,
+        "ci_high": 21.59230888817753
+      },
+      "saving_share": {
+        "value": 0.12445166242082821,
+        "ci_low": 0.09554993743820069,
+        "ci_high": 0.15335338740345575
+      },
+      "replication_means": [
+        121.61540328010724,
+        133.70633874831105,
+        114.9508395497179,
+        122.07527848019622,
+        131.77928293365608,
+        121.6929311542152,
+        125.5721760467699,
+        122.04192231641139,
+        120.31002767149808,
+        124.10749661660641,
+        119.98610436034834,
+        119.57912671781558,
+        122.22966493205293,
+        126.43753641079617,
+        129.47054950874207,
+        126.18750623158657,
+        119.15112732156587,
+        115.3786647272917,
+        133.091518315844,
+        122.45839686053392,
+        122.83655266801408,
+        127.15818963394997,
+        131.7232665791812,
+        126.49788794471863,
+        124.46687872898043,
+        121.39703214391467,
+        116.99899233596271,
+        119.35381791969454,
+        117.77449285283082,
+        118.31319961081803
+      ]
+    },
+    {
+      "changes": [
+        "C1",
+        "C2",
+        "C3"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 105.05388459711908,
+          "ci_low": 103.26190442872199,
+          "ci_high": 106.84586476551617
+        },
+        "median": {
+          "value": 103.31869770828021,
+          "ci_low": 101.82970938227616,
+          "ci_high": 104.80768603428426
+        },
+        "p90": {
+          "value": 143.3488622692494,
+          "ci_low": 139.6934339154023,
+          "ci_high": 147.0042906230965
+        }
+      },
+      "saving": {
+        "value": 35.74710619789065,
+        "ci_low": 31.507174052986485,
+        "ci_high": 39.98703834279482
+      },
+      "saving_share": {
+        "value": 0.2538839108734284,
+        "ci_low": 0.22377096833684473,
+        "ci_high": 0.28399685341001196
+      },
+      "replication_means": [
+        102.59232532519373,
+        113.92064707940264,
+        97.39132261024966,
+        103.76983537417185,
+        112.11640561414382,
+        102.241709478557,
+        107.83506171713042,
+        103.77778558303692,
+        102.9978215674407,
+        105.7319412001752,
+        101.51893619346194,
+        101.22593394921847,
+        104.52963809970234,
+        109.20154921660351,
+        111.16969628256271,
+        107.57795477227955,
+        101.26023782283364,
+        97.51764401484694,
+        115.53971163790092,
+        104.86883843198497,
+        104.91504534812972,
+        108.78556678000899,
+        112.41145285565284,
+        108.83019037563906,
+        105.4982986206407,
+        103.51874618951679,
+        99.56579630746738,
+        101.65659951327595,
+        99.51529753175522,
+        100.13454842058881
+      ]
+    },
+    {
+      "changes": [
+        "C1",
+        "C2",
+        "C4"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 101.71392003230567,
+          "ci_low": 100.13595798395939,
+          "ci_high": 103.29188208065194
+        },
+        "median": {
+          "value": 99.39320931769274,
+          "ci_low": 98.1017667373843,
+          "ci_high": 100.68465189800118
+        },
+        "p90": {
+          "value": 138.74833338185152,
+          "ci_low": 135.82758859559803,
+          "ci_high": 141.66907816810502
+        }
+      },
+      "saving": {
+        "value": 39.087070762704066,
+        "ci_low": 34.81619057127151,
+        "ci_high": 43.35795095413662
+      },
+      "saving_share": {
+        "value": 0.2776050831887285,
+        "ci_low": 0.24727234073203322,
+        "ci_high": 0.30793782564542377
+      },
+      "replication_means": [
+        100.48867233175147,
+        110.58014058181213,
+        95.5369605073328,
+        101.0917760056498,
+        107.80706150359954,
+        99.84778437484893,
+        103.50298319916534,
+        100.68299506808788,
+        98.37818471922715,
+        103.04603099943911,
+        99.57541732398185,
+        98.28585367858167,
+        101.60593847207389,
+        106.58187227950442,
+        105.35508758052727,
+        104.99792353043823,
+        98.26649928584534,
+        95.13816671838407,
+        110.69007264030323,
+        101.80768525357072,
+        101.6244305451134,
+        102.70666142607102,
+        108.67468124384028,
+        104.72920627703049,
+        101.97615559318851,
+        98.71935596796177,
+        97.07407559917658,
+        98.0856334915928,
+        97.07145964022175,
+        97.48883513084888
+      ]
+    },
+    {
+      "changes": [
+        "C1",
+        "C3",
+        "C4"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 107.6304328959306,
+          "ci_low": 105.74454006325165,
+          "ci_high": 109.51632572860954
+        },
+        "median": {
+          "value": 105.39129698276808,
+          "ci_low": 103.81472392288208,
+          "ci_high": 106.96787004265408
+        },
+        "p90": {
+          "value": 148.0463863308101,
+          "ci_low": 144.32923652676882,
+          "ci_high": 151.76353613485136
+        }
+      },
+      "saving": {
+        "value": 33.170557899079164,
+        "ci_low": 29.03494521778131,
+        "ci_high": 37.30617058037702
+      },
+      "saving_share": {
+        "value": 0.2355846909299931,
+        "ci_low": 0.2062126484610673,
+        "ci_high": 0.2649567333989189
+      },
+      "replication_means": [
+        105.92135535648387,
+        117.60541943588383,
+        99.71030237688186,
+        106.064609585285,
+        114.893265605046,
+        105.03677103379314,
+        109.94570298664391,
+        106.98239618231024,
+        104.32431985997225,
+        107.86887127339853,
+        104.16615249966947,
+        104.28684590132438,
+        107.86861397002241,
+        111.13667640282638,
+        113.6329804343536,
+        110.37607662005682,
+        103.47304281648118,
+        99.94929239155898,
+        120.0681996772255,
+        107.13848617233258,
+        107.51467644132072,
+        110.48699127041644,
+        115.60795725093563,
+        110.43740198137456,
+        108.16722517078233,
+        105.72065765738341,
+        102.27167745916108,
+        103.74603880272151,
+        101.84308046734854,
+        102.66789979492323
+      ]
+    },
+    {
+      "changes": [
+        "C2",
+        "C3",
+        "C4"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 115.83757501575805,
+          "ci_low": 114.0911778552526,
+          "ci_high": 117.5839721762635
+        },
+        "median": {
+          "value": 114.27865585496058,
+          "ci_low": 112.81047905879899,
+          "ci_high": 115.74683265112216
+        },
+        "p90": {
+          "value": 155.2489203252572,
+          "ci_low": 151.76004827718606,
+          "ci_high": 158.73779237332832
+        }
+      },
+      "saving": {
+        "value": 24.9634157792517,
+        "ci_low": 20.733259875904903,
+        "ci_high": 29.1935716825985
+      },
+      "saving_share": {
+        "value": 0.17729573945680258,
+        "ci_low": 0.14725222996541396,
+        "ci_high": 0.20733924894819122
+      },
+      "replication_means": [
+        113.53450703108861,
+        124.43319575204205,
+        108.35080436446442,
+        114.6177763303718,
+        123.75608945158922,
+        113.31250325233387,
+        118.31004715459885,
+        114.96329990519176,
+        113.16356764152823,
+        116.5296207275483,
+        112.81507959570664,
+        112.28731376335122,
+        115.92249954386925,
+        119.65370609193339,
+        121.71094750684476,
+        119.00589079124713,
+        112.20434337509934,
+        108.39102480396907,
+        125.44329665382473,
+        115.62794270493995,
+        115.80500812606627,
+        117.8146743396163,
+        123.42758686637995,
+        119.33056814967037,
+        116.79700231538443,
+        113.73164852010211,
+        111.01825914573416,
+        111.9975712746204,
+        110.53632590206368,
+        110.63514939156096
+      ]
+    },
+    {
+      "changes": [
+        "C1",
+        "C2",
+        "C3",
+        "C4"
+      ],
+      "cycle_time": {
+        "mean": {
+          "value": 104.54905147500526,
+          "ci_low": 102.75159962943067,
+          "ci_high": 106.34650332057984
+        },
+        "median": {
+          "value": 102.93066285793157,
+          "ci_low": 101.47480469639758,
+          "ci_high": 104.38652101946555
+        },
+        "p90": {
+          "value": 142.4610817527408,
+          "ci_low": 138.78374181223802,
+          "ci_high": 146.13842169324357
+        }
+      },
+      "saving": {
+        "value": 36.25193932000449,
+        "ci_low": 32.00262015720574,
+        "ci_high": 40.50125848280324
+      },
+      "saving_share": {
+        "value": 0.25746934815809075,
+        "ci_low": 0.22728973692946472,
+        "ci_high": 0.2876489593867168
+      },
+      "replication_means": [
+        102.0272987463964,
+        113.11500629571447,
+        96.95284982260912,
+        102.85215221229274,
+        112.21340783000892,
+        102.15591293380174,
+        107.3097285030066,
+        103.64570776573339,
+        102.10911966289974,
+        105.00528537163035,
+        101.08380395117364,
+        100.73015481859979,
+        105.39201900735418,
+        108.2977799068788,
+        110.34243508168584,
+        107.11109619382651,
+        100.59509902377957,
+        96.78504865206679,
+        115.97635511855313,
+        104.29296742308667,
+        104.14537185218603,
+        107.28508857971843,
+        111.56750089175677,
+        108.4242049816885,
+        104.80790394228468,
+        102.7660511114036,
+        99.24626042974417,
+        100.81498360633341,
+        99.21919184953771,
+        100.20175868440595
+      ]
+    }
+  ],
+  "ablation": [
+    {
+      "change": "C1",
+      "alone": {
+        "value": 20.363203240494446,
+        "ci_low": 19.37019100846903,
+        "ci_high": 21.356215472519864
+      },
+      "full_minus": {
+        "value": 11.288523540752786,
+        "ci_low": 11.091563572946093,
+        "ci_high": 11.48548350855948
+      }
+    },
+    {
+      "change": "C2",
+      "alone": {
+        "value": 27.51893484163251,
+        "ci_low": 23.276910749020214,
+        "ci_high": 31.760958934244808
+      },
+      "full_minus": {
+        "value": 3.081381420925325,
+        "ci_low": 2.87628763199754,
+        "ci_high": 3.2864752098531103
+      }
+    },
+    {
+      "change": "C3",
+      "alone": {
+        "value": 15.609068868806332,
+        "ci_low": 11.719948339355938,
+        "ci_high": 19.498189398256727
+      },
+      "full_minus": {
+        "value": -2.835131442699576,
+        "ci_low": -3.236617866177972,
+        "ci_high": -2.4336450192211805
+      }
+    },
+    {
+      "change": "C4",
+      "alone": {
+        "value": 12.998446817459403,
+        "ci_low": 9.414170667630374,
+        "ci_high": 16.58272296728843
+      },
+      "full_minus": {
+        "value": 0.5048331221138256,
+        "ci_low": 0.33426437261811953,
+        "ci_high": 0.6754018716095316
+      }
+    }
+  ],
+  "headline": {
+    "changes": [
+      "C1",
+      "C2",
+      "C3",
+      "C4"
+    ],
+    "top_change": "C1",
+    "best": [
+      "C1",
+      "C2",
+      "C4"
+    ]
   },
   "models": {
     "as_is": {
-      "bpmn": "models/as_is.bpmn"
+      "bpmn": "models/as_is.bpmn",
+      "names": {
+        "Lane_BusinessUnit": "Business unit / PMO",
+        "Lane_ITManagement": "IT management",
+        "Lane_Development": "Application development",
+        "Lane_QualityControl": "QC / Acceptance unit",
+        "Lane_ITOperations": "IT operations / App support / PMO",
+        "Flow_ProposalApproved": "proposal approved",
+        "Flow_ProposalChangesRequested": "changes requested",
+        "Flow_ProposalRejected": "proposal rejected",
+        "Flow_PlanApproved": "plan approved",
+        "Flow_PlanChangesRequested": "plan needs changes",
+        "Flow_TestsPassed": "all tests passed",
+        "Flow_DefectsFound": "defects found",
+        "Flow_ReleaseApproved": "release approved",
+        "Flow_ReleaseRejected": "release rejected",
+        "Start_RequestReceived": "Development request received",
+        "Task_RegisterRequest": "Register development request",
+        "Task_ApproveProposal": "Approve project proposal",
+        "Task_ReviseProposal": "Revise project proposal",
+        "End_ProposalRejected": "Proposal rejected",
+        "Task_HoldKickOff": "Hold project kick-off",
+        "Task_SpecifyRequirements": "Specify business and technical requirements",
+        "Task_DraftPlan": "Draft detailed project plan",
+        "Task_ApprovePlan": "Approve project plan",
+        "Task_BuildApplication": "Build application",
+        "Task_ReviewSourceCode": "Review source code",
+        "Task_RunFunctionalTests": "Run functional tests",
+        "Task_RunSecurityTests": "Run security tests",
+        "Task_RunAcceptanceTests": "Run acceptance tests",
+        "Task_FixDefects": "Fix defects",
+        "Task_ApproveRelease": "Approve application release",
+        "Task_RefineApplication": "Refine application",
+        "Task_DeployApplication": "Deploy application to production",
+        "Task_StartOperation": "Start live operation",
+        "Task_MonitorOperation": "Monitor live operation",
+        "Task_EvaluateProject": "Evaluate project results",
+        "End_ProjectClosed": "Project closed",
+        "Gateway_ProposalSplit": "Decision after Approve project proposal",
+        "Gateway_PlanSplit": "Decision after Approve project plan",
+        "Gateway_TestSplit": "Decision after Run acceptance tests",
+        "Gateway_ReleaseSplit": "Decision after Approve application release"
+      },
+      "lint": []
+    },
+    "to_be": {
+      "bpmn": "models/to_be.bpmn",
+      "names": {
+        "Lane_BusinessUnit": "Business unit / PMO",
+        "Lane_ITManagement": "IT management",
+        "Lane_Development": "Application development",
+        "Lane_QualityControl": "QC / Acceptance unit",
+        "Lane_ITOperations": "IT operations / App support / PMO",
+        "Flow_ProposalApproved": "proposal approved",
+        "Flow_ProposalChangesRequested": "changes requested",
+        "Flow_ProposalRejected": "proposal rejected",
+        "Flow_PlanApproved": "plan approved",
+        "Flow_PlanChangesRequested": "plan needs changes",
+        "Flow_TestsPassed": "all tests passed",
+        "Flow_DefectsFound": "defects found",
+        "Flow_ReleaseApproved": "release approved",
+        "Flow_ReleaseRejected": "release rejected",
+        "Start_RequestReceived": "Development request received",
+        "Task_RegisterRequest": "Register development request",
+        "Task_ApproveProposal": "Approve project proposal",
+        "Task_ReviseProposal": "Revise project proposal",
+        "End_ProposalRejected": "Proposal rejected",
+        "Task_HoldKickOff": "Hold project kick-off",
+        "Task_SpecifyRequirements": "Specify business and technical requirements",
+        "Task_DraftPlan": "Draft detailed project plan",
+        "Task_ApprovePlan": "Approve project plan",
+        "Task_BuildApplication": "Build application",
+        "Task_ReviewSourceCode": "Review source code",
+        "Task_RunFunctionalTests": "Run functional tests",
+        "Task_RunSecurityTests": "Run security tests",
+        "Task_RunAcceptanceTests": "Run acceptance tests",
+        "Task_FixDefects": "Fix defects",
+        "Task_RetestFixedDefects": "Retest fixed defects",
+        "Task_ApproveRelease": "Approve application release",
+        "Task_RefineApplication": "Refine application",
+        "Task_DeployApplication": "Deploy application to production",
+        "Task_StartOperation": "Start live operation",
+        "Task_MonitorOperation": "Monitor live operation",
+        "Task_EvaluateProject": "Evaluate project results",
+        "End_ProjectClosed": "Project closed",
+        "Gateway_ProposalSplit": "Decision after Approve project proposal",
+        "Gateway_PlanSplit": "Decision after Approve project plan",
+        "Gateway_ReleaseSplit": "Decision after Approve application release"
+      },
+      "lint": [
+        {
+          "rule": "G7",
+          "element_id": "Process_AppDevelopment_ToBe",
+          "message": "Model has 33 flow nodes. 7PMG G7: decompose a model with more than 30 elements (§5.4.4 p.193). We count events, tasks and gateways.",
+          "severity": "warning"
+        }
+      ]
     }
   }
 }

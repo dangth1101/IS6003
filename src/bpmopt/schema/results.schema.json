@@ -2,21 +2,40 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/dangth1101/IS6003/results.schema.json",
   "title": "IS6003 results file",
-  "description": "Contract between the notebook (writer) and the static page (reader). Version 1: walking skeleton.",
+  "description": "Contract between the notebook (writer) and the static page (reader). Version 4: every section from the spec, with per-replication means in the scenarios, the ablation and the headline. Sections other than meta, text, models and baseline are optional until the step that fills them is done; inside a section, the shape is fixed. All times are in working days. All human-readable text is in `text`, in the catalog entries (`changes`, `assumptions`, `threats`, `value_added` reasons, lint messages) or in the BPMN labels.",
   "type": "object",
-  "required": ["meta", "models", "baseline"],
+  "required": ["meta", "text", "models", "baseline"],
   "additionalProperties": false,
   "properties": {
     "meta": {
       "type": "object",
-      "required": ["schema_version", "seed", "case_count", "parameter_version", "generated_at"],
+      "required": ["schema_version", "seed", "replications", "case_count", "warm_up", "parameter_version", "generated_at"],
       "additionalProperties": false,
       "properties": {
-        "schema_version": { "const": 1 },
+        "schema_version": { "const": 4 },
         "seed": { "type": "integer" },
-        "case_count": { "type": "integer", "minimum": 1 },
+        "replications": { "type": "integer", "minimum": 1, "description": "Replications per scenario. 1 for a single baseline run." },
+        "case_count": { "type": "integer", "minimum": 1, "description": "Cases per run, after the warm-up is dropped." },
+        "warm_up": { "type": "number", "minimum": 0, "description": "Warm-up length in working days. Cases that start before it are dropped." },
         "parameter_version": { "type": "string" },
-        "generated_at": { "type": "string", "format": "date-time" }
+        "generated_at": { "type": "string", "format": "date-time" },
+        "fake": { "type": "boolean", "description": "True only in the fake file the page is built against. The page shows a notice when set." }
+      }
+    },
+    "text": { "$ref": "#/$defs/text" },
+    "assumptions": {
+      "type": "array",
+      "description": "Generated from the parameter file, then the overrides of the change catalog (bpmopt.scenarios.Catalog.assumptions).",
+      "items": {
+        "type": "object",
+        "required": ["parameter", "value", "rationale"],
+        "additionalProperties": false,
+        "properties": {
+          "parameter": { "type": "string", "description": "Key path in the parameter file, e.g. tasks.build.duration." },
+          "value": { "type": ["string", "number"] },
+          "rationale": { "type": "string", "minLength": 1 },
+          "change": { "$ref": "#/$defs/id", "description": "The change that adds or replaces this parameter. Absent for as-is parameters." }
+        }
       }
     },
     "models": {
@@ -28,31 +47,392 @@
         "to_be": { "$ref": "#/$defs/model" }
       }
     },
+    "value_added": {
+      "type": "object",
+      "description": "Activity ID -> value-added class (book §6.1).",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["class", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "class": { "enum": ["VA", "BVA", "NVA"] },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "baseline": {
       "type": "object",
-      "required": ["time_unit", "cycle_time"],
+      "description": "As-is performance measures from the event log (book §7.1). Every cycle time ends at the parameters' cut-off (cycle_time.ends_at in the assumptions), or at the end event for a case that ends before it.",
+      "required": ["time_unit", "cycle_time", "processing_time", "waiting_time", "cycle_time_efficiency", "by_outcome", "rework", "waiting_by_activity", "flow_analysis"],
       "additionalProperties": false,
       "properties": {
         "time_unit": { "const": "working days" },
-        "cycle_time": {
+        "cycle_time": { "$ref": "#/$defs/stats" },
+        "processing_time": { "$ref": "#/$defs/stats" },
+        "waiting_time": { "$ref": "#/$defs/stats" },
+        "cycle_time_efficiency": { "type": "number", "minimum": 0, "maximum": 1, "description": "Processing time / cycle time (§7.1.2)." },
+        "by_outcome": {
+          "type": "array",
+          "description": "Cycle time of the cases that ended at each end event, most common first. Only end events some case reached.",
+          "items": {
+            "type": "object",
+            "required": ["end_event_id", "case_count", "cycle_time", "cycle_time_efficiency"],
+            "additionalProperties": false,
+            "properties": {
+              "end_event_id": { "type": "string" },
+              "case_count": { "type": "integer", "minimum": 1 },
+              "cycle_time": { "$ref": "#/$defs/stats" },
+              "cycle_time_efficiency": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        },
+        "rework": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["gateway_id", "rate"],
+            "additionalProperties": false,
+            "properties": {
+              "gateway_id": { "type": "string" },
+              "rate": { "type": "number", "minimum": 0, "maximum": 1, "description": "Share of cases that took the loop-back branch at least once." }
+            }
+          }
+        },
+        "waiting_by_activity": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["activity_id", "mean"],
+            "additionalProperties": false,
+            "properties": {
+              "activity_id": { "type": "string" },
+              "mean": { "type": "number", "minimum": 0 }
+            }
+          }
+        },
+        "flow_analysis": {
           "type": "object",
-          "required": ["mean"],
+          "description": "Cross-check: theoretical cycle time from the book's flow analysis (§7.1.1) vs the simulated mean with unlimited capacity.",
+          "required": ["theoretical", "simulated"],
           "additionalProperties": false,
           "properties": {
-            "mean": { "type": "number", "minimum": 0 }
+            "theoretical": { "type": "number", "minimum": 0 },
+            "simulated": { "type": "number", "minimum": 0 }
           }
+        }
+      }
+    },
+    "ml": {
+      "type": "object",
+      "description": "Cycle time prediction and rework prediction per gateway.",
+      "required": ["split", "tasks"],
+      "additionalProperties": false,
+      "properties": {
+        "split": {
+          "type": "object",
+          "required": ["method", "train_share"],
+          "additionalProperties": false,
+          "properties": {
+            "method": { "const": "chronological" },
+            "train_share": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 }
+          }
+        },
+        "tasks": { "type": "array", "items": { "$ref": "#/$defs/ml_task" } }
+      }
+    },
+    "changes": {
+      "type": "array",
+      "description": "Change catalog.",
+      "items": { "$ref": "#/$defs/change" }
+    },
+    "scenarios": {
+      "type": "array",
+      "description": "Full factorial: one entry per combination of change IDs, including the empty one (as-is).",
+      "items": { "$ref": "#/$defs/scenario" }
+    },
+    "ablation": {
+      "type": "array",
+      "description": "Per change, in catalog order, read off the scenarios (bpmopt.scenarios.ablation).",
+      "items": {
+        "type": "object",
+        "required": ["change", "alone", "full_minus"],
+        "additionalProperties": false,
+        "properties": {
+          "change": { "$ref": "#/$defs/id" },
+          "alone": { "$ref": "#/$defs/estimate", "description": "Saving of the scenario with only this change: its saving." },
+          "full_minus": { "$ref": "#/$defs/estimate", "description": "Days the mean cycle time grows when this change is dropped from the full design, paired by replication. Negative means the full design is faster without it." }
+        }
+      }
+    },
+    "headline": {
+      "type": "object",
+      "description": "What the page leads with (bpmopt.scenarios.headline).",
+      "required": ["changes", "top_change", "best"],
+      "additionalProperties": false,
+      "properties": {
+        "changes": { "type": "array", "items": { "$ref": "#/$defs/id" }, "description": "The proposed design: every change in the catalog." },
+        "top_change": { "$ref": "#/$defs/id", "description": "The change with the largest full_minus: the one the proposed design needs most." },
+        "best": { "type": "array", "items": { "$ref": "#/$defs/id" }, "description": "The scenario with the largest mean saving. Can differ from the proposed design." }
+      }
+    },
+    "threats": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title", "detail"],
+        "additionalProperties": false,
+        "properties": {
+          "title": { "type": "string", "minLength": 1 },
+          "detail": { "type": "string", "minLength": 1 }
         }
       }
     }
   },
   "$defs": {
-    "model": {
+    "id": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$" },
+    "stats": {
       "type": "object",
-      "required": ["bpmn"],
+      "required": ["mean", "median", "p90"],
       "additionalProperties": false,
       "properties": {
-        "bpmn": { "type": "string", "description": "Path to the BPMN file, relative to the results file." }
+        "mean": { "type": "number", "minimum": 0 },
+        "median": { "type": "number", "minimum": 0 },
+        "p90": { "type": "number", "minimum": 0 }
       }
+    },
+    "estimate": {
+      "type": "object",
+      "description": "Point estimate with its 95% confidence interval.",
+      "required": ["value", "ci_low", "ci_high"],
+      "additionalProperties": false,
+      "properties": {
+        "value": { "type": "number" },
+        "ci_low": { "type": "number" },
+        "ci_high": { "type": "number" }
+      }
+    },
+    "model": {
+      "type": "object",
+      "required": ["bpmn", "names"],
+      "additionalProperties": false,
+      "properties": {
+        "bpmn": { "type": "string", "description": "Path to the BPMN file, relative to the results file." },
+        "names": {
+          "type": "object",
+          "description": "Element ID -> display name. An unnamed XOR gateway with one incoming flow is named after the element before it. Written by export_results; the page labels tables with it.",
+          "additionalProperties": { "type": "string" }
+        },
+        "lint": {
+          "type": "array",
+          "description": "Linter violations. Empty means clean. Missing means not checked yet.",
+          "items": {
+            "type": "object",
+            "required": ["rule", "element_id", "severity", "message"],
+            "additionalProperties": false,
+            "properties": {
+              "rule": { "type": "string", "description": "Bare rule ID, e.g. G3 or ARC-LABEL." },
+              "element_id": { "type": "string", "minLength": 1, "description": "The element the violation is about. Rules about the whole model (POOL, G7) give the process ID." },
+              "severity": { "enum": ["error", "warning"] },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "ml_task": {
+      "type": "object",
+      "description": "A fitted task has models and drivers. A rework gateway whose training or test cases all went the same way can't be fitted; its task has `skipped` with the reason instead.",
+      "required": ["id", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["regression", "classification"] },
+        "gateway_id": { "type": "string", "description": "Rework gateway this classifier predicts. Classification only." },
+        "skipped": { "type": "string", "minLength": 1, "description": "Why the task wasn't fitted. Classification only." },
+        "outcome": { "type": "string", "description": "End event ID. When set, the task trained and tested only on cases that ended there." },
+        "models": {
+          "type": "array",
+          "description": "Every fitted task reports the reference model, so the others can be read against it.",
+          "minItems": 1,
+          "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "reference" } } },
+          "items": {
+            "type": "object",
+            "required": ["id", "metrics"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "enum": ["reference", "linear", "gradient_boosting"], "description": "reference = predict the mean / majority class; linear = linear or logistic regression." },
+              "metrics": { "type": "object", "additionalProperties": { "type": "number" } }
+            }
+          }
+        },
+        "drivers": {
+          "type": "array",
+          "description": "Ranked by mean |SHAP| of the gradient boosting model, largest first.",
+          "items": {
+            "type": "object",
+            "required": ["feature", "mean_abs_shap"],
+            "additionalProperties": false,
+            "properties": {
+              "feature": { "type": "string" },
+              "mean_abs_shap": { "type": "number", "minimum": 0 }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["skipped"] },
+          "then": {
+            "properties": { "kind": { "const": "classification" } },
+            "not": { "anyOf": [{ "required": ["models"] }, { "required": ["drivers"] }] }
+          },
+          "else": { "required": ["models", "drivers"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "regression" } } },
+          "then": {
+            "not": { "required": ["gateway_id"] },
+            "properties": { "models": { "items": { "properties": { "metrics": { "required": ["mae", "r2"], "additionalProperties": false, "properties": { "mae": {}, "r2": {} } } } } } }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "classification" } } },
+          "then": {
+            "required": ["gateway_id"],
+            "properties": { "models": { "items": { "properties": { "metrics": { "required": ["roc_auc", "f1"], "additionalProperties": false, "properties": { "roc_auc": {}, "f1": {} } } } } } }
+          }
+        }
+      ]
+    },
+    "change": {
+      "type": "object",
+      "required": ["id", "title", "driver", "heuristic", "expected_effect", "trade_off"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string", "minLength": 1 },
+        "driver": { "type": "string", "minLength": 1, "description": "The delay driver this change targets (from ML or the baseline)." },
+        "heuristic": {
+          "type": "object",
+          "required": ["name", "ref"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "ref": { "type": "string", "minLength": 1, "description": "Book reference, e.g. Appendix A.1." }
+          }
+        },
+        "expected_effect": { "type": "string", "minLength": 1 },
+        "trade_off": {
+          "type": "object",
+          "description": "Devil's Quadrangle (§8.1.3): effect on each dimension.",
+          "required": ["time", "cost", "quality", "flexibility", "note"],
+          "additionalProperties": false,
+          "properties": {
+            "time": { "$ref": "#/$defs/effect" },
+            "cost": { "$ref": "#/$defs/effect" },
+            "quality": { "$ref": "#/$defs/effect" },
+            "flexibility": { "$ref": "#/$defs/effect" },
+            "note": { "type": "string" }
+          }
+        }
+      }
+    },
+    "effect": { "enum": ["better", "worse", "neutral"] },
+    "scenario": {
+      "type": "object",
+      "required": ["changes", "cycle_time", "saving", "saving_share", "replication_means"],
+      "additionalProperties": false,
+      "properties": {
+        "changes": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "cycle_time": {
+          "type": "object",
+          "required": ["mean", "median", "p90"],
+          "additionalProperties": false,
+          "properties": {
+            "mean": { "$ref": "#/$defs/estimate" },
+            "median": { "$ref": "#/$defs/estimate" },
+            "p90": { "$ref": "#/$defs/estimate" }
+          }
+        },
+        "saving": {
+          "$ref": "#/$defs/estimate",
+          "description": "Mean cycle time of the as-is scenario minus this one, paired by replication (common random numbers). Positive means faster. Zero for the as-is scenario."
+        },
+        "saving_share": {
+          "$ref": "#/$defs/estimate",
+          "description": "The saving and its CI bounds, each divided by the as-is mean cycle time (bpmopt.scenarios.saving_share). 0.25 means 25% faster."
+        },
+        "replication_means": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "number", "minimum": 0 },
+          "description": "Mean cycle time of each replication, in replication order. Replication r of every scenario ran with the same seed, so two scenarios can be compared pair by pair. There are meta.replications of them, and their average is cycle_time.mean.value."
+        }
+      }
+    },
+    "section_text": {
+      "type": "object",
+      "required": ["heading", "paragraphs"],
+      "additionalProperties": false,
+      "properties": {
+        "heading": { "type": "string", "minLength": 1 },
+        "paragraphs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "text": {
+      "type": "object",
+      "description": "Every piece of page text that isn't data. Translating the page means editing this, not the code. Labels may contain {name} placeholders the page fills in.",
+      "required": ["lang", "title", "subtitle", "sections", "labels"],
+      "additionalProperties": false,
+      "properties": {
+        "lang": { "type": "string", "description": "BCP 47 tag, used for <html lang> and number formatting." },
+        "title": { "type": "string", "minLength": 1 },
+        "subtitle": { "type": "string" },
+        "sections": {
+          "type": "object",
+          "required": ["problem", "as_is", "ml", "redesign", "evaluation", "assumptions"],
+          "additionalProperties": false,
+          "properties": {
+            "problem": { "$ref": "#/$defs/section_text" },
+            "as_is": { "$ref": "#/$defs/section_text" },
+            "ml": { "$ref": "#/$defs/section_text" },
+            "redesign": { "$ref": "#/$defs/section_text" },
+            "evaluation": { "$ref": "#/$defs/section_text" },
+            "assumptions": { "$ref": "#/$defs/section_text" }
+          }
+        },
+        "labels": { "$ref": "#/$defs/labels" },
+        "features": {
+          "type": "object",
+          "description": "Display names for ML feature IDs. The page falls back to the raw ID.",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "labels": {
+      "type": "object",
+      "description": "Short UI strings. Every key the page uses is required here (a test checks it).",
+      "additionalProperties": { "type": "string" },
+      "required": [
+        "fake_notice", "pending", "diagram_error", "run_summary",
+        "headline", "headline_detail", "headline_top", "headline_best", "share_method", "range", "baseline_one_run",
+        "as_is_model", "to_be_model", "to_be_missing",
+        "lint", "lint_clean", "lint_not_checked", "lint_rule", "lint_element", "lint_message", "severity_error", "severity_warning",
+        "mean", "median", "p90", "ci",
+        "cycle_time", "processing_time", "waiting_time", "cycle_time_efficiency", "days",
+        "by_outcome", "outcome", "cases", "ml_outcome",
+        "rework", "gateway", "rework_rate", "waiting_by_activity", "activity", "mean_waiting",
+        "flow_analysis", "flow_theoretical", "flow_simulated", "flow_difference",
+        "value_added", "va_class", "va_reason", "va_VA", "va_BVA", "va_NVA",
+        "ml_split", "ml_task_cycle_time", "ml_task_rework", "ml_model", "model_reference_regression", "model_reference_classification",
+        "model_linear_regression", "model_linear_classification", "model_gradient_boosting",
+        "metric_mae", "metric_r2", "metric_roc_auc", "metric_f1", "drivers", "mean_abs_shap",
+        "change_catalog", "change_id", "driver", "heuristic", "expected_effect", "trade_off",
+        "dq_time", "dq_cost", "dq_quality", "dq_flexibility", "effect_better", "effect_worse", "effect_neutral",
+        "toggles", "scenario_as_is", "scenario_selected", "saving", "saving_share", "scenario_missing",
+        "ablation", "ablation_alone", "ablation_full_minus",
+        "assumptions", "parameter", "value", "rationale", "assumption_change", "threats"
+      ]
     }
   }
 }

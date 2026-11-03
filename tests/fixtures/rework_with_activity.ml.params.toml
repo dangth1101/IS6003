@@ -1,0 +1,39 @@
+# rework_with_activity.bpmn with one planted driver of cycle time.
+# Only project_type changes the chance of failing a test round:
+# logistic(-2 + 3 x [project_type = mobile]), so 0.12 for web and core, 0.73 for mobile.
+# Mobile cases loop back about 2.7 times on average, the others about 0.14 times.
+# The other attributes are noise. Lanes are unlimited, so arrivals don't add waiting time.
+
+version = "fixture-1"
+
+[arrivals]
+rate = 2.0
+rationale = "Fixture value."
+
+[attributes.complexity]
+distribution = { choice = [1, 2, 3], weights = [0.3, 0.5, 0.2] }
+rationale = "Fixture value."
+
+[attributes.project_type]
+distribution = { choice = ["web", "mobile", "core"], weights = [0.5, 0.3, 0.2] }
+rationale = "Fixture value."
+
+[attributes.integrations]
+distribution = { poisson = 1.5 }
+rationale = "Fixture value."
+
+[attributes.workload]
+distribution = { triangular = [0.2, 0.6, 1.0] }
+rationale = "Fixture value."
+
+[tasks.Task_TestBuild]
+duration = { triangular = [2.0, 4.0, 6.0] }
+rationale = "Fixture value."
+
+[tasks.Task_FixDefects]
+duration = { triangular = [1.0, 2.0, 3.0] }
+rationale = "Fixture value."
+
+[gateways.Gateway_LoopSplit]
+branches = { Flow_Passed = "rest", Flow_Failed = { logistic = { intercept = -2.0, project_type = { mobile = 3.0 } } } }
+rationale = "Fixture value."

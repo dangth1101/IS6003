@@ -1,0 +1,29 @@
+# sequence.capacity2 with the cycle time cut off at the end of Build application.
+# Two developers at about 79% utilisation, so cases queue, also for Test application.
+# That wait comes after the cut-off and doesn't count.
+
+version = "fixture-1"
+
+[arrivals]
+rate = 0.15
+rationale = "Fixture value."
+
+[cycle_time]
+ends_at = "Task_BuildApp"
+rationale = "Fixture value."
+
+[lanes.Lane_Dev]
+capacity = 2
+rationale = "Fixture value."
+
+[tasks.Task_WriteSpec]
+duration = { fixed = 2.0 }
+rationale = "Fixture value."
+
+[tasks.Task_BuildApp]
+duration = { fixed = 5.5 }
+rationale = "Fixture value."
+
+[tasks.Task_TestApp]
+duration = { fixed = 3.0 }
+rationale = "Fixture value."

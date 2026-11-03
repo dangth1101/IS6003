@@ -1,0 +1,19 @@
+# Book Fig. 7.2 (p.256-257), the 90/10 case: "upper branch 90%, lower 10%". Hours.
+
+version = "fixture-1"
+
+[tasks.Task_A]
+duration = { fixed = 10.0 }
+rationale = "Book Fig. 7.2."
+
+[tasks.Task_B]
+duration = { fixed = 20.0 }
+rationale = "Book Fig. 7.2."
+
+[tasks.Task_C]
+duration = { fixed = 10.0 }
+rationale = "Book Fig. 7.2."
+
+[gateways.Gateway_Split]
+branches = { Flow_ToB = 0.9, Flow_ToC = 0.1 }
+rationale = "Book p.257."

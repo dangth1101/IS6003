@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Book Fig. 7.7 (p.259): task A, then a rework block around B with an empty loop-back arc. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_book_fig7_7" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration>
+    <bpmn:participant id="Participant_book_fig7_7" name="Fig. 7.7" processRef="Process_BookFig77" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_BookFig77" isExecutable="false">
+    <bpmn:laneSet>
+      <bpmn:lane id="Lane_Worker" name="Worker">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_A</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_LoopJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_B</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_LoopSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Case started" />
+    <bpmn:task id="Task_A" name="A" />
+    <bpmn:exclusiveGateway id="Gateway_LoopJoin" />
+    <bpmn:task id="Task_B" name="B" />
+    <bpmn:exclusiveGateway id="Gateway_LoopSplit" />
+    <bpmn:endEvent id="End" name="Case completed" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start" targetRef="Task_A" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_A" targetRef="Gateway_LoopJoin" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Gateway_LoopJoin" targetRef="Task_B" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_B" targetRef="Gateway_LoopSplit" />
+    <bpmn:sequenceFlow id="Flow_Done" sourceRef="Gateway_LoopSplit" targetRef="End" name="B acceptable" />
+    <bpmn:sequenceFlow id="Flow_Rework" sourceRef="Gateway_LoopSplit" targetRef="Gateway_LoopJoin" name="B to be reworked" />
+  </bpmn:process>
+</bpmn:definitions>

@@ -1,0 +1,58 @@
+# Attribute effects put into as_is.params.toml on purpose, to check the ML drivers against.
+# Sizes and the reasoning behind each effect are in as_is_planted_effects.md.
+# A test checks this file against the parameter file and the .md table.
+#
+# kind: "duration" for a scaled task duration, "branch" for a logistic branch of an XOR-split.
+# The attributes the ML should find per task follow from these entries (bpmopt.planted).
+
+negative_control = "requesting_unit"  # drawn like the others, but nothing reads it
+
+[[effects]]
+element = "Task_BuildApplication"
+attribute = "complexity"
+kind = "duration"
+
+[[effects]]
+element = "Task_BuildApplication"
+attribute = "integrations"
+kind = "duration"
+
+[[effects]]
+element = "Task_BuildApplication"
+attribute = "team_workload"
+kind = "duration"
+
+[[effects]]
+element = "Task_SpecifyRequirements"
+attribute = "complexity"
+kind = "duration"
+
+[[effects]]
+element = "Task_RunSecurityTests"
+attribute = "security_level"
+kind = "duration"
+
+[[effects]]
+element = "Gateway_TestSplit"
+attribute = "complexity"
+kind = "branch"
+
+[[effects]]
+element = "Gateway_TestSplit"
+attribute = "integrations"
+kind = "branch"
+
+[[effects]]
+element = "Gateway_TestSplit"
+attribute = "security_level"
+kind = "branch"
+
+[[effects]]
+element = "Gateway_PlanSplit"
+attribute = "project_type"
+kind = "branch"
+
+[[effects]]
+element = "Gateway_ReleaseSplit"
+attribute = "project_type"
+kind = "branch"

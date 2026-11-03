@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Book Fig. 7.10 (p.261): credit application with rework on Check completeness. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_book_fig7_10" targetNamespace="https://example.org/is6003/fixtures">
+  <bpmn:collaboration>
+    <bpmn:participant id="Participant_book_fig7_10" name="Credit application" processRef="Process_BookFig710" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_BookFig710" isExecutable="false">
+    <bpmn:laneSet>
+      <bpmn:lane id="Lane_Credit" name="Credit department">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_CompletenessJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CheckCompleteness</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_CompletenessSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ChecksSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CheckCreditHistory</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CheckIncomeSources</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ChecksJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AssessApplication</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Decision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_MakeCreditOffer</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_NotifyRejection</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_DecisionJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Application received" />
+    <bpmn:exclusiveGateway id="Gateway_CompletenessJoin" />
+    <bpmn:task id="Task_CheckCompleteness" name="Check completeness" />
+    <bpmn:exclusiveGateway id="Gateway_CompletenessSplit" />
+    <bpmn:parallelGateway id="Gateway_ChecksSplit" />
+    <bpmn:task id="Task_CheckCreditHistory" name="Check credit history" />
+    <bpmn:task id="Task_CheckIncomeSources" name="Check income sources" />
+    <bpmn:parallelGateway id="Gateway_ChecksJoin" />
+    <bpmn:task id="Task_AssessApplication" name="Assess application" />
+    <bpmn:exclusiveGateway id="Gateway_Decision" />
+    <bpmn:task id="Task_MakeCreditOffer" name="Make credit offer" />
+    <bpmn:task id="Task_NotifyRejection" name="Notify rejection" />
+    <bpmn:exclusiveGateway id="Gateway_DecisionJoin" />
+    <bpmn:endEvent id="End" name="Application processed" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start" targetRef="Gateway_CompletenessJoin" />
+    <bpmn:sequenceFlow id="Flow_1b" sourceRef="Gateway_CompletenessJoin" targetRef="Task_CheckCompleteness" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_CheckCompleteness" targetRef="Gateway_CompletenessSplit" />
+    <bpmn:sequenceFlow id="Flow_Incomplete" sourceRef="Gateway_CompletenessSplit" targetRef="Gateway_CompletenessJoin" name="application incomplete" />
+    <bpmn:sequenceFlow id="Flow_Complete" sourceRef="Gateway_CompletenessSplit" targetRef="Gateway_ChecksSplit" name="application complete" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Gateway_ChecksSplit" targetRef="Task_CheckCreditHistory" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Gateway_ChecksSplit" targetRef="Task_CheckIncomeSources" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_CheckCreditHistory" targetRef="Gateway_ChecksJoin" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_CheckIncomeSources" targetRef="Gateway_ChecksJoin" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Gateway_ChecksJoin" targetRef="Task_AssessApplication" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Task_AssessApplication" targetRef="Gateway_Decision" />
+    <bpmn:sequenceFlow id="Flow_Granted" sourceRef="Gateway_Decision" targetRef="Task_MakeCreditOffer" name="granted" />
+    <bpmn:sequenceFlow id="Flow_Denied" sourceRef="Gateway_Decision" targetRef="Task_NotifyRejection" name="denied" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Task_MakeCreditOffer" targetRef="Gateway_DecisionJoin" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Task_NotifyRejection" targetRef="Gateway_DecisionJoin" />
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="Gateway_DecisionJoin" targetRef="End" />
+  </bpmn:process>
+</bpmn:definitions>

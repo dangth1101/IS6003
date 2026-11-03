@@ -42,8 +42,30 @@ class ProcessModel:
     def outgoing(self, node_id: str) -> list[Flow]:
         return [f for f in self.flows.values() if f.source == node_id]
 
+    def incoming(self, node_id: str) -> list[Flow]:
+        return [f for f in self.flows.values() if f.target == node_id]
+
     def nodes_of_type(self, element_type: str) -> list[Node]:
         return [n for n in self.nodes.values() if n.element_type == element_type]
+
+    def is_split(self, node_id: str) -> bool:
+        """A gateway of any type with more than one outgoing flow."""
+        return self.nodes[node_id].element_type.endswith("Gateway") and len(self.outgoing(node_id)) > 1
+
+    def is_join(self, node_id: str) -> bool:
+        """A gateway of any type with more than one incoming flow."""
+        return self.nodes[node_id].element_type.endswith("Gateway") and len(self.incoming(node_id)) > 1
+
+    def xor_splits(self) -> list[Node]:
+        """XOR gateways with more than one outgoing flow, in model order. Only these take branch probabilities."""
+        return [n for n in self.nodes_of_type("exclusiveGateway") if self.is_split(n.id)]
+
+    def single_start(self) -> Node:
+        """The model's one start event. Raises ValueError if there are none or several."""
+        starts = self.nodes_of_type("startEvent")
+        if len(starts) != 1:
+            raise ValueError(f"expected exactly one start event, found {len(starts)}")
+        return starts[0]
 
 
 def read_bpmn(path: str | Path) -> ProcessModel:
