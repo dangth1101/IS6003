@@ -6,7 +6,7 @@
     "case_count": 2000,
     "warm_up": 250.0,
     "parameter_version": "proposed-3",
-    "generated_at": "2026-11-03T03:32:08+00:00"
+    "generated_at": "2026-11-03T03:59:30+00:00"
   },
   "text": {
     "lang": "en",
@@ -43,27 +43,27 @@
       "redesign": {
         "heading": "Redesign",
         "paragraphs": [
-          "The to-be model applies four changes, picked from the baseline, the drivers above and the book's redesign heuristics (Appendix A). Each change says what it targets and what it costs on the Devil's Quadrangle (§8.1.3, p.303).",
-          "The baseline points at quality control. Its four checks are the longest queue, a test round finds defects in about a third of cases, and every fix sends the case through all four checks again. C1 runs the checks in parallel and C2 retests only what was fixed. C3 targets the two strongest drivers, complexity and security level, with a longer requirements step for risky cases. C4 adds a tester.",
-          "C1 and C2 change the model, and the diagram shows both. C3 and C4 only change parameters, so they don't appear in it. The to-be model has no rule errors, but with 33 elements it is just over the 30 of guideline G7 (§5.4.4, p.193). The book's fix is a sub-process, which our simulator doesn't support, so we accept the warning.",
+          "The to-be model applies {change_count} changes, picked from the baseline, the drivers above and the book's redesign heuristics (Appendix A). Each change says what it targets and what it costs on the Devil's Quadrangle (§8.1.3, p.303).",
+          "The baseline points at quality control. Its four checks are the longest queue, {rework_Gateway_TestSplit} of the cases that reach testing are sent back for fixes at least once, and every fix sends the case through all four checks again. C1 runs the checks in parallel and C2 retests only what was fixed. C3 targets the two strongest drivers, complexity and security level, with a longer requirements step for risky cases. C4 adds a tester.",
+          "C1 and C2 change the model, and the diagram shows both. C3 and C4 only change parameters, so they don't appear in it. The to-be model has no rule errors, but it is just over the 30 elements of guideline G7 (§5.4.4, p.193); the rule check below gives the count. The book's fix is a sub-process, which our simulator doesn't support, so we accept the warning.",
           "The redesign is a human decision. Machine learning shows where time is lost. It doesn't draw the new process."
         ]
       },
       "evaluation": {
         "heading": "Evaluation",
         "paragraphs": [
-          "Every combination of the four changes was simulated 30 times, with the same parameters, case count and warm-up as the baseline. Run r of every combination used the same seed, so differences come from the design and not from luck. Ranges are 95% confidence intervals over the 30 runs. Savings are compared run by run, so their ranges are much narrower than those of the cycle times themselves.",
-          "With all four changes the process is about a quarter faster, and the whole range sits above the 20% target. The objective is met.",
-          "Which change matters most depends on how you ask. On its own, C2 saves the most, about 27 days. In the full design, C1 matters most: without it the design takes about 11 days longer, without C2 only about 3. Both shrink the same QC queue, so once one of them is in, the other has less left to remove.",
-          "C3 helps on its own, about 16 days, but it makes the full design about 3 days slower, and that range is clearly below zero. Once C1 and C2 have emptied the QC queue, fewer defects buy little time, while the longer requirements step still loads the business unit. C4 adds only half a day on top of C1 and C2, for the cost of a salary. So the fastest combination is C1, C2 and C4, and C1 and C2 alone get almost all of it.",
-          "The headline still reports the full design, because that is the design the student approved. Reporting the best of 16 combinations, picked after looking at all of them, would overstate the gain. Dropping C3 is a real option: it would trade the fewer defects C3 aims for against about 3 days. The model counts a defect only by the rework time it causes, so it can't settle that trade-off.",
+          "Every combination of the {change_count} changes was simulated {replications} times, with the same parameters, case count and warm-up as the baseline. Run r of every combination used the same seed, so differences come from the design and not from luck. Ranges are 95% confidence intervals over the {replications} runs. Savings are compared run by run, so their ranges are much narrower than those of the cycle times themselves.",
+          "With all {change_count} changes the whole range of the saving, {share_full_ci} faster, sits above the 20% target. The objective is met.",
+          "Which change matters most depends on how you ask. On its own, C2 saves the most, {alone_C2} days. In the full design, C1 matters most: without it the design takes {full_minus_C1} days longer, without C2 only {full_minus_C2}. Both shrink the same QC queue, so once one of them is in, the other has less left to remove.",
+          "C3 helps on its own, {alone_C3} days, but the full design is {full_minus_C3_abs} days faster without it (95% CI of the days added if dropped: {full_minus_C3_ci}). Once C1 and C2 have emptied the QC queue, fewer defects buy little time, while the longer requirements step still loads the business unit. C4 adds only {full_minus_C4} days to the full design, for the cost of a salary. So the fastest combination is {best_changes}, {share_best} faster, and C1 and C2 alone get {share_C1_C2}.",
+          "The headline still reports the full design, because that is the design the student approved. Reporting the best of {scenario_count} combinations, picked after looking at all of them, would overstate the gain. Dropping C3 is a real option: it would trade the fewer defects C3 aims for against {full_minus_C3_abs} days. The model counts a defect only by the rework time it causes, so it can't settle that trade-off.",
           "Switch changes on and off below to see the cycle time of any combination. The ablation shows each change on its own and how much longer the full design takes without it. A negative value means the full design is faster without that change."
         ]
       },
       "assumptions": {
         "heading": "Assumptions and threats to validity",
         "paragraphs": [
-          "Every number on this page comes from the parameters below. They are estimates, not measurements, and can be changed in the parameter file."
+          "Every number on this page comes from the parameters below. They are estimates, not measurements, and can be changed in the parameter file. Rows marked with a change ID are the values that change adds or replaces, from the change catalog."
         ]
       }
     },
@@ -76,6 +76,8 @@
       "headline_detail": "With all changes on ({changes}), the mean cycle time drops from {as_is} to {to_be} working days, a saving of {days} days (95% CI {low} to {high}).",
       "headline_top": "{change} contributes most. Without it, the full design takes {days} days longer (95% CI {low} to {high}).",
       "headline_best": "The full design isn't the fastest combination. With only {changes}, the process is {share} faster (95% CI {low} to {high}). See the ablation below.",
+      "share_method": "“Faster” is the mean saving divided by the as-is mean cycle time. Its 95% CI is the saving's CI divided by the same mean.",
+      "range": "{low} to {high}",
       "baseline_one_run": "These numbers come from one run (seed {seed}), with a mean cycle time of {mean} days. The evaluation runs the same as-is process {replications} times, with the same parameters, case count and warm-up but a new seed each time. Over those runs the mean is {runs_mean} days (95% CI {low} to {high}), and single runs range from {min} to {max}. QC is busy most of the time, so a run that happens to build long queues pulls its mean up. Read this baseline for where time goes, and the evaluation for how much the redesign saves.",
       "as_is_model": "As-is model",
       "to_be_model": "To-be model",
@@ -159,6 +161,7 @@
       "parameter": "Parameter",
       "value": "Value",
       "rationale": "Rationale",
+      "assumption_change": "Applies to",
       "threats": "Threats to validity"
     },
     "features": {
@@ -355,6 +358,30 @@
       "parameter": "gateways.Gateway_ReleaseSplit.branches",
       "value": "Flow_ReleaseApproved: rest, Flow_ReleaseRejected: logistic(-2.6 + 1 × [project_type = regulatory])",
       "rationale": "Proposed default. 7% of releases rejected, 17% for regulatory changes, which compliance signs off at release. About 9% overall."
+    },
+    {
+      "parameter": "tasks.Task_RetestFixedDefects.duration",
+      "value": "triangular(1, 2, 4)",
+      "rationale": "Proposed default, new task of C2. Rerun only the checks that found defects, on the fixed parts: about as long as a code review (the shortest check), a fraction of a full round (about 18 days of QC work). The chance that the retest finds new defects is the as-is one of Gateway_TestSplit, an assumption on the safe side for time.",
+      "change": "C2"
+    },
+    {
+      "parameter": "tasks.Task_SpecifyRequirements.duration",
+      "value": "triangular(4, 6.4, 12.8) × (1 + 0.5 × complexity + 0.125 × security_level)",
+      "rationale": "Proposed default, assumed effect. The as-is requirements step, plus 10% of its base for every complexity step and every security level step above 1. Written with the as-is base x 0.8 so that a case with complexity 1 and security level 1 takes exactly what it takes today: 0.8 x (1 + 0.5 x 1 + 0.125 x 1) = 1.3, the as-is factor. About 1.6 days more on average, 3.9 for the riskiest case. Kept at 10% so the business unit lane stays below about 0.9 busy.",
+      "change": "C3"
+    },
+    {
+      "parameter": "gateways.Gateway_TestSplit.branches",
+      "value": "Flow_TestsPassed: rest, Flow_DefectsFound: logistic(-2.6 + 0.4 × complexity + 0.15 × integrations + 0.3 × security_level)",
+      "rationale": "Proposed default, assumed effect. Complexity lowered from 0.6 to 0.4 and security level from 0.5 to 0.3 per step, because the threat model and the integration design catch some defects before the build. The intercept goes from -3.0 to -2.6 so a case with complexity 1 and security level 1 keeps the as-is defect rate; only steps above 1 get the benefit. For the riskiest case (complexity 3, security level 3, 2 integrations) the chance that a round finds defects falls from 65% to 45%; over all cases from about 35% to 27%.",
+      "change": "C3"
+    },
+    {
+      "parameter": "lanes.Lane_QualityControl.capacity",
+      "value": 9,
+      "rationale": "Proposed default. One tester or test team more than the as-is eight.",
+      "change": "C4"
     }
   ],
   "threats": [
@@ -368,7 +395,7 @@
     },
     {
       "title": "The effects of the changes are assumed",
-      "detail": "C3 is the least certain. How much longer the extended requirements take, and how many fewer defects they lead to, are both guesses. C2 assumes a retest takes 1 to 4 days and finds new defects as often as a full test round. Other values in models/to_be.catalog.toml could change which change helps most."
+      "detail": "C3 is the least certain. How much longer the extended requirements take, and how many fewer defects they lead to, are both guesses. C2 assumes how long a retest takes, and that it finds new defects as often as a full test round. These values are in the assumptions table, marked with their change. Other values in models/to_be.catalog.toml could change which change helps most."
     },
     {
       "title": "No working calendar",
@@ -376,15 +403,15 @@
     },
     {
       "title": "Identical resources",
-      "detail": "Each lane is a pool of identical people who are always available and work on one case at a time. Real people differ in speed, take leave and split their time across projects, which is where much waiting comes from in practice (p.261). So the waiting here is a lower bound."
+      "detail": "Each lane is a pool of identical people who are always available and work on one case at a time. Real people differ in speed, take leave and split their time across projects. The model also has no handoff delays or batching, which the book names as common sources of waiting (§7.1.2, p.261). So the waiting here is a lower bound."
     },
     {
       "title": "Quality control runs close to its limit",
-      "detail": "QC is busy about 87% of the time in the as-is process, and close to 100% a queue grows fast (§7.2.2, p.276). A few runs build long queues, so as-is runs differ a lot. The book advises checking how results change when one resource is added (§7.3.4, p.287). C4 is that check for QC: one more tester saves about 13 days on its own, so the as-is numbers depend a lot on QC capacity. The to-be numbers depend much less on it: on top of C1 and C2 the same tester saves half a day."
+      "detail": "The arrival rate is set so that QC, the busiest lane, runs close to its limit in the as-is process (see arrivals.rate under Assumptions), and the closer a lane gets to full use, the faster its queue grows (§7.2.2, p.276). A few runs build long queues, so as-is runs differ a lot. The book advises checking how results change when one resource is added (§7.3.4, p.287). C4 is that check for QC: one more tester saves {alone_C4} days on its own, so the as-is numbers depend a lot on QC capacity. The to-be numbers depend much less on it: in the full design the same tester saves {full_minus_C4} days."
     },
     {
       "title": "The to-be models break the 30-element guideline",
-      "detail": "The to-be models have 31 to 33 flow nodes, just over the limit of 7PMG G7 (§5.4.4, p.193). The book's fix is a sub-process, which our simulator doesn't support. The rule check shows this as a warning, not an error."
+      "detail": "The to-be models are just over the limit of 7PMG G7 (§5.4.4, p.193); the rule check gives each count. The book's fix is a sub-process, which our simulator doesn't support. The rule check shows this as a warning, not an error."
     }
   ],
   "baseline": {
@@ -1036,9 +1063,9 @@
         "ci_high": 21.356215472519864
       },
       "saving_share": {
-        "value": 0.14446701588687635,
-        "ci_low": 0.1417427392941944,
-        "ci_high": 0.1471912924795583
+        "value": 0.1446240053107365,
+        "ci_low": 0.1375714112457478,
+        "ci_high": 0.15167659937572522
       },
       "replication_means": [
         124.91301185780321,
@@ -1100,9 +1127,9 @@
         "ci_high": 31.760958934244808
       },
       "saving_share": {
-        "value": 0.1907298750682836,
-        "ci_low": 0.1725107317987942,
-        "ci_high": 0.208949018337773
+        "value": 0.19544560507885178,
+        "ci_low": 0.16531780506366436,
+        "ci_high": 0.2255734050940392
       },
       "replication_means": [
         111.71232116976354,
@@ -1164,9 +1191,9 @@
         "ci_high": 19.498189398256727
       },
       "saving_share": {
-        "value": 0.10611075034014918,
-        "ci_low": 0.08741100200192775,
-        "ci_high": 0.1248104986783706
+        "value": 0.1108590840211584,
+        "ci_low": 0.08323768372069806,
+        "ci_high": 0.13848048432161875
       },
       "replication_means": [
         123.4792352943954,
@@ -1228,9 +1255,9 @@
         "ci_high": 16.58272296728843
       },
       "saving_share": {
-        "value": 0.08782584331734693,
-        "ci_low": 0.07060276866606396,
-        "ci_high": 0.10504891796862989
+        "value": 0.09231786469729938,
+        "ci_low": 0.0668615370848941,
+        "ci_high": 0.11777419230970466
       },
       "replication_means": [
         128.80111423210806,
@@ -1293,9 +1320,9 @@
         "ci_high": 42.65920406845609
       },
       "saving_share": {
-        "value": 0.26862335652724173,
-        "ci_low": 0.25258885626492533,
-        "ci_high": 0.28465785678955813
+        "value": 0.27268368194081244,
+        "ci_low": 0.24239219426394049,
+        "ci_high": 0.30297516961768445
       },
       "replication_means": [
         101.28389988927276,
@@ -1358,9 +1385,9 @@
         "ci_high": 35.400610981497806
       },
       "saving_share": {
-        "value": 0.21908497727141674,
-        "ci_low": 0.20302444178145046,
-        "ci_high": 0.235145512761383
+        "value": 0.22303951150333232,
+        "ci_low": 0.19465599834175243,
+        "ci_high": 0.25142302466491223
       },
       "replication_means": [
         107.45543623978526,
@@ -1423,9 +1450,9 @@
         "ci_high": 35.39244155694143
       },
       "saving_share": {
-        "value": 0.22046164959228448,
-        "ci_low": 0.2057382141373298,
-        "ci_high": 0.23518508504723917
+        "value": 0.2241756868980543,
+        "ci_low": 0.1969863702041324,
+        "ci_high": 0.2513650035919762
       },
       "replication_means": [
         109.46542129629752,
@@ -1488,9 +1515,9 @@
         "ci_high": 28.99243557900024
       },
       "saving_share": {
-        "value": 0.17103827083731002,
-        "ci_low": 0.15217472532450554,
-        "ci_high": 0.1899018163501145
+        "value": 0.17580178604588698,
+        "ci_low": 0.14569283655433768,
+        "ci_high": 0.20591073553743625
       },
       "replication_means": [
         113.72402481804707,
@@ -1553,9 +1580,9 @@
         "ci_high": 32.06468477231038
       },
       "saving_share": {
-        "value": 0.19247373336398912,
-        "ci_low": 0.1740230619893876,
-        "ci_high": 0.21092440473859064
+        "value": 0.19725325286891762,
+        "ci_low": 0.16677597208702505,
+        "ci_high": 0.22773053365081022
       },
       "replication_means": [
         111.73033699580165,
@@ -1618,9 +1645,9 @@
         "ci_high": 21.59230888817753
       },
       "saving_share": {
-        "value": 0.11951741217527913,
-        "ci_low": 0.10017304810681454,
-        "ci_high": 0.1388617762437437
+        "value": 0.12445166242082821,
+        "ci_low": 0.09554993743820069,
+        "ci_high": 0.15335338740345575
       },
       "replication_means": [
         121.61540328010724,
@@ -1684,9 +1711,9 @@
         "ci_high": 39.98703834279482
       },
       "saving_share": {
-        "value": 0.24980543674083222,
-        "ci_low": 0.23322216146974095,
-        "ci_high": 0.2663887120119235
+        "value": 0.2538839108734284,
+        "ci_low": 0.22377096833684473,
+        "ci_high": 0.28399685341001196
       },
       "replication_means": [
         102.59232532519373,
@@ -1750,9 +1777,9 @@
         "ci_high": 43.35795095413662
       },
       "saving_share": {
-        "value": 0.27355868563558283,
-        "ci_low": 0.2576655078996284,
-        "ci_high": 0.2894518633715373
+        "value": 0.2776050831887285,
+        "ci_low": 0.24727234073203322,
+        "ci_high": 0.30793782564542377
       },
       "replication_means": [
         100.48867233175147,
@@ -1816,9 +1843,9 @@
         "ci_high": 37.30617058037702
       },
       "saving_share": {
-        "value": 0.23152538515451176,
-        "ci_low": 0.21499927628309062,
-        "ci_high": 0.2480514940259329
+        "value": 0.2355846909299931,
+        "ci_low": 0.2062126484610673,
+        "ci_high": 0.2649567333989189
       },
       "replication_means": [
         105.92135535648387,
@@ -1882,9 +1909,9 @@
         "ci_high": 29.1935716825985
       },
       "saving_share": {
-        "value": 0.17254563928393007,
-        "ci_low": 0.1538818457846464,
-        "ci_high": 0.19120943278321376
+        "value": 0.17729573945680258,
+        "ci_low": 0.14725222996541396,
+        "ci_high": 0.20733924894819122
       },
       "replication_means": [
         113.53450703108861,
@@ -1949,9 +1976,9 @@
         "ci_high": 40.50125848280324
       },
       "saving_share": {
-        "value": 0.2534188802416454,
-        "ci_low": 0.23692812532211974,
-        "ci_high": 0.26990963516117106
+        "value": 0.25746934815809075,
+        "ci_low": 0.22728973692946472,
+        "ci_high": 0.2876489593867168
       },
       "replication_means": [
         102.0272987463964,
