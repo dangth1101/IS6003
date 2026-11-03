@@ -43,8 +43,8 @@ from scipy.stats import t as student_t
 
 from bpmopt.analysis import cycle_times
 from bpmopt.bpmn import ProcessModel, read_bpmn
-from bpmopt.parameters import Parameters, apply_overrides, check_parameters
-from bpmopt.results import validate_changes
+from bpmopt.contract import validate_changes
+from bpmopt.parameters import Parameters, apply_overrides, assumptions, check_parameters
 from bpmopt.simulation import simulate
 
 
@@ -90,6 +90,20 @@ class Catalog:
     def entries(self) -> list[dict]:
         """The `changes` section of the results file."""
         return [change.entry() for change in self.changes]
+
+    def assumptions(self) -> list[dict]:
+        """Assumptions table rows for every parameter a change adds or replaces, each marked with its change.
+
+        Values are described from the parsed overrides, like the as-is rows.
+        Rows follow the catalog order, then the order of the change's overrides.
+        """
+        _, as_is = self.resolve([])
+        rows = []
+        for change in self.changes:
+            entries = [f"{section}.{element_id}" for section, items in change.overrides.items() for element_id in items]
+            by_entry = {row["parameter"].rsplit(".", 1)[0]: row for row in assumptions(apply_overrides(as_is, change.overrides))}
+            rows += [{**by_entry[entry], "change": change.id} for entry in entries]
+        return rows
 
 
 _CHANGE_FIELDS = ("title", "driver", "heuristic", "expected_effect", "trade_off")
@@ -224,8 +238,8 @@ def run_scenarios(catalog: Catalog, *, n_cases: int, seed: int, replications: in
     per scenario; the estimate is their average over replications, with a 95%
     t-interval. The saving is the as-is mean cycle time minus the scenario's,
     paired by replication, so the CI only reflects how the difference varies.
-    saving_share is the same saving as a share of that replication's as-is
-    mean, and replication_means keeps each replication's mean cycle time, so
+    saving_share is that saving over the as-is mean (see saving_share), and
+    replication_means keeps each replication's mean cycle time, so
     any two scenarios can be compared pair by pair later (see ablation).
     Cycle times stop at the as-is parameters' cut-off (cycle_time_end), which no
     change can override, so every scenario is measured over the same span.
@@ -243,16 +257,29 @@ def run_scenarios(catalog: Catalog, *, n_cases: int, seed: int, replications: in
             "p90": np.array([ct.quantile(0.9) for ct in runs]),
         }
     as_is = stats[()]["mean"]
-    return [
-        {
-            "changes": list(combo),
-            "cycle_time": {name: _estimate(values) for name, values in s.items()},
-            "saving": _estimate(as_is - s["mean"]),
-            "saving_share": _estimate((as_is - s["mean"]) / as_is),
-            "replication_means": [float(m) for m in s["mean"]],
-        }
-        for combo, s in stats.items()
-    ]
+    scenarios = []
+    for combo, s in stats.items():
+        saving = _estimate(as_is - s["mean"])
+        scenarios.append(
+            {
+                "changes": list(combo),
+                "cycle_time": {name: _estimate(values) for name, values in s.items()},
+                "saving": saving,
+                "saving_share": saving_share(saving, float(as_is.mean())),
+                "replication_means": [float(m) for m in s["mean"]],
+            }
+        )
+    return scenarios
+
+
+def saving_share(saving: dict[str, float], as_is_mean: float) -> dict[str, float]:
+    """The saving as a share of the as-is mean cycle time: the saving and its CI bounds, each divided by that mean.
+
+    The as-is mean is treated as fixed, so the share always equals the days the
+    page shows next to it (saving / as-is mean). Its own uncertainty is in the
+    as-is cycle time CI, not in the share's.
+    """
+    return {k: v / as_is_mean for k, v in saving.items()}
 
 
 def ablation(scenarios: list[dict]) -> list[dict]:
@@ -265,16 +292,15 @@ def ablation(scenarios: list[dict]) -> list[dict]:
     replication, like the saving does. A negative full_minus means the full
     design is faster without that change.
     """
-    by_changes = {frozenset(s["changes"]): s for s in scenarios}
-    full_ids = max((s["changes"] for s in scenarios), key=len)
-    full = np.array(by_changes[frozenset(full_ids)]["replication_means"])
+    full = full_design(scenarios)
+    full_means = np.array(full["replication_means"])
     return [
         {
             "change": change_id,
-            "alone": by_changes[frozenset({change_id})]["saving"],
-            "full_minus": _estimate(np.array(by_changes[frozenset(full_ids) - {change_id}]["replication_means"]) - full),
+            "alone": find_scenario(scenarios, [change_id])["saving"],
+            "full_minus": _estimate(np.array(find_scenario(scenarios, set(full["changes"]) - {change_id})["replication_means"]) - full_means),
         }
-        for change_id in full_ids
+        for change_id in full["changes"]
     ]
 
 
@@ -287,10 +313,20 @@ def headline(scenarios: list[dict], ablation_rows: list[dict]) -> dict:
     with the largest mean saving, which can be smaller than the full design when
     changes get in each other's way.
     """
-    full = max((s["changes"] for s in scenarios), key=len)
     best = max(scenarios, key=lambda s: s["saving"]["value"])
     top = max(ablation_rows, key=lambda row: row["full_minus"]["value"])
-    return {"changes": list(full), "top_change": top["change"], "best": list(best["changes"])}
+    return {"changes": list(full_design(scenarios)["changes"]), "top_change": top["change"], "best": list(best["changes"])}
+
+
+def find_scenario(scenarios: list[dict], changes) -> dict | None:
+    """The scenario that applies exactly these change IDs, in any order. None if there is none."""
+    key = frozenset(changes)
+    return next((s for s in scenarios if frozenset(s["changes"]) == key), None)
+
+
+def full_design(scenarios: list[dict]) -> dict:
+    """The scenario with every change of the catalog: the proposed design."""
+    return max(scenarios, key=lambda s: len(s["changes"]))
 
 
 def _estimate(values: np.ndarray) -> dict[str, float]:

@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 from xml.etree import ElementTree
 
+import pandas as pd
 import pytest
 
 from bpmopt.bpmn import read_bpmn
@@ -143,24 +144,33 @@ def test_every_combination_resolves_to_its_model(catalog):
         assert ("Task_RetestFixedDefects" in params.task_durations) == ("C2" in combo)
 
 
+def _per_case(log):
+    """Per case: its attributes, days in Specify requirements, and test rounds that found defects."""
+    tasks = log[log.activity_id == "Task_SpecifyRequirements"]
+    decisions = log[log.activity_id == "Gateway_TestSplit"]
+    return log.groupby("case_id")[["complexity", "security_level"]].first().assign(
+        spec_days=(tasks.end_time - tasks.start_time).groupby(tasks.case_id).sum(),
+        defect_rounds=(decisions.flow_id == "Flow_DefectsFound").groupby(decisions.case_id).sum(),
+    )
+
+
 def test_c3_leaves_a_simple_internal_app_as_it_is_and_shifts_effort_to_risky_cases(catalog):
-    _, as_is = catalog.resolve([])
-    _, triaged = catalog.resolve(["C3"])
-    simple = {"complexity": 1, "security_level": 1, "integrations": 2}
-    risky = {"complexity": 3, "security_level": 3, "integrations": 2}
+    # Same seed, so both runs draw the same cases and the same random numbers per
+    # task and gateway (common random numbers). Any difference per case is C3's.
+    as_is = _per_case(simulate(*catalog.resolve([]), n_cases=500, seed=3))
+    triaged = _per_case(simulate(*catalog.resolve(["C3"]), n_cases=500, seed=3))
 
-    def spec_days(params, case):
-        return params.task_durations["Task_SpecifyRequirements"].mean_given(case)
-
-    def defect_rate(params, case):
-        return params.branch_probabilities["Gateway_TestSplit"].probabilities(case)["Flow_DefectsFound"]
-
-    assert spec_days(triaged, simple) == pytest.approx(spec_days(as_is, simple))
-    assert defect_rate(triaged, simple) == pytest.approx(defect_rate(as_is, simple))
-    # Riskiest case: 10% of the as-is base more per step above 1 on both attributes, 4 steps in all.
-    base = (5 + 8 + 16) / 3
-    assert spec_days(triaged, risky) == pytest.approx(spec_days(as_is, risky) + 0.4 * base)
-    assert defect_rate(triaged, risky) < defect_rate(as_is, risky)
+    simple = (as_is.complexity == 1) & (as_is.security_level == 1)
+    risky = (as_is.complexity == 3) & (as_is.security_level == 3)
+    assert simple.sum() > 20 and risky.sum() > 5
+    # A simple internal app keeps today's requirements step and today's test rounds, case by case.
+    pd.testing.assert_series_equal(triaged.spec_days[simple], as_is.spec_days[simple])
+    pd.testing.assert_series_equal(triaged.defect_rounds[simple], as_is.defect_rounds[simple])
+    # Every case above level 1 on either attribute pays more up front...
+    above = ~simple & as_is.spec_days.notna()
+    assert (triaged.spec_days[above] > as_is.spec_days[above]).all()
+    # ...and the riskiest cases find defects in fewer test rounds.
+    assert triaged.defect_rounds[risky].sum() < as_is.defect_rounds[risky].sum()
 
 
 def test_c4_adds_one_qc_tester(catalog):

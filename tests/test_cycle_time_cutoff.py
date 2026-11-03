@@ -18,7 +18,7 @@ from bpmopt.flow_analysis import theoretical_cycle_time
 from bpmopt.ml import cycle_time_task, ml_section
 from bpmopt.parameters import assumptions, load_parameters
 from bpmopt.results import build_results, export_results, validate_results
-from bpmopt.scenarios import load_catalog, run_scenarios
+from bpmopt.scenarios import find_scenario, load_catalog, run_scenarios
 from bpmopt.simulation import simulate
 from bpmopt.value_added import time_per_class
 
@@ -147,11 +147,11 @@ def test_scenarios_measure_the_cycle_time_up_to_the_cut_off(fixtures_dir):
         fixtures_dir / "sequence.catalog.toml", model=model, params=load_parameters(fixtures_dir / "sequence.cutoff.params.toml")
     )
 
-    scenarios = {frozenset(s["changes"]): s for s in run_scenarios(catalog, n_cases=10, replications=2, seed=1)}
+    scenarios = run_scenarios(catalog, n_cases=10, replications=2, seed=1)
 
-    assert scenarios[frozenset()]["cycle_time"]["mean"]["value"] == pytest.approx(7.5)
-    assert scenarios[frozenset({"C2"})]["cycle_time"]["mean"]["value"] == pytest.approx(5.5)
-    assert scenarios[frozenset({"C2"})]["saving"]["value"] == pytest.approx(2.0)
+    assert find_scenario(scenarios, [])["cycle_time"]["mean"]["value"] == pytest.approx(7.5)
+    assert find_scenario(scenarios, {"C2"})["cycle_time"]["mean"]["value"] == pytest.approx(5.5)
+    assert find_scenario(scenarios, {"C2"})["saving"]["value"] == pytest.approx(2.0)
 
 
 @pytest.fixture(scope="module")

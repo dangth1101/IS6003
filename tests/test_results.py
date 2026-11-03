@@ -9,7 +9,7 @@ import pytest
 from bpmopt.bpmn import read_bpmn
 from bpmopt.parameters import assumptions, load_parameters
 from bpmopt.results import build_results, element_names, export_results, validate_results
-from bpmopt.scenarios import ablation, headline, load_catalog, run_scenarios
+from bpmopt.scenarios import load_catalog, run_scenarios
 from bpmopt.simulation import simulate
 
 
@@ -174,6 +174,52 @@ def test_the_committed_page_results_validate_against_the_schema():
     validate_results(json.loads((WEB / "results.json").read_text(encoding="utf-8")))
 
 
+def _prose(content: dict) -> list[str]:
+    """Section paragraphs and threats: the page text that may carry {name} placeholders filled from the results."""
+    paragraphs = [p for section in content["sections"].values() for p in section["paragraphs"]]
+    return paragraphs + [part for threat in content["threats"] for part in (threat["title"], threat["detail"])]
+
+
+def _prose_names(results: dict) -> set[str]:
+    """The placeholder names the page fills for these results (index.html, proseVars), as the content file's header lists them."""
+    ids = [change["id"] for change in results["changes"]]
+    keys = ["_".join(i for i in ids if i in s["changes"]) for s in results["scenarios"] if s["changes"]] + ["full", "best"]
+    names = {"replications", "change_count", "scenario_count", "best_changes"}
+    names |= {f"{name}_{key}" for key in keys for name in ("share", "saving")} | {f"share_{key}_ci" for key in keys}
+    names |= {f"alone_{i}" for i in ids} | {f"full_minus_{i}{suffix}" for i in ids for suffix in ("", "_abs", "_ci")}
+    return names | {f"rework_{r['gateway_id']}" for r in results["baseline"]["rework"]}
+
+
+PAGE_CONTENT = Path(__file__).parents[1] / "src/bpmopt/content/page.en.toml"
+
+
+def test_every_placeholder_in_the_page_prose_names_a_result_the_page_fills():
+    # A placeholder the page can't fill would show as "{name}" on screen.
+    content = tomllib.loads(PAGE_CONTENT.read_text(encoding="utf-8"))
+    results = json.loads((WEB / "results.json").read_text(encoding="utf-8"))
+
+    used = {name for text in _prose(content) for name in re.findall(r"\{(\w+)\}", text)}
+
+    assert used
+    assert used <= _prose_names(results)
+
+
+def test_the_page_prose_types_in_no_result():
+    # Results come from results.json through placeholders, so a rerun can't leave
+    # stale numbers in the text. What may stay: book citations, change and guideline
+    # IDs, the 95% confidence level, the 20% objective, the 30-element limit of G7
+    # and the year of the method paper.
+    allowed = [
+        r"§[\d.]+", r"\bpp?\.[\d-]+", r"\b(?:Appendix|Eq\.|Fig\.|Table) [A-Z]?[\d.]*\d", r"\b[CG]\d\b",
+        r"\b95%", r"\b20%", r"\b30[- ]elements?", r"\b7PMG", r"Peffers et al\., 2007", r"\b2nd ed\.",
+    ]
+    content = tomllib.loads(PAGE_CONTENT.read_text(encoding="utf-8"))
+
+    for text in _prose(content):
+        stripped = re.sub("|".join(allowed), "", re.sub(r"\{\w+\}", "", text))
+        assert not re.search(r"\d", stripped), f"a number is typed into the page text: {text!r}"
+
+
 def test_fake_results_fill_every_section_of_the_spec(fake):
     # Spec, "Results contract", plus `text` for the page wording and the ablation and headline derived from the scenarios.
     spec_sections = {"meta", "assumptions", "models", "value_added", "baseline", "ml", "changes", "scenarios", "threats"}
@@ -310,28 +356,60 @@ def test_threats_to_validity_come_from_the_page_content_file(exported):
     assert "threats" not in exported["text"]
 
 
+SCENARIO_PARAMS = "sequence.scenarios.params.toml"
+
+
 @pytest.fixture
 def with_scenarios(fixtures_dir):
     """Results with the fixture catalog's full factorial, 3 replications, built the way the notebook does it."""
     model = read_bpmn(fixtures_dir / "sequence.bpmn")
-    params = load_parameters(fixtures_dir / "sequence.scenarios.params.toml")
+    params = load_parameters(fixtures_dir / SCENARIO_PARAMS)
     catalog = load_catalog(fixtures_dir / "sequence.catalog.toml", model=model, params=params)
     log = simulate(model, params, n_cases=30, seed=5)
-    results = build_results(log=log, model=model, params=params, seed=5, replications=3)
-    as_is = {"bpmn": "models/as_is.bpmn", "names": element_names(model)}
     scenarios = run_scenarios(catalog, n_cases=30, replications=3, seed=5)
-    rows = ablation(scenarios)
-    return results | {
-        "models": {"as_is": as_is},
-        "changes": catalog.entries(),
-        "scenarios": scenarios,
-        "ablation": rows,
-        "headline": headline(scenarios, rows),
-    }
+    results = build_results(log=log, model=model, params=params, seed=5, catalog=catalog, scenarios=scenarios)
+    return results | {"models": {"as_is": {"bpmn": "models/as_is.bpmn", "names": element_names(model)}}}
 
 
 def test_results_with_scenarios_an_ablation_and_a_headline_validate(with_scenarios):
     validate_results(with_scenarios)
+
+
+def test_results_with_scenarios_carry_the_catalog_the_ablation_and_the_headline(with_scenarios):
+    # Fixture catalog: C1 and C2 each shorten every case, C3 adds a developer.
+    assert [change["id"] for change in with_scenarios["changes"]] == ["C1", "C2", "C3"]
+    assert len(with_scenarios["scenarios"]) == 2**3
+    assert [row["change"] for row in with_scenarios["ablation"]] == ["C1", "C2", "C3"]
+    assert with_scenarios["headline"]["changes"] == ["C1", "C2", "C3"]
+    assert with_scenarios["meta"]["replications"] == 3
+
+
+def test_the_assumptions_list_every_override_of_the_redesign_marked_with_its_change(with_scenarios, fixtures_dir):
+    # Every parameter goes in the assumptions table, the to-be ones too. The as-is
+    # rows come first and carry no change; then each change's overrides, in catalog order.
+    as_is = assumptions(load_parameters(fixtures_dir / SCENARIO_PARAMS))
+    rows = with_scenarios["assumptions"]
+
+    assert rows[: len(as_is)] == as_is
+    assert rows[len(as_is) :] == [
+        {"parameter": "tasks.Task_BuildApp.duration", "value": "triangular(1, 3, 8)", "rationale": "The as-is duration shifted down by 2 days.", "change": "C1"},
+        {"parameter": "lanes.Lane_Dev.capacity", "value": 3, "rationale": "One developer more than the as-is team.", "change": "C3"},
+    ]
+
+
+def test_an_assumption_marked_with_a_change_must_name_one_in_the_catalog(with_scenarios):
+    with_scenarios["assumptions"][-1]["change"] = "C9"
+
+    with pytest.raises(jsonschema.ValidationError, match="C9"):
+        validate_results(with_scenarios)
+
+
+def test_the_saving_share_must_be_the_saving_over_the_as_is_mean(with_scenarios):
+    # The headline shows the share next to the days, so the two must agree.
+    with_scenarios["scenarios"][3]["saving_share"] = {"value": 0.5, "ci_low": 0.4, "ci_high": 0.6}
+
+    with pytest.raises(jsonschema.ValidationError, match="saving_share"):
+        validate_results(with_scenarios)
 
 
 def test_the_ablation_must_agree_with_the_scenarios(with_scenarios):

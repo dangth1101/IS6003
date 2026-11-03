@@ -13,7 +13,7 @@ from bpmopt.analysis import mean_cycle_time
 from bpmopt.bpmn import read_bpmn
 from bpmopt.parameters import load_parameters
 from bpmopt.results import build_results, element_names, validate_results
-from bpmopt.scenarios import ablation, headline, load_catalog, replication_seeds, run_scenarios
+from bpmopt.scenarios import ablation, find_scenario, headline, load_catalog, replication_seeds, run_scenarios
 from bpmopt.simulation import simulate
 
 
@@ -28,19 +28,15 @@ def load(fixtures_dir):
     return run
 
 
-def _by_changes(scenarios):
-    return {frozenset(s["changes"]): s for s in scenarios}
-
-
 def test_a_change_that_removes_a_fixed_amount_of_work_saves_exactly_that_much(load):
     # C1 shifts the triangular duration of Build application down by 2 days. With
     # unlimited capacity and common random numbers every case draws the same
     # uniform for the task in both scenarios, so every case is exactly 2 days faster.
     catalog = load("sequence.triangular")
 
-    scenarios = _by_changes(run_scenarios(catalog, n_cases=20, replications=3, seed=1))
+    scenarios = run_scenarios(catalog, n_cases=20, replications=3, seed=1)
 
-    saving = scenarios[frozenset({"C1"})]["saving"]
+    saving = find_scenario(scenarios, {"C1"})["saving"]
     assert saving["value"] == pytest.approx(2.0)
     assert saving["ci_low"] == pytest.approx(2.0)
     assert saving["ci_high"] == pytest.approx(2.0)
@@ -50,12 +46,12 @@ def test_the_empty_scenario_reproduces_the_as_is_run_exactly(load, fixtures_dir)
     catalog = load("sequence.scenarios")
     seeds = replication_seeds(5, 3)
 
-    scenarios = _by_changes(run_scenarios(catalog, n_cases=30, replications=3, seed=5))
+    scenarios = run_scenarios(catalog, n_cases=30, replications=3, seed=5)
 
     model = read_bpmn(fixtures_dir / "sequence.bpmn")
     params = load_parameters(fixtures_dir / "sequence.scenarios.params.toml")
     as_is_means = [mean_cycle_time(simulate(model, params, n_cases=30, seed=s)) for s in seeds]
-    as_is = scenarios[frozenset()]
+    as_is = find_scenario(scenarios, [])
     assert as_is["cycle_time"]["mean"]["value"] == pytest.approx(sum(as_is_means) / 3, abs=1e-12)
     assert as_is["saving"] == {"value": 0.0, "ci_low": 0.0, "ci_high": 0.0}
     # Queues make the replications differ, so the CI has some width.
@@ -66,7 +62,7 @@ def test_with_a_warm_up_every_scenario_leaves_out_the_warm_up_cases(load):
     catalog = load("sequence.scenarios.warmup")
     seeds = replication_seeds(5, 3)
 
-    scenarios = _by_changes(run_scenarios(catalog, n_cases=30, replications=3, seed=5))
+    scenarios = run_scenarios(catalog, n_cases=30, replications=3, seed=5)
 
     # Changes can't touch the warm-up, so every scenario keeps it, structural ones too.
     for combo in [(), ("C1",), ("C2",), ("C1", "C2", "C3")]:
@@ -75,10 +71,10 @@ def test_with_a_warm_up_every_scenario_leaves_out_the_warm_up_cases(load):
         logs = [simulate(model, params, n_cases=30, seed=s) for s in seeds]
         assert all(log.case_id.nunique() == 30 and log.case_id.min() > 1 for log in logs)
         expected = sum(mean_cycle_time(log) for log in logs) / 3
-        assert scenarios[frozenset(combo)]["cycle_time"]["mean"]["value"] == pytest.approx(expected, abs=1e-12)
+        assert find_scenario(scenarios, combo)["cycle_time"]["mean"]["value"] == pytest.approx(expected, abs=1e-12)
     # The warm-up changes which cases are measured, so the as-is estimate differs from a run without one.
-    without = _by_changes(run_scenarios(load("sequence.scenarios"), n_cases=30, replications=3, seed=5))
-    assert scenarios[frozenset()]["cycle_time"]["mean"]["value"] != pytest.approx(without[frozenset()]["cycle_time"]["mean"]["value"])
+    without = run_scenarios(load("sequence.scenarios"), n_cases=30, replications=3, seed=5)
+    assert find_scenario(scenarios, [])["cycle_time"]["mean"]["value"] != pytest.approx(find_scenario(without, [])["cycle_time"]["mean"]["value"])
 
 
 def test_every_combination_of_changes_is_simulated_and_the_results_validate(load):
@@ -92,10 +88,8 @@ def test_every_combination_of_changes_is_simulated_and_the_results_validate(load
     assert {frozenset(s["changes"]) for s in scenarios} == {
         frozenset(c) for c in [(), ("C1",), ("C2",), ("C3",), ("C1", "C2"), ("C1", "C3"), ("C2", "C3"), ("C1", "C2", "C3")]
     }
-    results = build_results(log=log, model=model, params=params, seed=5, replications=3)
-    as_is = {"bpmn": "models/as_is.bpmn", "names": element_names(model)}
-    results |= {"models": {"as_is": as_is}, "changes": catalog.entries(), "scenarios": scenarios}
-    validate_results(results)
+    results = build_results(log=log, model=model, params=params, seed=5, catalog=catalog, scenarios=scenarios)
+    validate_results(results | {"models": {"as_is": {"bpmn": "models/as_is.bpmn", "names": element_names(model)}}})
 
 
 def _durations(log):
@@ -139,11 +133,11 @@ def test_a_structural_change_runs_on_its_own_model_and_saves_the_removed_work(lo
     catalog = load("sequence.triangular")
 
     model, params = catalog.resolve(["C2"])
-    scenarios = _by_changes(run_scenarios(catalog, n_cases=40, replications=5, seed=3))
+    scenarios = run_scenarios(catalog, n_cases=40, replications=5, seed=3)
 
     assert model.process_id == "Process_SequenceWithoutSpec"
     assert "Task_WriteSpec" not in params.task_durations
-    saving = scenarios[frozenset({"C2"})]["saving"]
+    saving = find_scenario(scenarios, {"C2"})["saving"]
     assert saving["ci_low"] < 2.0 < saving["ci_high"]
     assert saving["ci_high"] - saving["ci_low"] < 0.3
 
@@ -151,15 +145,14 @@ def test_a_structural_change_runs_on_its_own_model_and_saves_the_removed_work(lo
 def test_ablation_views_come_straight_from_the_factorial_results(load):
     catalog = load("sequence.scenarios")
     scenarios = run_scenarios(catalog, n_cases=30, replications=3, seed=5)
-    by_changes = _by_changes(scenarios)
-    full = by_changes[frozenset({"C1", "C2", "C3"})]["saving"]["value"]
+    full = find_scenario(scenarios, {"C1", "C2", "C3"})["saving"]["value"]
 
     rows = {row["change"]: row for row in ablation(scenarios)}
 
     assert list(rows) == ["C1", "C2", "C3"]
     for change_id, row in rows.items():
-        assert row["alone"] == by_changes[frozenset({change_id})]["saving"]
-        without = by_changes[frozenset({"C1", "C2", "C3"} - {change_id})]["saving"]["value"]
+        assert row["alone"] == find_scenario(scenarios, {change_id})["saving"]
+        without = find_scenario(scenarios, {"C1", "C2", "C3"} - {change_id})["saving"]["value"]
         assert row["full_minus"]["value"] == pytest.approx(full - without)
     # Every change shortens the cycle time here, on its own and in the full design.
     assert all(row["alone"]["value"] > 0 and row["full_minus"]["value"] > 0 for row in rows.values())
@@ -307,25 +300,26 @@ def test_each_scenario_keeps_the_mean_cycle_time_of_every_replication(load):
     # The page and the ablation pair scenarios by replication, so they need the runs, not only the summary.
     catalog = load("sequence.scenarios")
 
-    scenarios = _by_changes(run_scenarios(catalog, n_cases=30, replications=3, seed=5))
+    scenarios = run_scenarios(catalog, n_cases=30, replications=3, seed=5)
 
     for combo in [(), ("C2",), ("C1", "C3")]:
         model, params = catalog.resolve(combo)
         expected = [mean_cycle_time(simulate(model, params, n_cases=30, seed=s)) for s in replication_seeds(5, 3)]
-        assert scenarios[frozenset(combo)]["replication_means"] == pytest.approx(expected, abs=1e-12)
+        assert find_scenario(scenarios, combo)["replication_means"] == pytest.approx(expected, abs=1e-12)
 
 
-def test_the_relative_saving_is_paired_by_replication(load):
+def test_the_saving_share_is_the_mean_saving_over_the_as_is_mean(load):
     # C1 makes every case exactly 2 days faster (unlimited capacity, common random
-    # numbers), so in replication r it saves 2 / (as-is mean of r) of the cycle time.
+    # numbers), so the saving is 2 days in every replication, with a zero-width CI.
+    # The share is the saving over the as-is mean cycle time, and its CI is the
+    # saving's CI over the same mean: here 2 / as-is mean, also zero width. So the
+    # page's "X% faster" always matches its "from A to B days, a saving of S".
     catalog = load("sequence.triangular")
 
-    scenarios = _by_changes(run_scenarios(catalog, n_cases=20, replications=4, seed=1))
+    scenarios = run_scenarios(catalog, n_cases=20, replications=4, seed=1)
 
     model, params = catalog.resolve([])
-    as_is = [mean_cycle_time(simulate(model, params, n_cases=20, seed=s)) for s in replication_seeds(1, 4)]
-    shares = [2.0 / m for m in as_is]
-    share = scenarios[frozenset({"C1"})]["saving_share"]
-    assert share["value"] == pytest.approx(sum(shares) / 4)
-    assert share["ci_low"] < share["value"] < share["ci_high"]
-    assert scenarios[frozenset()]["saving_share"] == {"value": 0.0, "ci_low": 0.0, "ci_high": 0.0}
+    as_is_mean = sum(mean_cycle_time(simulate(model, params, n_cases=20, seed=s)) for s in replication_seeds(1, 4)) / 4
+    share = 2.0 / as_is_mean
+    assert find_scenario(scenarios, {"C1"})["saving_share"] == pytest.approx({"value": share, "ci_low": share, "ci_high": share})
+    assert find_scenario(scenarios, [])["saving_share"] == {"value": 0.0, "ci_low": 0.0, "ci_high": 0.0}

@@ -135,11 +135,16 @@
 
     let TEXT = null;
     let NUM = null;
+    let PROSE = {}; // placeholder values for section paragraphs and threats, see proseVars
+
+    /** template with its {name} placeholders filled from vars. An unknown name stays visible as {name}. */
+    function fill(template, vars) {
+      return template.replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? `{${name}}`));
+    }
 
     /** Label from text.labels, with {name} placeholders filled from vars. */
     function t(key, vars = {}) {
-      const template = TEXT.labels[key] ?? `[${key}]`;
-      return template.replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? `{${name}}`));
+      return fill(TEXT.labels[key] ?? `[${key}]`, vars);
     }
 
     function fmt(value, digits = 1) {
@@ -211,11 +216,42 @@
       const ids = (results.changes ?? []).map((c) => c.id);
       const keyOf = (list) => ids.filter((id) => list.includes(id)).join("|");
       const byKey = new Map((results.scenarios ?? []).map((s) => [keyOf(s.changes), s]));
-      return { ids, get: (list) => byKey.get(keyOf(list)) };
+      return { ids, keyOf, get: (list) => byKey.get(keyOf(list)) };
     }
 
     function pct(value) {
       return NUM(1, "percent").format(value);
+    }
+
+    /** Values for the {name} placeholders of section paragraphs and threats. The content file's header lists them. */
+    function proseVars(results) {
+      const vars = { replications: results.meta.replications };
+      for (const r of results.baseline.rework ?? []) vars[`rework_${r.gateway_id}`] = NUM(0, "percent").format(r.rate);
+      const { changes, scenarios, ablation, headline } = results;
+      if (!changes || !scenarios) return vars;
+      const index = scenarioIndex(results);
+      const range = (e, f) => t("range", { low: f(e.ci_low), high: f(e.ci_high) });
+      const addScenario = (key, s) => {
+        if (!s) return;
+        vars[`share_${key}`] = pct(s.saving_share.value);
+        vars[`share_${key}_ci`] = range(s.saving_share, pct);
+        vars[`saving_${key}`] = fmt(s.saving.value);
+      };
+      vars.change_count = changes.length;
+      vars.scenario_count = scenarios.length;
+      for (const s of scenarios) if (s.changes.length) addScenario(index.keyOf(s.changes).replaceAll("|", "_"), s);
+      if (headline) {
+        addScenario("full", index.get(headline.changes));
+        addScenario("best", index.get(headline.best));
+        vars.best_changes = new Intl.ListFormat(TEXT.lang, { type: "conjunction" }).format(headline.best);
+      }
+      for (const row of ablation ?? []) {
+        vars[`alone_${row.change}`] = fmt(row.alone.value);
+        vars[`full_minus_${row.change}`] = fmt(row.full_minus.value);
+        vars[`full_minus_${row.change}_abs`] = fmt(Math.abs(row.full_minus.value));
+        vars[`full_minus_${row.change}_ci`] = range(row.full_minus, fmt);
+      }
+      return vars;
     }
 
     /** The result in one box: the full design's saving, the change it needs most, and the best combination. */
@@ -241,12 +277,13 @@
         sameSet(h.best, h.changes) ? null : el("p", {}, t("headline_best", {
           changes: h.best.join(", "), share: pct(best.saving_share.value),
           low: pct(best.saving_share.ci_low), high: pct(best.saving_share.ci_high),
-        })));
+        })),
+        el("p", { class: "small muted" }, t("share_method")));
     }
 
     function prose(key) {
       const section = TEXT.sections[key];
-      return [el("h2", { id: key }, section.heading), section.paragraphs.map((p) => el("p", {}, p))];
+      return [el("h2", { id: key }, section.heading), section.paragraphs.map((p) => el("p", {}, fill(p, PROSE)))];
     }
 
     function diagramBlock(caption) {
@@ -431,7 +468,6 @@
       const index = scenarioIndex(results);
       const asIs = index.get([]);
       const selected = new Set();
-      out.push(headlineBlock(results));
 
       const result = el("div", {});
       const render = () => {
@@ -488,13 +524,15 @@
     function assumptionsSection(results) {
       const out = [prose("assumptions")];
       out.push(el("h3", {}, t("assumptions")));
+      // Rows with a change are the to-be parameters that change adds or replaces.
       out.push(results.assumptions
-        ? table([t("parameter"), t("value"), t("rationale")],
-            results.assumptions.map((a) => [el("code", {}, a.parameter), typeof a.value === "number" ? fmt(a.value, Number.isInteger(a.value) ? 0 : 2) : a.value, a.rationale]))
+        ? table([t("parameter"), t("assumption_change"), t("value"), t("rationale")],
+            results.assumptions.map((a) => [el("code", {}, a.parameter), a.change ?? t("scenario_as_is"),
+              typeof a.value === "number" ? fmt(a.value, Number.isInteger(a.value) ? 0 : 2) : a.value, a.rationale]))
         : pending());
       out.push(el("h3", {}, t("threats")));
       out.push(results.threats
-        ? el("ul", { class: "threats" }, results.threats.map((x) => el("li", {}, el("strong", {}, x.title), ". ", x.detail)))
+        ? el("ul", { class: "threats" }, results.threats.map((x) => el("li", {}, el("strong", {}, fill(x.title, PROSE)), ". ", fill(x.detail, PROSE))))
         : pending());
       return out;
     }
@@ -530,6 +568,7 @@
       };
       document.documentElement.lang = TEXT.lang;
       document.title = TEXT.title;
+      PROSE = proseVars(results);
 
       const modelUrl = (model) => new URL(model.bpmn, resultsUrl);
       const asIsXml = await (await fetchOk(modelUrl(results.models.as_is))).text();

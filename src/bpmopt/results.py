@@ -12,7 +12,6 @@ from collections import Counter
 from collections.abc import Iterator
 from dataclasses import asdict
 from datetime import UTC, datetime
-from functools import cache
 from importlib import resources
 from itertools import combinations
 from pathlib import Path
@@ -22,28 +21,47 @@ import pandas as pd
 
 from bpmopt.analysis import baseline_metrics, flow_analysis_check
 from bpmopt.bpmn import ProcessModel, read_bpmn
+from bpmopt.contract import validator
 from bpmopt.lint import lint
 from bpmopt.parameters import Parameters, assumptions
+from bpmopt.scenarios import Catalog, ablation, find_scenario, headline, saving_share
 
 SCHEMA_VERSION = 4
 
 
 def build_results(
-    *, log: pd.DataFrame, model: ProcessModel, params: Parameters, seed: int, replications: int = 1, lang: str = "en"
+    *,
+    log: pd.DataFrame,
+    model: ProcessModel,
+    params: Parameters,
+    seed: int,
+    replications: int | None = None,
+    value_added: dict | None = None,
+    ml: dict | None = None,
+    catalog: Catalog | None = None,
+    scenarios: list[dict] | None = None,
+    lang: str = "en",
 ) -> dict:
     """Results without the `models` section, which export_results fills in.
 
-    `log` is the simulation of `model` with `params` and `seed`. `replications`
-    is the R the scenarios ran with (1 when there are no scenarios). The flow
+    `log` is the simulation of `model` with `params` and `seed`. The flow
     analysis check simulates the model once more with unlimited capacity, with
     the same seed and case count. Every cycle time stops at the parameters'
     cut-off (cycle_time_end), if they set one.
 
-    The threats to validity come from the page content file, like the page
-    text. The notebook adds the other sections (value_added, ml, changes,
-    scenarios, ablation, headline) to this dict before export.
+    The optional sections go in as given: value_added (load_value_added), ml
+    (ml_section), the change catalog and the scenarios run_scenarios returned
+    for it. With scenarios, the ablation and the headline are derived from them
+    and `replications` defaults to the runs per scenario (else 1). The catalog's
+    overrides join the assumptions table after the as-is rows, each marked with
+    its change. The threats to validity come from the page content file, like
+    the page text.
     """
-    return {
+    if scenarios is not None and catalog is None:
+        raise ValueError("scenarios need the catalog they were run from")
+    if replications is None:
+        replications = len(scenarios[0]["replication_means"]) if scenarios else 1
+    results = {
         "meta": {
             "schema_version": SCHEMA_VERSION,
             "seed": seed,
@@ -54,7 +72,7 @@ def build_results(
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         },
         "text": load_page_text(lang),
-        "assumptions": assumptions(params),
+        "assumptions": assumptions(params) + (catalog.assumptions() if catalog else []),
         "threats": _page_content(lang)["threats"],
         "baseline": {
             "time_unit": "working days",
@@ -62,6 +80,16 @@ def build_results(
             "flow_analysis": flow_analysis_check(model, params, n_cases=int(log.case_id.nunique()), seed=seed),
         },
     }
+    if value_added is not None:
+        results["value_added"] = value_added
+    if ml is not None:
+        results["ml"] = ml
+    if catalog is not None:
+        results["changes"] = catalog.entries()
+    if scenarios is not None:
+        rows = ablation(scenarios)
+        results |= {"scenarios": scenarios, "ablation": rows, "headline": headline(scenarios, rows)}
+    return results
 
 
 def load_page_text(lang: str = "en") -> dict:
@@ -124,9 +152,12 @@ def validate_results(results: dict) -> None:
 
     First the JSON schema, then the rules a schema can't express: the scenarios
     are the full factorial of the change catalog, every CI holds its estimate,
-    and each scenario has one mean per replication that average to its estimate.
+    each scenario has one mean per replication that average to its estimate,
+    every saving share is its saving over the as-is mean, assumptions marked
+    with a change name one in the catalog, and the ablation and the headline
+    match the scenarios.
     """
-    error = jsonschema.exceptions.best_match(_validator().iter_errors(results))
+    error = jsonschema.exceptions.best_match(validator().iter_errors(results))
     if error is not None:
         raise error
     for message in _cross_field_errors(results):
@@ -147,7 +178,13 @@ def _cross_field_errors(results: dict) -> Iterator[str]:
                     count = seen[frozenset(combo)]
                     yield f"expected one scenario for changes [{', '.join(combo)}], found {count}"
 
+    catalog_ids = {change["id"] for change in results.get("changes", [])}
+    for i, row in enumerate(results.get("assumptions", [])):
+        if "change" in row and row["change"] not in catalog_ids:
+            yield f"assumptions[{i}] ({row['parameter']}): change {row['change']} isn't in the change catalog"
+
     replications = results["meta"]["replications"]
+    as_is = find_scenario(scenarios, [])
     for i, scenario in enumerate(scenarios):
         estimates = {f"cycle_time.{k}": v for k, v in scenario["cycle_time"].items()}
         estimates |= {"saving": scenario["saving"], "saving_share": scenario["saving_share"]}
@@ -159,14 +196,16 @@ def _cross_field_errors(results: dict) -> Iterator[str]:
             yield f"scenarios[{i}].replication_means: {len(runs)} values, but meta.replications is {replications}"
         elif not _close(sum(runs) / len(runs), scenario["cycle_time"]["mean"]["value"]):
             yield f"scenarios[{i}].replication_means: their average isn't cycle_time.mean.value"
+        if as_is is not None:
+            want = saving_share(scenario["saving"], as_is["cycle_time"]["mean"]["value"])
+            if not all(_close(scenario["saving_share"][k], want[k]) for k in want):
+                yield f"scenarios[{i}].saving_share: must be the saving and its CI divided by the as-is mean cycle time, expected {want}"
 
     yield from _summary_errors(results, scenarios)
 
 
 def _summary_errors(results: dict, scenarios: list[dict]) -> Iterator[str]:
     """The ablation and the headline are derived from the scenarios, so they must match them."""
-    from bpmopt.scenarios import ablation  # scenarios imports this module
-
     if ("ablation" in results or "headline" in results) and not scenarios:
         yield "ablation and headline need scenarios"
         return
@@ -182,10 +221,9 @@ def _summary_errors(results: dict, scenarios: list[dict]) -> Iterator[str]:
             yield f"ablation has {len(results['ablation'])} rows, expected one per change ({len(expected)})"
     if "headline" in results:
         summary = results["headline"]
-        combos = {frozenset(s["changes"]) for s in scenarios}
         catalog = {change["id"] for change in results.get("changes", [])}
         for field in ("changes", "best"):
-            if frozenset(summary[field]) not in combos:
+            if find_scenario(scenarios, summary[field]) is None:
                 yield f"headline.{field}: no scenario has changes [{', '.join(summary[field])}]"
         if summary["top_change"] not in catalog:
             yield f"headline.top_change: {summary['top_change']} isn't in the change catalog"
@@ -193,22 +231,3 @@ def _summary_errors(results: dict, scenarios: list[dict]) -> Iterator[str]:
 
 def _close(a: float, b: float) -> bool:
     return math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-9)
-
-
-def validate_changes(changes: list[dict]) -> None:
-    """Raise jsonschema.ValidationError if a change catalog breaks the contract's `changes` section.
-
-    Lets the catalog loader catch a bad entry before any simulation runs.
-    """
-    validator = _validator()
-    section = validator.schema["properties"]["changes"]
-    error = jsonschema.exceptions.best_match(validator.evolve(schema={**section, "$defs": validator.schema["$defs"]}).iter_errors(changes))
-    if error is not None:
-        raise error
-
-
-@cache
-def _validator() -> jsonschema.Draft202012Validator:
-    schema = json.loads(resources.files("bpmopt").joinpath("schema/results.schema.json").read_text())
-    # Formats like date-time are only checked with a format checker (needs rfc3339-validator).
-    return jsonschema.Draft202012Validator(schema, format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER)

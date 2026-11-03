@@ -18,14 +18,14 @@ version = "proposed-1"
 
 [changes.C1]
 title = "Run the four checks in parallel"
-driver = "Baseline: the test block is the main queue. A test round runs four checks one after the other (about 18 days of QC work) and each check waits about 2 days for a tester, so a round takes about 26 days; QC is the busiest lane (0.87)."
+driver = "Baseline run (seed 42, 2,000 cases): the test block is the main queue. A test round runs four checks one after the other (about 18 days of QC work) and each check waits about 2 days for a tester, so a round takes about 26 days; QC is the busiest lane (0.87)."
 heuristic = { name = "Parallelism", ref = "Appendix A.3" }
 expected_effect = "Code review, functional, security and acceptance tests start at the same time after the build, so a test round lasts as long as its longest check (functional tests, about 6 days) plus waiting, instead of the sum of all four. The QC work per round stays the same."
 trade_off = { time = "better", cost = "worse", quality = "worse", flexibility = "neutral", note = "Four testers are busy on one case at the same time, so the QC lane needs more coordination. A defect the code review finds can make a functional or acceptance test that ran next to it worthless, so some test work is wasted and has to be redone after the fix." }
 
 [changes.C2]
 title = "Retest only what was fixed"
-driver = "Baseline: Gateway_TestSplit has the highest rework rate, 37% of test rounds find defects, and after every fix all four checks run again. Student's own idea (models/as_is_changelog.md, answered questions 3 and 4)."
+driver = "Baseline run (seed 42, 2,000 cases): Gateway_TestSplit has the highest rework rate: 37% of the cases that reach testing are sent back for fixes at least once, and after every fix all four checks run again. Student's own idea (models/as_is_changelog.md, answered questions 3 and 4)."
 heuristic = { name = "Activity elimination", ref = "Appendix A.2" }
 expected_effect = "After Fix defects, a short Retest fixed defects (about 2 days) replaces a full second round of all four checks (about 18 days of QC work plus waiting). Fewer QC hours per case also shortens the queue for everyone."
 trade_off = { time = "better", cost = "better", quality = "worse", flexibility = "neutral", note = "The checks that passed are not repeated after a fix, so a fix that breaks something they would have caught (a regression) reaches release approval. Mitigation outside the model: automated regression tests, or a full rerun for security-relevant fixes." }
@@ -36,7 +36,7 @@ rationale = "Proposed default, new task of C2. Rerun only the checks that found 
 
 [changes.C3]
 title = "Triage risky cases into an extended requirements version"
-driver = "ML (ticket 14): complexity and security_level are the top two drivers of both cycle time and test rework, and Gateway_TestSplit is the loop that costs most."
+driver = "ML on the baseline run (ticket 14, seed 42, 2,000 cases): complexity and security_level are the top two drivers of both cycle time and test rework, and Gateway_TestSplit is the loop that costs most."
 heuristic = { name = "Triage", ref = "Appendix A.2" }
 expected_effect = "Complex and highly classified cases get a longer requirements step with a threat model and an integration design. That extra work up front makes defects found in testing less likely for exactly those cases, so there are fewer test rounds and fixes. A simple internal app keeps today's requirements step and today's defect rate."
 trade_off = { time = "better", cost = "worse", quality = "better", flexibility = "neutral", note = "More analyst time up front (about 1.6 days per case on average, up to 4 days for the riskiest), and the business unit lane gets busier. The size of the defect reduction is an assumption, not measured: it belongs in the threats to validity." }
@@ -51,7 +51,7 @@ rationale = "Proposed default, assumed effect. Complexity lowered from 0.6 to 0.
 
 [changes.C4]
 title = "Add one QC tester"
-driver = "Baseline: QC is the busiest lane (0.87) and its four checks have the longest waits of all tasks, about 2 days each."
+driver = "Baseline run (seed 42, 2,000 cases): QC is the busiest lane (0.87) and its four checks have the longest waits of all tasks, about 2 days each."
 heuristic = { name = "Extra resources", ref = "Appendix A.4" }
 expected_effect = "Nine testers instead of eight bring QC utilisation from about 0.87 to about 0.77, so cases wait less for every check."
 trade_off = { time = "better", cost = "worse", quality = "neutral", flexibility = "better", note = "One more tester's salary. The extra capacity also gives some slack for peaks and absences." }
