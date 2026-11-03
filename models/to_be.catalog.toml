@@ -1,0 +1,67 @@
+# Change catalog of the redesign (Phase 5), applied to models/as_is.bpmn and models/as_is.params.toml.
+#
+# Four changes, so the scenario runner simulates 2^4 = 16 scenarios. C1 and C2 change the
+# model (structural), C3 and C4 only change parameters. Why each change and what it costs
+# is explained in models/to_be_changelog.md.
+#
+# Baseline the changes target (web/results.json, 2,000 cases, seed 42): mean cycle time
+# 132.5 working days, P90 198; waiting 27.8 days per case, most of it in front of the four
+# QC checks; 37% of test rounds find defects, the highest rework rate. QC is the busiest
+# lane (0.87). The ML (ticket 14) ranks complexity, security_level and integrations first
+# for both cycle time and test rework.
+#
+# Every override value is a proposed default, an assumption, not a measurement. The
+# design itself was delegated to Claude by the student, who approved keeping all four
+# changes on 2026-11-03.
+
+version = "proposed-1"
+
+[changes.C1]
+title = "Run the four checks in parallel"
+driver = "Baseline: the test block is the main queue. A test round runs four checks one after the other (about 18 days of QC work) and each check waits about 2 days for a tester, so a round takes about 26 days; QC is the busiest lane (0.87)."
+heuristic = { name = "Parallelism", ref = "Appendix A.3" }
+expected_effect = "Code review, functional, security and acceptance tests start at the same time after the build, so a test round lasts as long as its longest check (functional tests, about 6 days) plus waiting, instead of the sum of all four. The QC work per round stays the same."
+trade_off = { time = "better", cost = "worse", quality = "worse", flexibility = "neutral", note = "Four testers are busy on one case at the same time, so the QC lane needs more coordination. A defect the code review finds can make a functional or acceptance test that ran next to it worthless, so some test work is wasted and has to be redone after the fix." }
+
+[changes.C2]
+title = "Retest only what was fixed"
+driver = "Baseline: Gateway_TestSplit has the highest rework rate, 37% of test rounds find defects, and after every fix all four checks run again. Student's own idea (models/as_is_changelog.md, answered questions 3 and 4)."
+heuristic = { name = "Activity elimination", ref = "Appendix A.2" }
+expected_effect = "After Fix defects, a short Retest fixed defects (about 2 days) replaces a full second round of all four checks (about 18 days of QC work plus waiting). Fewer QC hours per case also shortens the queue for everyone."
+trade_off = { time = "better", cost = "better", quality = "worse", flexibility = "neutral", note = "The checks that passed are not repeated after a fix, so a fix that breaks something they would have caught (a regression) reaches release approval. Mitigation outside the model: automated regression tests, or a full rerun for security-relevant fixes." }
+
+[changes.C2.overrides.tasks.Task_RetestFixedDefects]
+duration = { triangular = [1, 2, 4] }
+rationale = "Proposed default, new task of C2. Rerun only the checks that found defects, on the fixed parts: about as long as a code review (the shortest check), a fraction of a full round (about 18 days of QC work). The chance that the retest finds new defects is the as-is one of Gateway_TestSplit, an assumption on the safe side for time."
+
+[changes.C3]
+title = "Triage risky cases into an extended requirements version"
+driver = "ML (ticket 14): complexity and security_level are the top two drivers of both cycle time and test rework, and Gateway_TestSplit is the loop that costs most."
+heuristic = { name = "Triage", ref = "Appendix A.2" }
+expected_effect = "Complex and highly classified cases get a longer requirements step with a threat model and an integration design. That extra work up front makes defects found in testing less likely for exactly those cases, so there are fewer test rounds and fixes. A simple internal app keeps today's requirements step and today's defect rate."
+trade_off = { time = "better", cost = "worse", quality = "better", flexibility = "neutral", note = "More analyst time up front (about 1.6 days per case on average, up to 4 days for the riskiest), and the business unit lane gets busier. The size of the defect reduction is an assumption, not measured: it belongs in the threats to validity." }
+
+[changes.C3.overrides.tasks.Task_SpecifyRequirements]
+duration = { triangular = [4, 6.4, 12.8], scale = { complexity = 0.5, security_level = 0.125 } }
+rationale = "Proposed default, assumed effect. The as-is requirements step, plus 10% of its base for every complexity step and every security level step above 1. Written with the as-is base x 0.8 so that a case with complexity 1 and security level 1 takes exactly what it takes today: 0.8 x (1 + 0.5 x 1 + 0.125 x 1) = 1.3, the as-is factor. About 1.6 days more on average, 3.9 for the riskiest case. Kept at 10% so the business unit lane stays below about 0.9 busy."
+
+[changes.C3.overrides.gateways.Gateway_TestSplit]
+branches = { Flow_TestsPassed = "rest", Flow_DefectsFound = { logistic = { intercept = -2.6, complexity = 0.4, integrations = 0.15, security_level = 0.3 } } }
+rationale = "Proposed default, assumed effect. Complexity lowered from 0.6 to 0.4 and security level from 0.5 to 0.3 per step, because the threat model and the integration design catch some defects before the build. The intercept goes from -3.0 to -2.6 so a case with complexity 1 and security level 1 keeps the as-is defect rate; only steps above 1 get the benefit. For the riskiest case (complexity 3, security level 3, 2 integrations) the chance that a round finds defects falls from 65% to 45%; over all cases from about 35% to 27%."
+
+[changes.C4]
+title = "Add one QC tester"
+driver = "Baseline: QC is the busiest lane (0.87) and its four checks have the longest waits of all tasks, about 2 days each."
+heuristic = { name = "Extra resources", ref = "Appendix A.4" }
+expected_effect = "Nine testers instead of eight bring QC utilisation from about 0.87 to about 0.77, so cases wait less for every check."
+trade_off = { time = "better", cost = "worse", quality = "neutral", flexibility = "better", note = "One more tester's salary. The extra capacity also gives some slack for peaks and absences." }
+
+[changes.C4.overrides.lanes.Lane_QualityControl]
+capacity = 9
+rationale = "Proposed default. One tester or test team more than the as-is eight."
+
+# Structural changes: the model each combination of them runs on.
+[models]
+C1 = "to_be_c1.bpmn"
+C2 = "to_be_c2.bpmn"
+"C1+C2" = "to_be.bpmn"
