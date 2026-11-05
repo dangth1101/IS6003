@@ -6,7 +6,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Research note saved in `docs/research/` with a source link for each claim
 - [ ] Pinned Pyodide and bpmn-js Modeler versions chosen, with the reason
@@ -14,3 +14,4 @@
 - [ ] Any version gap with our pins is listed with a proposed way to handle it
 
 ## Comments
+- 2026-11-05: claimed. Research agent started.
