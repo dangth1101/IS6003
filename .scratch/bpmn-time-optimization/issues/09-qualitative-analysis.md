@@ -4,7 +4,7 @@
 
 **Blocked by:** 05, 06
 
-**Status:** ready-for-human
+**Status:** claimed
 
 - [x] Every activity ID in the corrected model has exactly one classification with a one-line reason
 - [x] Waste analysis uses the book's categories (move, hold, overdo)
@@ -35,3 +35,4 @@
 - Review questions cut to the open ones, plus two new: is eight QC testers realistic, and does one request a week still fit now that few proposals are rejected.
 - Still a draft. Not signed off.
 
+- 2026-11-05: claimed for sign-off. Student answers: customer is the requesting business unit (internal customer, §1.2 p.5); QC is the main problem; eight QC testers stay. Borderline classes researched in `docs/analysis/value-added-borderline-tasks.md`: Register request moves to VA, the other four stay. Updating the draft and data, then rerunning the notebook.
