@@ -1,7 +1,9 @@
 # Value-added classification of every task in models/as_is.bpmn (book §6.1, pp.213-218).
-# DRAFT, awaiting student review. Reasoning and open points: docs/analysis/phase1-qualitative.md.
+# Signed off by the student on 2026-11-05 (ticket 09). Reasoning: docs/analysis/phase1-qualitative.md;
+# borderline calls: docs/analysis/value-added-borderline-tasks.md.
 #
-# Customer of the process: the business unit that asked for the application.
+# Customer of the process: the business unit that asked for the application, an internal
+# customer (§1.2, p.5: the one who consumes the output).
 # Positive outcome for them: a working, secure application in live operation that does what they asked.
 # VA = the customer would see the outcome as less valuable without it (p.214).
 # BVA = the bank needs it (control, risk, regulation, records) but the customer doesn't pay for it (p.214).
@@ -11,8 +13,8 @@
 # class of its main step, so a task can still hide a few NVA steps (e.g. waiting for a meeting slot).
 
 [Task_RegisterRequest]
-class = "BVA"
-reason = "Logs the request so the PMO can track and prioritize it; the requester gets nothing from the record itself."
+class = "VA"
+reason = "The business unit fills in its own request; nothing can start without it. The book classes \"Fill request\" as VA (Table 6.1, p.217). The logging part is BVA but smaller."
 
 [Task_ApproveProposal]
 class = "BVA"

@@ -4,13 +4,13 @@
 
 **Blocked by:** 05, 06
 
-**Status:** claimed
+**Status:** done
 
 - [x] Every activity ID in the corrected model has exactly one classification with a one-line reason
 - [x] Waste analysis uses the book's categories (move, hold, overdo)
 - [x] Issue register uses the book's columns
 - [x] Objective is stated as a measurable cycle time target
-- [ ] Draft is marked for student review, and the student has signed off
+- [x] Draft is marked for student review, and the student has signed off
 
 ## Comments
 
@@ -36,3 +36,4 @@
 - Still a draft. Not signed off.
 
 - 2026-11-05: claimed for sign-off. Student answers: customer is the requesting business unit (internal customer, §1.2 p.5); QC is the main problem; eight QC testers stay. Borderline classes researched in `docs/analysis/value-added-borderline-tasks.md`: Register request moves to VA, the other four stay. Updating the draft and data, then rerunning the notebook.
+- 2026-11-05: signed off. Register request moved from BVA to VA (Table 6.1, p.217), so the classes are now 4 VA, 12 BVA, 3 NVA. Time per case on the log: VA 53.0 days (51%), BVA 47.1 (45%), NVA 4.6 (4%). The draft is no longer marked draft, and its review questions became "Answers at sign-off". Notebook rerun; the simulation, ML and scenario numbers are unchanged, since value-added classes don't feed the simulation.

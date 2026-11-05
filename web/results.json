@@ -6,7 +6,7 @@
     "case_count": 2000,
     "warm_up": 250.0,
     "parameter_version": "proposed-3",
-    "generated_at": "2026-11-03T03:59:30+00:00"
+    "generated_at": "2026-11-05T13:48:20+00:00"
   },
   "text": {
     "lang": "en",
@@ -549,8 +549,8 @@
   },
   "value_added": {
     "Task_RegisterRequest": {
-      "class": "BVA",
-      "reason": "Logs the request so the PMO can track and prioritize it; the requester gets nothing from the record itself."
+      "class": "VA",
+      "reason": "The business unit fills in its own request; nothing can start without it. The book classes \"Fill request\" as VA (Table 6.1, p.217). The logging part is BVA but smaller."
     },
     "Task_ApproveProposal": {
       "class": "BVA",
@@ -907,7 +907,7 @@
     {
       "id": "C1",
       "title": "Run the four checks in parallel",
-      "driver": "Baseline: the test block is the main queue. A test round runs four checks one after the other (about 18 days of QC work) and each check waits about 2 days for a tester, so a round takes about 26 days; QC is the busiest lane (0.87).",
+      "driver": "Baseline run (seed 42, 2,000 cases): the test block is the main queue. A test round runs four checks one after the other (about 18 days of QC work) and each check waits about 2 days for a tester, so a round takes about 26 days; QC is the busiest lane (0.87).",
       "heuristic": {
         "name": "Parallelism",
         "ref": "Appendix A.3"
@@ -924,7 +924,7 @@
     {
       "id": "C2",
       "title": "Retest only what was fixed",
-      "driver": "Baseline: Gateway_TestSplit has the highest rework rate, 37% of test rounds find defects, and after every fix all four checks run again. Student's own idea (models/as_is_changelog.md, answered questions 3 and 4).",
+      "driver": "Baseline run (seed 42, 2,000 cases): Gateway_TestSplit has the highest rework rate: 37% of the cases that reach testing are sent back for fixes at least once, and after every fix all four checks run again. Student's own idea (models/as_is_changelog.md, answered questions 3 and 4).",
       "heuristic": {
         "name": "Activity elimination",
         "ref": "Appendix A.2"
@@ -941,7 +941,7 @@
     {
       "id": "C3",
       "title": "Triage risky cases into an extended requirements version",
-      "driver": "ML (ticket 14): complexity and security_level are the top two drivers of both cycle time and test rework, and Gateway_TestSplit is the loop that costs most.",
+      "driver": "ML on the baseline run (ticket 14, seed 42, 2,000 cases): complexity and security_level are the top two drivers of both cycle time and test rework, and Gateway_TestSplit is the loop that costs most.",
       "heuristic": {
         "name": "Triage",
         "ref": "Appendix A.2"
@@ -958,7 +958,7 @@
     {
       "id": "C4",
       "title": "Add one QC tester",
-      "driver": "Baseline: QC is the busiest lane (0.87) and its four checks have the longest waits of all tasks, about 2 days each.",
+      "driver": "Baseline run (seed 42, 2,000 cases): QC is the busiest lane (0.87) and its four checks have the longest waits of all tasks, about 2 days each.",
       "heuristic": {
         "name": "Extra resources",
         "ref": "Appendix A.4"

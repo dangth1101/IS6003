@@ -1,6 +1,6 @@
 # Phase 1: Problem and objective (qualitative analysis)
 
-> **Draft, awaiting student review.** Written from the model only, with no knowledge of how the real process runs. Every class, priority and number below is a proposal until the student signs off in ticket 09. Review questions are at the end.
+> **Signed off by the student on 2026-11-05 (ticket 09).** Written from the model, then checked against the student's answers. The numbers are simulated, not measured. The answers are at the end.
 >
 > Numbers refreshed after the student's answers and the arrival-rate decision, from the parameters (`models/as_is.params.toml`, version `proposed-3`) and the simulated log (seed 42, 2,000 cases). Cycle time now ends at go-live. Where the new numbers changed a judgment, it is listed below.
 
@@ -26,7 +26,7 @@ The bank's application development process runs a request through three manageme
 
 ## 1. Value-added analysis (§6.1, pp.213-218)
 
-- Customer of the process (p.214): the business unit that asked for the application.
+- Customer of the process (p.214): the business unit that asked for the application. It is an internal customer: the book calls the one who consumes the output the customer, even when that is an employee of the organization (§1.2, p.5).
 - Outcome they want: a working, secure application in live operation that does what they asked.
 - Classes as defined on pp.214-215:
   - VA: the customer would see the outcome as less valuable without it.
@@ -38,7 +38,7 @@ The bank's application development process runs a request through three manageme
 
 | Task | Class | Reason |
 | --- | --- | --- |
-| Register development request | BVA | Lets the PMO track and prioritize requests; the requester gets nothing from the record |
+| Register development request | VA | The business unit fills in its own request, and nothing can start without it. The book classes "Fill request" as VA (Table 6.1, p.217); the logging part is BVA but smaller |
 | Approve project proposal | BVA | Control step: budget and fit checked before money is spent |
 | Revise project proposal | NVA | Rework after the first proposal wasn't accepted |
 | Hold project kick-off | BVA | Aligns business and IT on scope and roles, lowers risk |
@@ -60,9 +60,9 @@ The bank's application development process runs a request through three manageme
 
 What this shows:
 
-- 3 VA, 13 BVA, 3 NVA. A bank process full of controls is mostly BVA, which is expected.
-- With the mean durations of the parameters, a project that passes everything first time has about 88 days of processing up to go-live: 54 VA (61%), 34 BVA, 0 NVA. Monitoring and evaluation add another 14 BVA days after go-live, outside the cycle time. The NVA time only comes from the loops (section 3, issues 1, 5, 7, 8).
-- On the simulated log, up to go-live and over all cases including rejected ones and all loops, task time per case is 52 days VA (49%), 48 BVA (46%) and 5 NVA (4%).
+- 4 VA, 12 BVA, 3 NVA. A bank process full of controls is mostly BVA, which is expected.
+- With the mean durations of the parameters, a project that passes everything first time has about 88 days of processing up to go-live: 55 VA (63%), 33 BVA, 0 NVA. Monitoring and evaluation add another 14 BVA days after go-live, outside the cycle time. The NVA time only comes from the loops (section 3, issues 1, 5, 7, 8).
+- On the simulated log, up to go-live and over all cases including rejected ones and all loops, task time per case is 53 days VA (51%), 47 BVA (45%) and 5 NVA (4%).
 - Removing BVA steps is a trade-off, not a free win (p.218). So the time saving should come from waiting, rework and how the BVA steps are arranged, not from dropping controls.
 
 ## 2. Waste analysis (§6.2, pp.218-223)
@@ -224,24 +224,24 @@ Target (the student's decision): reduce the mean cycle time by at least 20% vers
   - Running the checks side by side could save about 12 days a project.
   - No single change looks big enough on its own: 27 days is a lot. Rerunning only the failed check cuts both the extra processing and QC's load, and with QC at 87% a lower load should still cut its waiting by more than the work saved. 20% most likely needs two or three changes aimed at testing. That is an expectation; the scenario runner will show it.
   - Caveat: what the QC changes save depends heavily on the assumed QC capacity (eight testers, a proposed default). With more testers in reality, the queue and the possible saving are both smaller.
-  - It stays modest because 13 of 19 tasks are BVA controls we keep, and "Build application" is the biggest single task.
+  - It stays modest because 12 of 19 tasks are BVA controls we keep, and "Build application" is the biggest single task.
 - Rejected proposals end early and pull the all-cases mean down. A design that rejects more, or earlier, would look faster for that reason alone. Rejection is rare now, so the effect is small, and the approved-only number shows it if a design changes the rejection rate.
 
-## Review questions for sign-off
+## Answers at sign-off
 
-Still open:
+Given by the student on 2026-11-05:
 
-1. Is the customer the requesting business unit? Every VA call rests on that.
-2. Do you agree with these calls?
-   - Register request: BVA.
-   - Hold kick-off: BVA, or NVA?
-   - Run acceptance tests: BVA, or VA because the business unit takes part?
-   - Start live operation: BVA, or VA?
-   - Refine application: NVA, or VA if it adds scope?
-3. Do you agree that QC (issues 1 and 2) is the main problem, ahead of the approvals queue (issue 4)? This is the biggest change from the first draft.
-4. Are eight QC testers realistic? Issue 2 and most of the possible saving rest on that number.
+- The customer is the requesting business unit, an internal customer (§1.2, p.5).
+- Borderline classes, checked against the book in `docs/analysis/value-added-borderline-tasks.md`:
+  - Register request: VA, changed from BVA. It matches "Fill request" in Table 6.1 (p.217).
+  - Hold kick-off: BVA. Like "communicate issues", it avoids misunderstandings (p.216).
+  - Run acceptance tests: BVA. It is a control step; the business unit taking part doesn't make it VA (p.216).
+  - Start live operation: BVA. The task is handover and go-live checks; "Deploy application to production" already delivers the application and is VA.
+  - Refine application: NVA. It is rework after a rejected release, defect waste (p.222).
+- QC (issues 1 and 2) is the main problem, ahead of the approvals queue (issue 4).
+- Eight QC testers stay as the assumed capacity.
 
-Answered:
+Answered earlier:
 
 - Target: at least 20% mean saving, with the 95% CI of the saving above 0.
 - Measured on all cases; approved projects only reported next to it.
