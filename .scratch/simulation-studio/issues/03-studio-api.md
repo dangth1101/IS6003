@@ -4,7 +4,7 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] `lint_xml` matches `lint` on the same file
 - [ ] A model with no parameters simulates after `default_parameters`, and the defaults are marked
@@ -14,3 +14,4 @@
 - [ ] Nothing on the studio path imports scikit-learn or SHAP
 
 ## Comments
+- 2026-11-05: claimed. Implementer started.
