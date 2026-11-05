@@ -97,7 +97,10 @@
     </div>
     <p id="error" class="error" role="alert" hidden></p>
 
-    <div id="diagram" class="diagram" aria-label=""></div>
+    <div class="workspace">
+      <div id="diagram" class="diagram" aria-label=""></div>
+      <aside id="params-panel"></aside>
+    </div>
 
     <div class="toolbar">
       <button id="run" type="button" disabled></button>
@@ -108,6 +111,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bpmn-js@18.31.1/dist/bpmn-modeler.production.min.js"></script>
   <script type="module">
+    import { createParamsPanel } from "./params-panel.mjs";
+
     // The default run, as in the spec: 1,000 cases and 10 replications.
     const RUN = { n_cases: 1000, replications: 10, seed: 42 };
     const PRESET = { xml: "presets/as_is.bpmn", params: "presets/as_is.params.toml" };
@@ -183,8 +188,12 @@
       $("first-load").textContent = t("first_load");
       $("run").textContent = t("run");
       $("diagram").setAttribute("aria-label", t("preset_as_is"));
+      renderRunSettings(RUN);
+    }
+
+    function renderRunSettings(run) {
       $("run-settings").textContent = t("run_settings", {
-        cases: new Intl.NumberFormat(TEXT.lang).format(RUN.n_cases), replications: RUN.replications, seed: RUN.seed,
+        cases: new Intl.NumberFormat(TEXT.lang).format(run.n_cases), replications: run.replications, seed: run.seed,
       });
     }
 
