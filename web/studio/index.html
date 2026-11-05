@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.31.1/dist/assets/bpmn-font/css/bpmn.css">
   <link rel="stylesheet" href="lint-panel.css">
   <link rel="stylesheet" href="params-panel.css">
+  <link rel="stylesheet" href="results-panel.css">
   <style>
     /* No wording in this file: every visible string comes from studio.<lang>.json
        (built from src/bpmopt/content/studio.<lang>.toml) or from the BPMN labels. */
@@ -117,6 +118,7 @@
   <script type="module">
     import { createLintPanel, blocksRun, runBlockedReason } from "./lint-panel.mjs";
     import { createParamsPanel } from "./params-panel.mjs";
+    import { createResultsPanel } from "./results-panel.mjs";
 
     // The default run, as in the spec: 1,000 cases and 10 replications.
     const RUN = { n_cases: 1000, replications: 10, seed: 42 };
@@ -213,37 +215,6 @@
       });
     }
 
-    function renderSummary(summary, seconds) {
-      const mean = summary.cycle_time.mean;
-      const results = $("results");
-      results.replaceChildren();
-      const tiles = document.createElement("dl");
-      tiles.className = "tiles";
-      const tile = document.createElement("div");
-      tile.className = "tile";
-      const dt = document.createElement("dt");
-      dt.textContent = t("mean_cycle_time");
-      const dd = document.createElement("dd");
-      dd.id = "mean-cycle-time";
-      dd.append(fmt(mean.value), " ");
-      const unit = document.createElement("span");
-      unit.textContent = t("days");
-      const ci = document.createElement("span");
-      ci.className = "sub";
-      ci.id = "mean-cycle-time-ci";
-      ci.textContent = t("ci", { low: fmt(mean.ci_low), high: fmt(mean.ci_high) });
-      dd.append(unit, ci);
-      tile.append(dt, dd);
-      tiles.append(tile);
-      const time = document.createElement("p");
-      time.className = "muted small";
-      time.textContent = t("run_time", { seconds: fmt(seconds) });
-      results.append(tiles, time);
-      // Full precision for pairing runs later and for the browser parity check.
-      results.dataset.summary = JSON.stringify(summary);
-      results.hidden = false;
-    }
-
     async function main() {
       TEXT = await (await fetch(`studio.${LANG}.json`)).json();
       renderText();
@@ -255,8 +226,12 @@
         container: $("lint"), modeler, t, onChange: updateRun,
         lint: (xml) => call("lint_xml", { xml }),
       });
+      const results = createResultsPanel({
+        container: $("results"), t, lang: TEXT.lang, compare: (baseline, variant) => call("compare", { baseline, variant }),
+      });
       const panel = createParamsPanel({
-        root: $("params-panel"), modeler, call, t, lang: TEXT.lang, run: RUN, onRunChange: renderRunSettings, onError: showError,
+        root: $("params-panel"), modeler, call, t, lang: TEXT.lang, run: RUN, onError: showError,
+        onRunChange: (run) => { renderRunSettings(run); results.runChanged(run); },
       });
       window.studio.panel = panel;
       const [xml, paramsToml] = await Promise.all([fetchText(PRESET.xml), fetchText(PRESET.params)]);
@@ -288,17 +263,20 @@
         $("error").hidden = true;
         const started = performance.now();
         const run = panel.run();
+        const timer = results.startRun(run);
         $("load-progress").max = run.replications;
         $("load-progress").value = 0;
-        $("status-text").textContent = t("running", { done: 1, total: run.replications });
+        $("status-text").textContent = timer.status(0, run.replications);
         try {
           const params = await panel.params();
           const { xml: current } = await modeler.saveXML();
           const summary = await call("simulate_summary", { xml: current, params, ...run }, (done, total) => {
             $("load-progress").value = done;
-            $("status-text").textContent = t("running", { done: Math.min(done + 1, total), total });
+            $("status-text").textContent = timer.status(done, total);
           });
-          renderSummary(summary, (performance.now() - started) / 1000);
+          const seconds = (performance.now() - started) / 1000;
+          timer.finish(seconds);
+          await results.show(summary, seconds);
           $("status-text").textContent = t("ready");
         } catch (e) {
           $("status-text").textContent = "";
