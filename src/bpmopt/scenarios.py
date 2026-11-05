@@ -33,6 +33,7 @@ dropped, so a change that removes a task needs no override for it.
 
 import math
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
@@ -118,17 +119,49 @@ def load_catalog(path: str | Path, *, model: ProcessModel, params: Parameters) -
     path = Path(path)
     with open(path, "rb") as f:
         raw = tomllib.load(f)
+    return parse_catalog(raw, _ModelFiles(path.parent), model=model, params=params, where=path.name)
+
+
+class _ModelFiles(Mapping):
+    """The models of a catalog's [models] files, read from its folder only when a combination is accepted."""
+
+    def __init__(self, folder: Path):
+        self._folder = folder
+
+    def __getitem__(self, file: str) -> ProcessModel:
+        return read_bpmn(self._folder / file)
+
+    def __iter__(self):
+        return (path.name for path in self._folder.glob("*.bpmn"))
+
+    def __len__(self) -> int:
+        return sum(1 for _ in self)
+
+
+def parse_catalog(
+    raw: dict,
+    model_files: Mapping[str, ProcessModel],
+    *,
+    model: ProcessModel,
+    params: Parameters,
+    where: str = "catalog",
+) -> Catalog:
+    """Same as load_catalog, for a catalog already read into a dict, e.g. by the studio in the browser.
+
+    model_files holds the model of each file name in [models]; where names the
+    catalog in error messages.
+    """
     unknown = set(raw) - {"version", "changes", "models"}
     if unknown:
-        raise ValueError(f"{path.name}: unknown sections {sorted(unknown)}, expected version, changes and models")
+        raise ValueError(f"{where}: unknown sections {sorted(unknown)}, expected version, changes and models")
     if not isinstance(raw.get("version"), str):
-        raise ValueError(f'{path.name}: version is missing: add a line like version = "draft-1" at the top')
-    changes = tuple(_change(path.name, change_id, entry) for change_id, entry in raw.get("changes", {}).items())
+        raise ValueError(f'{where}: version is missing: add a line like version = "draft-1" at the top')
+    changes = tuple(_change(where, change_id, entry) for change_id, entry in raw.get("changes", {}).items())
     if not changes:
-        raise ValueError(f"{path.name}: the catalog has no changes")
+        raise ValueError(f"{where}: the catalog has no changes")
     ids = [change.id for change in changes]
-    models = _models(path, raw.get("models", {}), ids)
-    _check_overrides(path.name, changes, [model, *models.values()])
+    models = _models(where, raw.get("models", {}), ids, model_files)
+    _check_overrides(where, changes, [model, *models.values()])
     check_parameters(params, model)  # before _restrict, which would hide a typo in the as-is parameters
 
     structural = set().union(*models)
@@ -141,12 +174,12 @@ def load_catalog(path: str | Path, *, model: ProcessModel, params: Parameters) -
                 try:
                     scenario_params = apply_overrides(scenario_params, change.overrides)
                 except ValueError as e:
-                    raise ValueError(f"{path.name}: changes.{change.id}.overrides: {e}") from e
+                    raise ValueError(f"{where}: changes.{change.id}.overrides: {e}") from e
         scenario_params = _restrict(scenario_params, scenario_model)
         try:
             check_parameters(scenario_params, scenario_model)
         except ValueError as e:
-            raise ValueError(f"{path.name}: scenario [{', '.join(combo)}]: {e}") from e
+            raise ValueError(f"{where}: scenario [{', '.join(combo)}]: {e}") from e
         scenarios[frozenset(combo)] = (scenario_model, scenario_params)
     return Catalog(raw["version"], changes, scenarios)
 
@@ -167,21 +200,24 @@ def _change(where: str, change_id: str, entry: dict) -> Change:
     return change
 
 
-def _models(path: Path, raw: dict[str, str], ids: list[str]) -> dict[frozenset[str], ProcessModel]:
-    """The model of each combination of structural changes. Every combination needs one."""
+def _models(where: str, raw: dict[str, str], ids: list[str], files: Mapping[str, ProcessModel]) -> dict[frozenset[str], ProcessModel]:
+    """The model of each combination of structural changes, from its file. Every combination needs one."""
     models: dict[frozenset[str], ProcessModel] = {}
     for key, file in raw.items():
         combo = frozenset(part.strip() for part in key.split("+"))
         unknown = sorted(combo - set(ids))
         if unknown:
-            raise ValueError(f"{path.name}: models.{key}: {', '.join(unknown)} aren't changes in the catalog")
+            raise ValueError(f"{where}: models.{key}: {', '.join(unknown)} aren't changes in the catalog")
         if combo in models:
-            raise ValueError(f"{path.name}: models.{key}: that combination already has a model")
-        models[combo] = read_bpmn(path.parent / file)
+            raise ValueError(f"{where}: models.{key}: that combination already has a model")
+        try:
+            models[combo] = files[file]
+        except KeyError:
+            raise ValueError(f"{where}: models.{key}: no model file {file!r} given") from None
     structural = [change_id for change_id in ids if any(change_id in combo for combo in models)]
     missing = ["+".join(combo) for combo in _combinations(structural) if combo and frozenset(combo) not in models]
     if missing:
-        raise ValueError(f"{path.name}: [models] needs a model for every combination of structural changes, missing: {', '.join(missing)}")
+        raise ValueError(f"{where}: [models] needs a model for every combination of structural changes, missing: {', '.join(missing)}")
     return models
 
 

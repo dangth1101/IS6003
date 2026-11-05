@@ -4,7 +4,7 @@
 
 - the bpmopt wheel, built from src/ with uv (hatchling, reproducible: an
   unchanged source gives the same bytes), which Pyodide installs;
-- the as-is preset, copied from models/;
+- the as-is preset and the change catalog with its models, copied from models/;
 - the studio text, src/bpmopt/content/studio.en.toml as JSON.
 
 Rerun it after changing anything under src/bpmopt/ or the preset models, and
@@ -20,7 +20,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 STUDIO = ROOT / "web" / "studio"
-PRESETS = ["as_is.bpmn", "as_is.params.toml"]
+# The as-is preset and the change catalog with its models, which apply_suggestion needs.
+PRESETS = ["as_is.bpmn", "as_is.params.toml", "to_be.catalog.toml", "to_be_c1.bpmn", "to_be_c2.bpmn", "to_be.bpmn"]
 
 
 def build_wheel() -> Path:

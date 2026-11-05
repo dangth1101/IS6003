@@ -2,7 +2,7 @@
 
 Book: Dumas et al., Fundamentals of BPM, 2nd ed. Page numbers are printed pages.
 
-`lint(path)` returns a list of `Violation`s. An empty list means the model is
+`lint(path)` (or `lint_model(model)`) returns a list of `Violation`s. An empty list means the model is
 clean; our project models must have no errors and no warnings.
 
 Rules (ID, severity, source):
@@ -43,7 +43,11 @@ class Violation:
 
 
 def lint(path: str | Path) -> list[Violation]:
-    model = read_bpmn(path)
+    return lint_model(read_bpmn(path))
+
+
+def lint_model(model: ProcessModel) -> list[Violation]:
+    """The violations of a model already read, e.g. from the string the studio page sends."""
     violations: list[Violation] = []
     for check in _CHECKS:
         violations.extend(check(model))

@@ -169,6 +169,20 @@ def waiting_by_activity(log: pd.DataFrame, ends_at: str | None = None) -> list[d
     return [{"activity_id": activity_id, "mean": float(mean)} for activity_id, mean in means.items()]
 
 
+def utilisation(log: pd.DataFrame, params: Parameters) -> dict[str, float]:
+    """Per lane with a capacity: rho = arrival rate x work per case / capacity (Eq. 7.8 p.270, p.276).
+
+    Work per case is the lane's processing time over every task row of the log,
+    after the cycle time cut-off too, since those tasks also keep the lane busy.
+    Needs an arrival rate: with every case arriving at time 0 there is no rate.
+    """
+    if params.arrival_rate is None:
+        raise ValueError("utilisation needs an arrival rate: without [arrivals] every case arrives at time 0")
+    tasks = log[log.element_type == "task"]
+    work_per_case = (tasks.end_time - tasks.start_time).groupby(tasks.lane_id).sum() / log.case_id.nunique()
+    return {lane_id: params.arrival_rate * float(work_per_case.get(lane_id, 0.0)) / c for lane_id, c in params.lane_capacities.items()}
+
+
 def flow_analysis_check(model: ProcessModel, params: Parameters, *, n_cases: int, seed: int) -> dict[str, float]:
     """Book flow analysis (§7.1.1) next to the simulated mean cycle time, both with unlimited capacity.
 
