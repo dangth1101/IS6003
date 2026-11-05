@@ -18,6 +18,7 @@ or planted, which pull in scikit-learn and SHAP or aren't needed in the browser.
 """
 
 import copy
+import json
 import tomllib
 from collections.abc import Callable, Mapping
 from dataclasses import replace
@@ -27,7 +28,7 @@ import numpy as np
 from bpmopt.analysis import baseline_metrics, utilisation
 from bpmopt.bpmn import ProcessModel, parse_bpmn
 from bpmopt.lint import ERROR, lint_model
-from bpmopt.parameters import parse_parameters
+from bpmopt.parameters import Logistic, parse_parameters
 from bpmopt.scenarios import Catalog, estimate, parse_catalog, replication_seeds, saving_share
 from bpmopt.simulation import simulate
 
@@ -284,13 +285,18 @@ def _scenario_models(catalog: Catalog) -> list[ProcessModel]:
     return [model for model, _ in catalog.scenarios.values()]
 
 
-def _restrict(params: dict, model: ProcessModel) -> dict:
-    """The parameter dict without task, XOR-split and lane entries the model doesn't have."""
-    known = {
+def _element_ids(model: ProcessModel) -> dict[str, set[str]]:
+    """The IDs each per-element section of the parameters may name: tasks, XOR splits, lanes."""
+    return {
         "tasks": {node.id for node in model.nodes_of_type("task")},
         "gateways": {node.id for node in model.xor_splits()},
         "lanes": set(model.lanes),
     }
+
+
+def _restrict(params: dict, model: ProcessModel) -> dict:
+    """The parameter dict without task, XOR-split and lane entries the model doesn't have."""
+    known = _element_ids(model)
     return {
         section: {i: entry for i, entry in value.items() if i in known[section]} if section in known else value
         for section, value in params.items()
@@ -356,6 +362,109 @@ def _per_element(runs: list[dict[str, float]]) -> dict[str, dict[str, float]]:
     ids = list(dict.fromkeys(i for run in runs for i in run))
     values = {i: [run[i] for run in runs if i in run] for i in ids}
     return {i: estimate(np.array(v)) for i, v in values.items() if len(v) >= 2}
+
+
+# The rationale of an entry the user set in the studio's parameter panel. It
+# doesn't start with STUDIO_DEFAULT, so the entry stops being shown as a default.
+STUDIO_EDIT = "Set in the studio."
+_SETTABLE = ("arrivals", "warm_up")  # single entries the panel sets; per element: tasks, gateways, lanes
+
+
+def set_parameter(xml: str, params: dict, entry: str, fields: dict) -> dict:
+    """The parameters with one entry set from the parameter panel: {params, defaults, dropped}.
+
+    entry is "tasks.<id>", "gateways.<id>" (an XOR split), "lanes.<id>",
+    "arrivals" or "warm_up"; fields its value as in the parameter file, e.g.
+    {"duration": {"triangular": [1, 2, 4]}} or {"capacity": 2}. The entry is
+    replaced by fields with the rationale STUDIO_EDIT, so it is no longer a
+    default; every other entry stays as it is. The result is completed by
+    default_parameters and checked against the model: ValueError, naming the
+    entry, when the value is invalid (min above max, probabilities that don't
+    sum to 1, capacity 0, ...) or the model has no such element.
+    """
+    model = parse_bpmn(xml)
+    raw = copy.deepcopy(params)
+    section, _, element_id = entry.partition(".")
+    known = _element_ids(model)
+    if section in _SETTABLE and not element_id:
+        raw[section] = {**fields, "rationale": STUDIO_EDIT}
+    elif section in known and element_id:
+        if element_id not in known[section]:
+            raise ValueError(f"{entry}: the model has no such element")
+        raw.setdefault(section, {})[element_id] = {**fields, "rationale": STUDIO_EDIT}
+    else:
+        raise ValueError(f"{entry}: the studio sets only {', '.join(_SETTABLE)} and tasks, gateways or lanes by ID")
+    filled = default_parameters(xml, raw)
+    parse_parameters(filled["params"], model)
+    return filled
+
+
+RESET_CASES = 10_000
+RESET_SEED = 0
+
+
+def fixed_branches(params: dict, gateway_id: str) -> dict:
+    """The XOR split's branches with each logistic branch replaced by a fixed share ("reset to fixed").
+
+    The share is the branch's mean probability over the case attributes
+    (RESET_CASES cases drawn from the attribute distributions, seed RESET_SEED),
+    rounded to 3 decimals, so the split keeps about the same overall rate but
+    no longer depends on the attributes. Fixed and "rest" branches stay as they
+    are. Pass the result to set_parameter as {"branches": ...}.
+    """
+    parsed = parse_parameters(params)
+    rng = np.random.default_rng(RESET_SEED)
+    cases = [{name: d.sample(rng) for name, d in parsed.attributes.items()} for _ in range(RESET_CASES)]
+    branches = dict(params["gateways"][gateway_id]["branches"])
+    for flow_id, p in parsed.branch_probabilities[gateway_id].flows.items():
+        if isinstance(p, Logistic):
+            branches[flow_id] = round(float(np.mean([p.probability(case) for case in cases])), 3)
+    return branches
+
+
+EXPORT_HEADER = "# Parameter file exported from the simulation studio. Read it with bpmopt.parameters.load_parameters.\n"
+
+
+def params_to_toml(params: dict) -> str:
+    """The parameter dict as a parameter file: TOML that load_parameters reads back to the same tables.
+
+    Laid out like the hand-written files: top-level keys first, then one
+    [section] per single entry and one [section.id] per entry of a collection,
+    each value on one line (tables inline). Pyodide has tomllib but no TOML
+    writer, hence this one; it only needs the types a parameter file holds.
+    """
+    lines = [EXPORT_HEADER.rstrip("\n")]
+    lines += [f"{_toml_key(key)} = {_toml_value(value)}" for key, value in params.items() if not isinstance(value, dict)]
+    for section, value in params.items():
+        if not isinstance(value, dict):
+            continue
+        if value and all(isinstance(entry, dict) for entry in value.values()):
+            tables = [(f"{_toml_key(section)}.{_toml_key(key)}", entry) for key, entry in value.items()]
+        else:
+            tables = [(_toml_key(section), value)]
+        for header, table in tables:
+            lines += ["", f"[{header}]", *(f"{_toml_key(key)} = {_toml_value(v)}" for key, v in table.items())]
+    return "\n".join(lines) + "\n"
+
+
+def _toml_key(key: str) -> str:
+    return key if key and all(c.isascii() and (c.isalnum() or c in "_-") for c in key) else json.dumps(key, ensure_ascii=False)
+
+
+def _toml_value(value) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return repr(value)  # shortest text that reads back to the same float; inf and nan are TOML too
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)  # a JSON string is a valid TOML basic string
+    if isinstance(value, list):
+        return "[" + ", ".join(_toml_value(v) for v in value) + "]"
+    if isinstance(value, dict):
+        return "{ " + ", ".join(f"{_toml_key(k)} = {_toml_value(v)}" for k, v in value.items()) + " }" if value else "{}"
+    raise TypeError(f"can't write {value!r} to a parameter file")
 
 
 def lint_xml(xml: str) -> list[dict]:
