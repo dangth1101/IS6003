@@ -4,7 +4,7 @@
 
 **Blocked by:** 05, 06, 07
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Demo path checked in headless Chrome with no console errors
 - [ ] Studio's full-design saving equals the report's for the same settings
@@ -13,3 +13,4 @@
 - [ ] All studio text in the content file
 
 ## Comments
+- 2026-11-05: claimed. Implementer started.
