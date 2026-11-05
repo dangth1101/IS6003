@@ -67,15 +67,17 @@ The flow on the page:
   - `lint_xml(xml)` → list of violations (rule, severity, element, message).
   - `default_parameters(xml, params=None)` → a full parameter set for the model: given entries are kept, missing ones get documented defaults (rationale "studio default"), and entries for elements no longer in the model are dropped. Returns which entries are defaults.
   - `simulate_summary(xml, params, n_cases, seed, replications, progress=None)` → the metrics in user stories 13-15, each with mean over replications and a 95% CI, plus the per-replication cycle time means (kept for pairing).
-  - `compare(baseline, variant)` → saving (days and share of the baseline mean) with a paired 95% CI, plus before/after per lane and per activity. Both runs must share seed and replications; otherwise it refuses.
-  - `apply_suggestion(xml, params, change_ids)` → the as-is preset's model and parameters for that set of catalog changes, using the existing catalog (`models/to_be.catalog.toml` and its model files). Only valid when the current model is the unmodified preset or a preset with suggestions applied; the page disables suggestions once the diagram is hand-edited, and says why.
+  - `compare(baseline, variant)` → saving (days and share of the baseline mean) with a paired 95% CI, plus before/after per lane and per activity. Both runs must share seed, replications and number of cases (`n_cases`); otherwise it refuses.
+  - `apply_suggestion(xml, change_ids, preset)` → the as-is preset's model and parameters for that set of catalog changes, using the existing catalog (`models/to_be.catalog.toml` and its model files, passed in as `preset`, file name → text). It takes no `params`: the result is the catalog's design, not an edit of the current parameters, so applying a smaller set is the undo. Only valid when the current model is the unmodified preset or a preset with suggestions applied; the page disables suggestions once the diagram is hand-edited, and says why.
+  - `set_parameter(xml, params, entry, fields)` sets one entry from the panel, including the cycle time end (`cycle_time`, a task or `None` for the end events).
+  - A refusal is a `StudioError`: a `ValueError` with a readable message for notebooks and pytest, plus a stable code and its data. The page shows the code's text from the `[errors]` table of the studio content file, never the Python message (user story 27).
   - Reading BPMN and parameters from strings / dicts is added to `bpmn` and `parameters` without changing their file-based APIs.
 - **Same numbers as the notebook:** the studio's simulate path is the same `simulate` + replication seeds (`replication_seeds`) as the scenario runner, so the same inputs give the same per-replication means.
 - **Parameters in the UI:** tasks (triangular min/mode/max, plus any attribute scaling from an imported file shown read-only), XOR splits (fixed probabilities editable; logistic branches from an imported file shown read-only with a "reset to fixed" option), lanes (capacity), arrivals (rate), warm-up, cycle time end (as in the file, or the end events by default). Case attributes come only from an imported parameter file; an imported model without one has none.
 - **Defaults for a new or imported model:** documented in the studio module and shown on the page (e.g. task triangular [1, 2, 4] days, XOR splits equal branches, lane capacity 1, arrival rate chosen so the busiest lane is below full). Exact values are decided in the ticket and listed with their rationale.
 - **Performance defaults:** 1,000 cases and 10 replications, editable. The worker reports progress per replication.
 - **Page:** `web/studio/` with its own `index.html`. bpmn-js Modeler pinned from a CDN, a chart library pinned as on the report page. Layout: diagram in the middle, element/parameter panel on the side, lint and results below. The report page and the studio link to each other. All UI text lives in a content file (like `src/bpmopt/content/page.en.toml`).
-- **Report page:** unchanged except the link. It stays the submission's write-up; the studio is the demo.
+- **Report page:** unchanged except the links to the studio (in the header and a `studio_try` paragraph at the end of the evaluation section, with the report's run settings) and a favicon (`<link rel="icon" href="data:,">`). It stays the submission's write-up; the studio is the demo.
 
 ## Testing Decisions
 
@@ -85,7 +87,7 @@ The flow on the page:
   - `compare` of the as-is with the full design matches the scenario runner's paired saving and CI.
   - `default_parameters` fills a model with no parameters so it simulates, keeps given entries untouched, drops entries for removed elements, and marks which entries are defaults.
   - `lint_xml` gives the same violations as `lint` on the file.
-  - `compare` refuses runs with different seeds or replications.
+  - `compare` refuses runs with different seeds, replications or number of cases.
 - **Wheel freshness:** a test rebuilds or hashes the package and fails when the committed wheel is stale.
 - **Browser path:** checked in headless Chrome against a local static server: Pyodide loads, the preset runs, a suggestion applies, a hand edit (add a task) runs, the comparison shows, no console errors. This is an acceptance check per ticket, not a unit test.
 - **Prior art:** `tests/test_scenarios.py`, `tests/test_to_be_model.py`, `tests/test_results.py`.

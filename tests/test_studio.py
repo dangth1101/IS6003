@@ -20,6 +20,7 @@ from bpmopt.analysis import baseline_metrics
 from bpmopt.bpmn import parse_bpmn, read_bpmn
 from bpmopt.lint import lint
 from bpmopt.parameters import load_parameters, parse_parameters
+from bpmopt.results import load_page_text
 from bpmopt.scenarios import Catalog, estimate, find_scenario, full_design, load_catalog, replication_seeds, run_scenarios
 from bpmopt.simulation import simulate
 from bpmopt.studio import apply_suggestion, compare, default_parameters, lint_xml, simulate_summary, suggestions
@@ -386,6 +387,21 @@ def test_compare_refuses_runs_that_do_not_share_their_settings(setting, other):
         compare(baseline, variant)
 
 
+def test_a_run_says_which_of_its_settings_a_comparison_pairs_on():
+    # The page warns before a run that won't compare with the pinned baseline, from the same list compare checks.
+    summary = simulate_summary(*as_is_preset(), n_cases=20, seed=7, replications=2)
+
+    assert summary["paired_on"] == ["seed", "replications", "n_cases"]
+    assert {key: summary[key] for key in summary["paired_on"]} == {"seed": 7, "replications": 2, "n_cases": 20}
+
+
+def test_the_default_arrival_rate_of_a_new_model_is_the_documented_one():
+    # Pins the pilot run's number, so moving the work-per-case formula can't change it unnoticed.
+    params = default_parameters((FIXTURES / "proposal_rejected.bpmn").read_text())["params"]
+
+    assert (params["arrivals"]["rate"], params["warm_up"]["length"]) == (0.167, 599)
+
+
 STUDIO = ROOT / "web" / "studio"
 REBUILD = "rebuild with: uv run python scripts/build_studio.py"
 
@@ -443,6 +459,12 @@ def test_the_studio_uses_exactly_the_labels_of_its_content_file():
     content = tomllib.loads((ROOT / "src" / "bpmopt" / "content" / "studio.en.toml").read_text(encoding="utf-8"))
 
     assert used == set(content["labels"])
+
+
+@pytest.mark.parametrize("path", [ROOT / "web" / "results.json", ROOT / "web" / "fixtures" / "fake_results.json"], ids=lambda p: p.name)
+def test_the_report_text_in_a_results_file_is_the_content_file(path):
+    # studio_try went into both files by hand; a later hand edit must not drift from page.en.toml.
+    assert json.loads(path.read_text(encoding="utf-8"))["text"] == load_page_text()
 
 
 def test_the_report_page_and_the_studio_link_to_each_other():

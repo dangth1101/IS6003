@@ -31,10 +31,11 @@ Entries for tasks, gateways and lanes that aren't in a scenario's model are
 dropped, so a change that removes a task needs no override for it.
 """
 
+import copy
 import math
 import tomllib
-from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
 
@@ -45,7 +46,17 @@ from scipy.stats import t as student_t
 from bpmopt.analysis import cycle_times
 from bpmopt.bpmn import ProcessModel, read_bpmn
 from bpmopt.contract import validate_changes
-from bpmopt.parameters import Parameters, apply_overrides, assumptions, check_parameters
+from bpmopt.parameters import (
+    PER_ELEMENT,
+    Parameters,
+    apply_overrides,
+    assumptions,
+    check_parameters,
+    element_ids,
+    entry_key,
+    restrict,
+    restrict_tables,
+)
 from bpmopt.simulation import simulate
 
 
@@ -92,6 +103,25 @@ class Catalog:
         """The `changes` section of the results file."""
         return [change.entry() for change in self.changes]
 
+    def changes_in(self, change_ids: Iterable[str]) -> list[Change]:
+        """The catalog's changes among change_ids, in catalog order: the order their overrides apply in."""
+        return _in_catalog_order(self.changes, change_ids)
+
+    def scenario_tables(self, as_is: dict, change_ids: Iterable[str]) -> dict:
+        """The parameter file tables of a scenario, built like resolve builds its parameters.
+
+        as_is is the as-is parameter file read into a dict. The overrides of the
+        scenario's changes are added in catalog order, then the entries for
+        elements the scenario's model lacks are dropped. The studio shows and
+        edits these tables; parse_parameters reads them to resolve's parameters.
+        """
+        model, _ = self.resolve(change_ids)
+        tables = copy.deepcopy(as_is)
+        for change in self.changes_in(change_ids):
+            for section, entries in change.overrides.items():
+                tables.setdefault(section, {}).update(copy.deepcopy(entries))
+        return restrict_tables(tables, model)
+
     def assumptions(self) -> list[dict]:
         """Assumptions table rows for every parameter a change adds or replaces, each marked with its change.
 
@@ -101,7 +131,7 @@ class Catalog:
         _, as_is = self.resolve([])
         rows = []
         for change in self.changes:
-            entries = [f"{section}.{element_id}" for section, items in change.overrides.items() for element_id in items]
+            entries = [entry_key(section, element_id) for section, items in change.overrides.items() for element_id in items]
             by_entry = {row["parameter"].rsplit(".", 1)[0]: row for row in assumptions(apply_overrides(as_is, change.overrides))}
             rows += [{**by_entry[entry], "change": change.id} for entry in entries]
         return rows
@@ -119,23 +149,26 @@ def load_catalog(path: str | Path, *, model: ProcessModel, params: Parameters) -
     path = Path(path)
     with open(path, "rb") as f:
         raw = tomllib.load(f)
-    return parse_catalog(raw, _ModelFiles(path.parent), model=model, params=params, where=path.name)
+    return parse_catalog(raw, _ModelFiles(path.parent, raw.get("models", {}).values()), model=model, params=params, where=path.name)
 
 
 class _ModelFiles(Mapping):
-    """The models of a catalog's [models] files, read from its folder only when a combination is accepted."""
+    """The models of the files a catalog's [models] names, each read from its folder only when looked up."""
 
-    def __init__(self, folder: Path):
+    def __init__(self, folder: Path, files: Iterable[str]):
         self._folder = folder
+        self._files = list(dict.fromkeys(files))
 
     def __getitem__(self, file: str) -> ProcessModel:
+        if file not in self._files:
+            raise KeyError(file)
         return read_bpmn(self._folder / file)
 
     def __iter__(self):
-        return (path.name for path in self._folder.glob("*.bpmn"))
+        return iter(self._files)
 
     def __len__(self) -> int:
-        return sum(1 for _ in self)
+        return len(self._files)
 
 
 def parse_catalog(
@@ -162,20 +195,19 @@ def parse_catalog(
     ids = [change.id for change in changes]
     models = _models(where, raw.get("models", {}), ids, model_files)
     _check_overrides(where, changes, [model, *models.values()])
-    check_parameters(params, model)  # before _restrict, which would hide a typo in the as-is parameters
+    check_parameters(params, model)  # before restrict, which would hide a typo in the as-is parameters
 
     structural = set().union(*models)
     scenarios = {}
     for combo in _combinations(ids):
         scenario_model = models.get(frozenset(combo) & structural, model)
         scenario_params = params
-        for change in changes:
-            if change.id in combo:
-                try:
-                    scenario_params = apply_overrides(scenario_params, change.overrides)
-                except ValueError as e:
-                    raise ValueError(f"{where}: changes.{change.id}.overrides: {e}") from e
-        scenario_params = _restrict(scenario_params, scenario_model)
+        for change in _in_catalog_order(changes, combo):
+            try:
+                scenario_params = apply_overrides(scenario_params, change.overrides)
+            except ValueError as e:
+                raise ValueError(f"{where}: changes.{change.id}.overrides: {e}") from e
+        scenario_params = restrict(scenario_params, scenario_model)
         try:
             check_parameters(scenario_params, scenario_model)
         except ValueError as e:
@@ -204,7 +236,7 @@ def _models(where: str, raw: dict[str, str], ids: list[str], files: Mapping[str,
     """The model of each combination of structural changes, from its file. Every combination needs one."""
     models: dict[frozenset[str], ProcessModel] = {}
     for key, file in raw.items():
-        combo = frozenset(part.strip() for part in key.split("+"))
+        combo = model_combo(key)
         unknown = sorted(combo - set(ids))
         if unknown:
             raise ValueError(f"{where}: models.{key}: {', '.join(unknown)} aren't changes in the catalog")
@@ -221,19 +253,25 @@ def _models(where: str, raw: dict[str, str], ids: list[str], files: Mapping[str,
     return models
 
 
+def _in_catalog_order(changes: tuple[Change, ...], change_ids: Iterable[str]) -> list[Change]:
+    wanted = set(change_ids)
+    return [change for change in changes if change.id in wanted]
+
+
+def model_combo(key: str) -> frozenset[str]:
+    """The structural changes a key of the catalog's [models] table stands for: "C1+C2" -> {C1, C2}."""
+    return frozenset(part.strip() for part in key.split("+"))
+
+
 def _check_overrides(where: str, changes: tuple[Change, ...], models: list[ProcessModel]) -> None:
     """Each override names an element of some model (a gateway must be an XOR-split), and no two changes override the same entry."""
     what = {"tasks": "task", "gateways": "XOR-split", "lanes": "lane"}
-    known = {
-        "tasks": {node.id for m in models for node in m.nodes_of_type("task")},
-        "gateways": {node.id for m in models for node in m.xor_splits()},
-        "lanes": {lane_id for m in models for lane_id in m.lanes},
-    }
+    known = {section: set().union(*(element_ids(m)[section] for m in models)) for section in PER_ELEMENT}
     owner: dict[str, str] = {}
     for change in changes:
         for section, entries in change.overrides.items():
             for element_id in entries if section in known else ():
-                entry = f"{section}.{element_id}"
+                entry = entry_key(section, element_id)
                 if element_id not in known[section]:
                     raise ValueError(f"{where}: changes.{change.id}.overrides.{entry}: no model in the catalog has a {what[section]} with this ID")
                 if entry in owner:
@@ -244,20 +282,6 @@ def _check_overrides(where: str, changes: tuple[Change, ...], models: list[Proce
 def _combinations(ids: list[str]) -> list[tuple[str, ...]]:
     """Every subset of ids, smallest first, each in catalog order."""
     return [combo for k in range(len(ids) + 1) for combo in combinations(ids, k)]
-
-
-def _restrict(params: Parameters, model: ProcessModel) -> Parameters:
-    """Drop the task, gateway and lane entries the model doesn't have."""
-    tasks = {node.id for node in model.nodes_of_type("task")}
-    gateways = {node.id for node in model.xor_splits()}
-    keep = {f"tasks.{i}" for i in tasks} | {f"gateways.{i}" for i in gateways} | {f"lanes.{i}" for i in model.lanes}
-    return replace(
-        params,
-        task_durations={k: v for k, v in params.task_durations.items() if k in tasks},
-        branch_probabilities={k: v for k, v in params.branch_probabilities.items() if k in gateways},
-        lane_capacities={k: v for k, v in params.lane_capacities.items() if k in model.lanes},
-        rationales={k: v for k, v in params.rationales.items() if k.split(".")[0] not in ("tasks", "gateways", "lanes") or k in keep},
-    )
 
 
 def replication_seeds(seed: int, replications: int) -> list[int]:

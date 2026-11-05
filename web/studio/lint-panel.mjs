@@ -1,20 +1,20 @@
 // The live lint panel: runs the book's lint rules (bpmopt.studio.lint_xml, in the worker) on the
 // diagram after each edit and lists the violations. Clicking one selects its element.
 //
-//   const panel = createLintPanel({ container, modeler, lint, t, onChange });
+//   const panel = createLintPanel({ container, modeler, lint, t, errorText, onChange });
 //
 // lint(xml) is a promise of lint_xml's result, [{rule, severity, element_id, message}]; it
-// rejects when the document can't be read. t(key, vars) is the page's label lookup.
+// rejects when the document can't be read. t(key, vars) is the page's label lookup, errorText(e) the text of an error.
 // onChange(state) is called whenever the panel's state changes; state is one of
 //   { status: "checking" }                               an edit is waiting for its result
 //   { status: "checked", errors, warnings }               counts of the latest result
-//   { status: "unreadable", message }                     lint_xml raised
+//   { status: "unreadable", text }                        lint_xml refused; text is errorText of it
 // blocksRun(state) says whether Run must stay disabled (anything but a checked model without
 // errors), and runBlockedReason(state, t) gives the text shown next to Run.
 
 const DEBOUNCE_MS = 300;
 
-export function createLintPanel({ container, modeler, lint, t, onChange = () => {} }) {
+export function createLintPanel({ container, modeler, lint, t, errorText, onChange = () => {} }) {
   const eventBus = modeler.get("eventBus");
   let latest = 0; // the newest lint request; older answers are dropped
   let timer = null;
@@ -39,7 +39,7 @@ export function createLintPanel({ container, modeler, lint, t, onChange = () => 
   function renderSummary() {
     summary.classList.toggle("error", state.status === "unreadable");
     if (state.status === "checking") summary.textContent = t("lint_checking");
-    else if (state.status === "unreadable") summary.textContent = t("lint_unreadable", { error: state.message });
+    else if (state.status === "unreadable") summary.textContent = t("lint_unreadable", { error: state.text });
     else if (state.errors + state.warnings === 0) summary.textContent = t("lint_ok");
     else summary.textContent = t("lint_count", { errors: state.errors, warnings: state.warnings });
   }
@@ -105,8 +105,8 @@ export function createLintPanel({ container, modeler, lint, t, onChange = () => 
     try {
       const { xml } = await modeler.saveXML();
       violations = await lint(xml);
-    } catch (e) {
-      if (request === latest) setState({ status: "unreadable", message: e.message });
+    } catch (thrown) {
+      if (request === latest) setState({ status: "unreadable", text: errorText(thrown) });
       return;
     }
     if (request !== latest) return;

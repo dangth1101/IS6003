@@ -88,6 +88,26 @@ def test_setting_the_arrival_rate_and_warm_up_of_a_model_without_them():
     assert parse_parameters(edited["params"]).warm_up == 20
 
 
+def test_the_cycle_time_can_end_at_a_chosen_task():
+    # The as-is preset measures up to go-live (Task_StartOperation); ending at deployment is shorter.
+    xml, params = as_is_preset()
+
+    edited = set_parameter(xml, params, "cycle_time", {"ends_at": "Task_DeployApplication"})
+
+    assert edited["params"]["cycle_time"] == {"ends_at": "Task_DeployApplication", "rationale": "Set in the studio."}
+    assert mean_cycle_time(xml, edited["params"]) < mean_cycle_time(xml, params)
+
+
+def test_the_cycle_time_can_end_at_the_end_events_again():
+    xml, params = as_is_preset()
+
+    edited = set_parameter(xml, params, "cycle_time", {"ends_at": None})
+
+    assert "cycle_time" not in edited["params"]
+    without = {key: value for key, value in params.items() if key != "cycle_time"}
+    assert mean_cycle_time(xml, edited["params"]) == mean_cycle_time(xml, without) > mean_cycle_time(xml, params)
+
+
 @pytest.mark.parametrize(
     ("entry", "fields", "message"),
     [
@@ -138,16 +158,27 @@ def test_an_edit_moves_the_next_runs_cycle_time_in_the_expected_direction(entry,
 def test_reset_to_fixed_replaces_a_logistic_branch_with_its_share_over_the_case_attributes(gateway_id, logistic_flow, low, high):
     xml, params = as_is_preset()
 
-    branches = fixed_branches(params, gateway_id)
+    fields = fixed_branches(params, gateway_id)
 
+    branches = fields["branches"]
     assert low <= branches[logistic_flow] <= high
     rest = next(flow for flow in branches if flow != logistic_flow)
     assert branches[rest] == "rest"
-    reset = set_parameter(xml, params, f"gateways.{gateway_id}", {"branches": branches})
+    reset = set_parameter(xml, params, f"gateways.{gateway_id}", fields)
     assert reset["params"]["gateways"][gateway_id]["branches"] == branches
+
+
+def test_reset_to_fixed_keeps_the_basis_of_the_shares_in_the_rationale():
+    xml, params = as_is_preset()
+
+    reset = set_parameter(xml, params, "gateways.Gateway_TestSplit", fixed_branches(params, "Gateway_TestSplit"))
+
+    rationale = reset["params"]["gateways"]["Gateway_TestSplit"]["rationale"]
+    assert rationale.startswith("Set in the studio.")
+    assert "10,000" in rationale and "seed 0" in rationale
 
 
 def test_reset_to_fixed_keeps_fixed_branches_as_they_are():
     _, params = as_is_preset()
 
-    assert fixed_branches(params, "Gateway_ProposalSplit") == params["gateways"]["Gateway_ProposalSplit"]["branches"]
+    assert fixed_branches(params, "Gateway_ProposalSplit")["branches"] == params["gateways"]["Gateway_ProposalSplit"]["branches"]

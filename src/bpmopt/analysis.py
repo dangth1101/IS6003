@@ -178,9 +178,14 @@ def utilisation(log: pd.DataFrame, params: Parameters) -> dict[str, float]:
     """
     if params.arrival_rate is None:
         raise ValueError("utilisation needs an arrival rate: without [arrivals] every case arrives at time 0")
+    work = work_per_case(log)
+    return {lane_id: params.arrival_rate * float(work.get(lane_id, 0.0)) / c for lane_id, c in params.lane_capacities.items()}
+
+
+def work_per_case(log: pd.DataFrame) -> pd.Series:
+    """Per lane: the processing time of every task row of the log over the number of cases, in working days."""
     tasks = log[log.element_type == "task"]
-    work_per_case = (tasks.end_time - tasks.start_time).groupby(tasks.lane_id).sum() / log.case_id.nunique()
-    return {lane_id: params.arrival_rate * float(work_per_case.get(lane_id, 0.0)) / c for lane_id, c in params.lane_capacities.items()}
+    return (tasks.end_time - tasks.start_time).groupby(tasks.lane_id).sum() / log.case_id.nunique()
 
 
 def flow_analysis_check(model: ProcessModel, params: Parameters, *, n_cases: int, seed: int) -> dict[str, float]:

@@ -11,26 +11,31 @@
 // edit and a value edit never overwrite each other.
 //
 // For the page (and tickets 06 / 07):
-//   const panel = createParamsPanel({ root, modeler, call, t, lang, run, onRunChange, onError, onParamsChange });
+//   const panel = createParamsPanel({ root, modeler, call, t, errorText, lang, run, onRunChange, onError, onParamsChange });
 //   onParamsChange(params) after every update of the parameters (edit, diagram edit, load)
 //   await panel.load({ params, name })          after the worker is ready: fill and show these parameters
 //   await panel.load({ xml, params, name })     also import xml into the Modeler first (e.g. a suggestion)
 //   await panel.params()                        the current parameters, after pending updates
 //   panel.run()                                 the run settings { n_cases, replications, seed }
-//   panel.name()                                the file name (no extension) the export uses
+//   panel.name()                                the file name (no extension) the export uses: the loaded
+//                                               name, plus EDITED once the diagram or a value was edited by hand
 // The root element carries data-params and data-defaults (JSON) for the browser check.
 
-const DEBOUNCE_MS = 300;
+import { el, entryKey, formatters, splitEntry } from "./dom.mjs";
 
-export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaults, onRunChange = () => {}, onError = () => {}, onParamsChange = () => {} }) {
+const DEBOUNCE_MS = 300;
+const EDITED = "_edited"; // e.g. as_is_C1_C2_edited.bpmn: no longer the catalog's design
+
+export function createParamsPanel({ root, modeler, call, t, errorText, lang, run: runDefaults, onRunChange = () => {}, onError = () => {}, onParamsChange = () => {} }) {
   const registry = modeler.get("elementRegistry");
   const canvas = modeler.get("canvas");
   const selection = modeler.get("selection");
-  const number = (value, digits = 3) => new Intl.NumberFormat(lang, { maximumFractionDigits: digits }).format(value);
-  const percent = (value) => new Intl.NumberFormat(lang, { style: "percent", maximumFractionDigits: 1 }).format(value);
+  const commandStack = modeler.get("commandStack");
+  const { upTo: number, percentUpTo: percent } = formatters(lang);
 
   let state = null; // { params, defaults, dropped } from bpmopt.studio
-  let name = "model";
+  let name = "model"; // of the last load
+  let valueEdited = false; // a value set in this panel since the last load
   let selected = null; // element ID
   let editError = null; // { key, message } of the last refused edit
   let marked = [];
@@ -46,11 +51,14 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
     const next = queue.then(async () => {
       try {
         state = await fn(state?.params);
-        if (key) editError = null;
+        if (key) {
+          editError = null;
+          valueEdited = true;
+        }
         onParamsChange(state.params);
-      } catch (e) {
-        if (!key) throw e;
-        editError = { key, message: e.message };
+      } catch (thrown) {
+        if (!key) throw thrown;
+        editError = { key, message: errorText(thrown) };
       }
       render();
     });
@@ -83,17 +91,6 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
 
   // ---------- rendering ----------
 
-  function el(tag, props = {}, ...children) {
-    const node = document.createElement(tag);
-    for (const [k, v] of Object.entries(props)) {
-      if (k === "dataset") Object.assign(node.dataset, v);
-      else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
-      else if (v !== undefined && v !== null && v !== false) node[k] = v;
-    }
-    node.append(...children.flat().filter((c) => c !== null && c !== undefined && c !== false));
-    return node;
-  }
-
   const labelOf = (id) => {
     const bo = registry.get(id)?.businessObject;
     return bo?.name || bo?.targetRef?.name || id;
@@ -125,7 +122,7 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
   }
 
   function taskForm(id) {
-    const key = `tasks.${id}`;
+    const key = entryKey("tasks", id);
     const entry = state.params.tasks[id];
     const { scale, ...base } = entry.duration;
     const fixed = "fixed" in base;
@@ -152,7 +149,7 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
   }
 
   function gatewayForm(id) {
-    const key = `gateways.${id}`;
+    const key = entryKey("gateways", id);
     const entry = state.params.gateways[id];
     const branches = entry.branches;
     const flows = Object.keys(branches);
@@ -197,7 +194,7 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
   }
 
   function laneForm(id) {
-    const key = `lanes.${id}`;
+    const key = entryKey("lanes", id);
     const entry = state.params.lanes[id];
     const form = el(
       "form",
@@ -231,12 +228,25 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
         el("input", { type: "number", step: "any", min: 0, name: "rate", value: p.arrivals?.rate ?? "", onchange: (e) => setEntry("arrivals", { rate: Number(e.target.value) }) })),
       el("label", {}, el("span", {}, t("setting_warm_up"), " ", badge("warm_up")),
         el("input", { type: "number", step: "any", min: 0, name: "warm_up", value: p.warm_up?.length ?? 0, onchange: (e) => setEntry("warm_up", { length: Number(e.target.value) }) })),
+      cycleEndInput(),
       runInput(t("setting_cases"), "n_cases", 1),
       runInput(t("setting_replications"), "replications", 2),
       runInput(t("setting_seed"), "seed", 0),
     );
     form.addEventListener("submit", (e) => e.preventDefault());
-    return [el("h2", {}, t("settings_title")), form, errorFor("arrivals"), errorFor("warm_up"), errorFor("run")];
+    return [el("h2", {}, t("settings_title")), form, errorFor("arrivals"), errorFor("warm_up"), errorFor("cycle_time"), errorFor("run")];
+  }
+
+  /** Where a case's cycle time ends: a task of the model, or (empty value) its end events. */
+  function cycleEndInput() {
+    const select = el("select", {
+      name: "cycle_time", id: "cycle-time-end",
+      onchange: (e) => setEntry("cycle_time", { ends_at: e.target.value || null }),
+    },
+      el("option", { value: "" }, t("setting_cycle_end_default")),
+      Object.keys(state.params.tasks ?? {}).map((id) => el("option", { value: id }, labelOf(id))));
+    select.value = state.params.cycle_time?.ends_at ?? "";
+    return el("label", { className: "wide" }, t("setting_cycle_end"), select);
   }
 
   function runInput(labelText, key, min) {
@@ -256,8 +266,8 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
     }));
   }
 
-  function describe(entryKey) {
-    const [section, id] = entryKey.split(/\.(.*)/s);
+  function describe(key) {
+    const [section, id] = splitEntry(key);
     const p = state.params;
     if (section === "arrivals") return [t("entry_arrivals"), t("value_rate", { rate: number(p.arrivals.rate) })];
     if (section === "warm_up") return [t("entry_warm_up"), t("value_days", { days: number(p.warm_up.length) })];
@@ -271,13 +281,13 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
     if (section === "gateways") {
       return [labelOf(id), Object.entries(entry.branches).map(([f, v]) => `${labelOf(f)} ${typeof v === "number" ? percent(v) : t("param_rest")}`).join(", ")];
     }
-    return [entryKey, ""];
+    return [key, ""];
   }
 
   function defaultsSection() {
     const items = state.defaults.map((key) => {
       const [what, value] = describe(key);
-      const id = key.split(/\.(.*)/s)[1];
+      const [, id] = splitEntry(key);
       const target = id && registry.get(id);
       return el("li", { dataset: { entry: key } },
         target ? el("button", { type: "button", onclick: () => selection.select(target) }, what) : what, `: ${value}`);
@@ -301,7 +311,7 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
 
   function markDefaults() {
     for (const id of marked) if (registry.get(id)) canvas.removeMarker(id, "studio-default");
-    marked = state.defaults.map((key) => key.split(/\.(.*)/s)[1]).filter((id) => id && registry.get(id));
+    marked = state.defaults.map((key) => splitEntry(key)[1]).filter((id) => id && registry.get(id));
     for (const id of marked) canvas.addMarker(id, "studio-default");
   }
 
@@ -327,22 +337,24 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
   }
 
   async function resetFixed(id) {
+    const key = entryKey("gateways", id);
     return update(async (params) => {
-      const branches = await call("fixed_branches", { params, gateway_id: id });
-      return call("set_parameter", { xml: await currentXml(), params, entry: `gateways.${id}`, fields: { branches } });
-    }, `gateways.${id}`);
+      const fields = await call("fixed_branches", { params, gateway_id: id }); // { branches, rationale }
+      return call("set_parameter", { xml: await currentXml(), params, entry: key, fields });
+    }, key);
   }
 
   async function load({ xml, params, name: newName }) {
     clearTimeout(timer);
     timer = null;
     if (newName) name = newName;
+    valueEdited = false;
     selected = null;
     editError = null;
     return update(async () => {
       if (xml !== undefined) {
         await modeler.importXML(xml); // the page fits the diagram to the view on import.done
-        await call("lint_xml", { xml: await currentXml() }); // raises "Not a readable BPMN document: ..." for a broken file
+        await call("lint_xml", { xml: await currentXml() }); // refuses (unreadable_*) a broken file
       }
       return call("default_parameters", params ? { xml: await currentXml(), params } : { xml: await currentXml() });
     });
@@ -354,15 +366,15 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
     let params;
     try {
       if (paramFile) params = await call("params_from_toml", { text: await paramFile.text() });
-    } catch (e) {
-      return onError(t("import_failed", { file: paramFile.name, error: e.message }));
+    } catch (thrown) {
+      return onError(t("import_failed", { file: paramFile.name, error: errorText(thrown) }));
     }
     if (model) {
       try {
         // A new model without a parameter file starts from studio defaults only.
         await load({ xml: await model.text(), params, name: model.name.replace(/\.(bpmn|xml)$/i, "") });
-      } catch (e) {
-        onError(t("import_failed", { file: model.name, error: e.message }));
+      } catch (thrown) {
+        onError(t("import_failed", { file: model.name, error: errorText(thrown) }));
       }
     } else if (paramFile) {
       await load({ params, name: paramFile.name.replace(/(\.params)?\.toml$/i, "") });
@@ -380,12 +392,18 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
 
   async function exportBpmn() {
     const { xml } = await modeler.saveXML({ format: true });
-    download(`${name}.bpmn`, xml, "application/xml");
+    download(`${exportName()}.bpmn`, xml, "application/xml");
   }
 
   async function exportParams() {
     const params = await currentParams();
-    download(`${name}.params.toml`, await call("params_to_toml", { params }), "application/toml");
+    download(`${exportName()}.params.toml`, await call("params_to_toml", { params }), "application/toml");
+  }
+
+  /** The loaded name, marked EDITED once the diagram (anything to undo) or a value was edited by hand. */
+  function exportName() {
+    const edited = valueEdited || commandStack.canUndo();
+    return edited && !name.endsWith(EDITED) ? `${name}${EDITED}` : name;
   }
 
   async function currentParams() {
@@ -401,5 +419,5 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
     return { ...settings };
   }
 
-  return { load, params: currentParams, run, name: () => name };
+  return { load, params: currentParams, run, name: exportName };
 }

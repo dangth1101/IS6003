@@ -3,26 +3,25 @@
 // pinned baseline, and the comparison of a later run with it (bpmopt.studio.compare).
 //
 // The page owns the worker and the Run button; this module only renders and calls compare:
-//   const results = createResultsPanel({ container, t, lang, compare });
+//   const results = createResultsPanel({ container, t, errorText, lang, compare });
 //   const timer = results.startRun(run)   run = { n_cases, replications, seed }; at the start of a run
 //   timer.status(done, total)             the status text after `done` replications, with a rough time left
 //   await results.show(summary, seconds)  a finished simulate_summary result; compares it with the baseline
 //   results.runChanged(run)               the run settings changed (params panel onRunChange)
 // compare(baseline, variant) is a promise of compare's result; it rejects when the runs can't be
-// paired (different seed, replications or cases), and its message is shown as the reason.
+// paired (code not_comparable, data.settings the settings that differ), shown as the reason.
+// Which settings must match comes from Python too: a summary's paired_on.
 // The container carries data-summary (the shown run) and data-compare (the comparison, absent when
 // there is none) as full-precision JSON for the browser checks.
+
+import { el, formatters } from "./dom.mjs";
 
 // Before a run has finished, the time estimate uses the as-is preset's speed in headless Chrome:
 // 8.6 s for 1,000 cases x 10 replications (ticket 03). After a run, that run's own speed.
 const PRIOR_SECONDS_PER_CASE = 8.6 / 10_000;
-const PAIRING = ["seed", "replications", "n_cases"]; // what compare requires to be equal
 
-export function createResultsPanel({ container, t, lang, compare }) {
-  const num = (digits) => new Intl.NumberFormat(lang, { minimumFractionDigits: digits, maximumFractionDigits: digits });
-  const fmt = (value, digits = 1) => num(digits).format(value);
-  const pct = (value, digits = 0) =>
-    new Intl.NumberFormat(lang, { style: "percent", minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
+export function createResultsPanel({ container, t, errorText, lang, compare }) {
+  const { fixed: fmt, percent: pct, whole } = formatters(lang);
   const days = (e) => `${fmt(e.value)} ${t("days")}`;
   const range = (e, f = fmt) => t("ci", { low: f(e.ci_low), high: f(e.ci_high) });
   const name = (label, id) => label || id; // XOR splits often have no label in the diagram
@@ -30,7 +29,7 @@ export function createResultsPanel({ container, t, lang, compare }) {
   let secondsPerCase = PRIOR_SECONDS_PER_CASE;
   let current = null; // the shown simulate_summary result
   let baseline = null; // the pinned one
-  let comparison = null; // { result } or { refused: message } of current against baseline
+  let comparison = null; // { result } or { refused: reason text } of current against baseline
   let settings = null; // the run settings now in the panel
 
   container.classList.add("results-panel"); // styles in results-panel.css
@@ -67,8 +66,8 @@ export function createResultsPanel({ container, t, lang, compare }) {
     if (baseline && baseline !== current) {
       try {
         comparison = { result: await compare(strip(baseline), strip(current)) };
-      } catch (e) {
-        comparison = { refused: e.message.replace(/^\w+Error: /, "") }; // the worker passes "ValueError: ..."
+      } catch (thrown) {
+        comparison = { refused: thrown?.code === "not_comparable" ? differsText(thrown.data.settings) : errorText(thrown) };
       }
     }
     render();
@@ -93,32 +92,23 @@ export function createResultsPanel({ container, t, lang, compare }) {
 
   const strip = ({ seconds, ...summary }) => summary; // compare gets simulate_summary's result as it was
 
-  /** "seed 42 vs 43, ..." for the settings in which `run` differs from the baseline, or "". */
+  /** The settings in which `run` differs from the baseline, as text, or "". paired_on comes from simulate_summary. */
   function mismatch(run) {
     if (!baseline || !run) return "";
+    return differsText(baseline.paired_on
+      .filter((key) => baseline[key] !== run[key])
+      .map((setting) => ({ setting, baseline: baseline[setting], variant: run[setting] })));
+  }
+
+  /** "Seed 42 in the baseline, 43 now; ..." for compare's not_comparable data.settings. */
+  function differsText(settings) {
     const label = { seed: t("setting_seed"), replications: t("setting_replications"), n_cases: t("setting_cases") };
-    return PAIRING.filter((key) => baseline[key] !== run[key])
-      .map((key) => t("differs", { setting: label[key], baseline: num(0).format(baseline[key]), run: num(0).format(run[key]) }))
+    return settings
+      .map(({ setting, baseline: before, variant: now }) => t("differs", { setting: label[setting] ?? setting, baseline: whole(before), run: whole(now) }))
       .join("; ");
   }
 
   // ---------- rendering ----------
-
-  function el(tag, props = {}, ...children) {
-    const node = document.createElement(tag);
-    for (const [key, value] of Object.entries(props)) {
-      if (value === undefined || value === null || value === false) continue;
-      if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
-      else if (key === "className" || key === "hidden" || key === "type" || key === "id") node[key] = value;
-      else if (key === "style") node.style.cssText = value;
-      else node.setAttribute(key, value);
-    }
-    for (const child of children.flat(Infinity)) {
-      if (child === null || child === undefined || child === false) continue;
-      node.append(child instanceof Node ? child : String(child));
-    }
-    return node;
-  }
 
   const mismatchNote = el("p", { id: "baseline-mismatch", className: "notice small", hidden: true });
 
@@ -141,7 +131,7 @@ export function createResultsPanel({ container, t, lang, compare }) {
       el("h3", {}, t("this_run")),
       runTiles(current),
       el("p", { className: "muted small" }, t("run_time", { seconds: fmt(current.seconds) }),
-        " ", t("run_settings", { cases: num(0).format(current.n_cases), replications: current.replications, seed: current.seed })),
+        " ", t("run_settings", { cases: whole(current.n_cases), replications: current.replications, seed: current.seed })),
       lanesBlock(),
       reworkBlock(),
       waitingBlock(),
@@ -162,7 +152,7 @@ export function createResultsPanel({ container, t, lang, compare }) {
       el("div", { id: "baseline-box", className: "baseline-box small" },
         el("span", { className: "swatch baseline" }),
         el("span", {}, t("baseline_summary", {
-          mean: fmt(baseline.cycle_time.mean.value), cases: num(0).format(baseline.n_cases),
+          mean: fmt(baseline.cycle_time.mean.value), cases: whole(baseline.n_cases),
           replications: baseline.replications, seed: baseline.seed,
         })),
         isCurrent ? el("span", { className: "muted" }, t("baseline_is_this_run")) : null),
@@ -272,7 +262,7 @@ export function createResultsPanel({ container, t, lang, compare }) {
     if (c) {
       const rows = c.lanes.map((l) => [name(l.label, l.lane_id), l.after, l.before]);
       out.push(legend(), bars("result-lanes", rows, share, Math.max(1, scaleOf(rows.flatMap(([, a, b]) => [a, b]))), true));
-      const capacity = (v) => (v === null ? "–" : num(0).format(v));
+      const capacity = (v) => (v === null ? "–" : whole(v));
       out.push(details(table("compare-lanes",
         [t("lane"), t("capacity_baseline"), t("capacity_this_run"), t("baseline"), t("this_run")],
         c.lanes.map((l) => [name(l.label, l.lane_id), capacity(l.capacity_before), capacity(l.capacity_after), ciCell(l.before, (v) => pct(v)), ciCell(l.after, (v) => pct(v))]),
@@ -281,7 +271,7 @@ export function createResultsPanel({ container, t, lang, compare }) {
       const rows = current.lanes.map((l) => [name(l.label, l.lane_id), l.utilisation]);
       out.push(bars("result-lanes", rows, share, Math.max(1, scaleOf(rows.map(([, v]) => v))), false));
       out.push(details(table("run-lanes", [t("lane"), t("capacity"), t("utilisation")],
-        current.lanes.map((l) => [name(l.label, l.lane_id), num(0).format(l.capacity), ciCell(l.utilisation, (v) => pct(v))]), [1, 2])));
+        current.lanes.map((l) => [name(l.label, l.lane_id), whole(l.capacity), ciCell(l.utilisation, (v) => pct(v))]), [1, 2])));
     }
     return out;
   }

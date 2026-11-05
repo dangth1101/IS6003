@@ -244,6 +244,62 @@ class Parameters:
 # What each entry holds besides its rationale. Single entries are one table; collections hold one table per ID.
 _SINGLE_ENTRIES = {"arrivals": "rate", "warm_up": "length", "cycle_time": "ends_at"}
 _COLLECTIONS = {"attributes": "distribution", "lanes": "capacity", "tasks": "duration", "gateways": "branches"}
+# The collections whose IDs are model elements, so a model change can leave an entry without its element.
+PER_ELEMENT = ("tasks", "gateways", "lanes")
+
+
+class ParameterError(ValueError):
+    """A parameter value that breaks a rule. rule names the rule for callers that show their own text (the studio)."""
+
+    def __init__(self, message: str, rule: str):
+        super().__init__(message)
+        self.rule = rule
+
+
+def entry_key(section: str, element_id: str | None = None) -> str:
+    """The name of one parameter entry: "arrivals" for a single entry, "tasks.Task_X" for one of a collection."""
+    return section if element_id is None else f"{section}.{element_id}"
+
+
+def split_entry(key: str) -> tuple[str, str | None]:
+    """The section and ID of an entry name (entry_key reversed); the ID is None for a single entry."""
+    section, dot, element_id = key.partition(".")
+    return section, element_id if dot else None
+
+
+def element_ids(model: ProcessModel) -> dict[str, list[str]]:
+    """The IDs each per-element section may name in the model, in model order: tasks, XOR splits (gateways) and lanes."""
+    return {
+        "tasks": [node.id for node in model.nodes_of_type("task")],
+        "gateways": [node.id for node in model.xor_splits()],
+        "lanes": list(model.lanes),
+    }
+
+
+def restrict(params: Parameters, model: ProcessModel) -> Parameters:
+    """Drop the task, gateway and lane entries the model doesn't have (see restrict_tables for the file's tables)."""
+    known = element_ids(model)
+    return replace(
+        params,
+        task_durations={k: v for k, v in params.task_durations.items() if k in known["tasks"]},
+        branch_probabilities={k: v for k, v in params.branch_probabilities.items() if k in known["gateways"]},
+        lane_capacities={k: v for k, v in params.lane_capacities.items() if k in known["lanes"]},
+        rationales={k: v for k, v in params.rationales.items() if _kept(split_entry(k), known)},
+    )
+
+
+def restrict_tables(raw: dict, model: ProcessModel) -> dict:
+    """The parameter file's tables without task, gateway and lane entries the model doesn't have, like restrict."""
+    known = element_ids(model)
+    return {
+        section: {i: entry for i, entry in value.items() if _kept((section, i), known)} if section in PER_ELEMENT else value
+        for section, value in raw.items()
+    }
+
+
+def _kept(entry: tuple[str, str | None], known: dict[str, list[str]]) -> bool:
+    section, element_id = entry
+    return section not in PER_ELEMENT or element_id in known[section]
 
 
 def load_parameters(path: str | Path, model: ProcessModel | None = None) -> Parameters:
@@ -260,10 +316,10 @@ def parse_parameters(raw: dict, model: ProcessModel | None = None) -> Parameters
     rationales = _check_layout(raw)
     arrival_rate = float(raw["arrivals"]["rate"]) if "arrivals" in raw else None
     if arrival_rate is not None and arrival_rate <= 0:
-        raise ValueError(f"arrivals.rate must be positive, got {arrival_rate}")
+        raise ParameterError(f"arrivals.rate must be positive, got {arrival_rate}", "rate_positive")
     warm_up = float(raw["warm_up"]["length"]) if "warm_up" in raw else 0.0
     if warm_up < 0:
-        raise ValueError(f"warm_up.length must not be negative, got {warm_up}")
+        raise ParameterError(f"warm_up.length must not be negative, got {warm_up}", "warm_up_negative")
     if warm_up > 0 and arrival_rate is None:
         raise ValueError("warm_up needs an arrival rate: without [arrivals] every case arrives at time 0")
     cycle_time_end = raw["cycle_time"]["ends_at"] if "cycle_time" in raw else None
@@ -365,7 +421,7 @@ def _check_layout(raw: dict) -> dict[str, str]:
         if section in _SINGLE_ENTRIES:
             entries[section] = (value, _SINGLE_ENTRIES[section])
         elif section in _COLLECTIONS:
-            entries |= {f"{section}.{key}": (entry, _COLLECTIONS[section]) for key, entry in value.items()}
+            entries |= {entry_key(section, key): (entry, _COLLECTIONS[section]) for key, entry in value.items()}
         elif section != "version":
             known = ", ".join([*_SINGLE_ENTRIES, *_COLLECTIONS])
             raise ValueError(f"unknown section {section!r}, expected one of: version, {known}")
@@ -437,7 +493,7 @@ def _triangular(where: str, values: list) -> tuple[float, float, float]:
         raise ValueError(f"{where}: triangular needs [min, mode, max], got {values!r}")
     low, mode, high = (float(v) for v in values)
     if not low <= mode <= high or low == high:
-        raise ValueError(f"{where}: triangular needs min <= mode <= max and min < max, got {values!r}")
+        raise ParameterError(f"{where}: triangular needs min <= mode <= max and min < max, got {values!r}", "duration_order")
     return low, mode, high
 
 
@@ -452,7 +508,9 @@ def _branches(gateway_id: str, spec: dict, attributes: dict[str, Distribution]) 
         raise ValueError(f'{where}: only one branch can be "rest"')
     total = sum(fixed)
     if any(not 0 <= p <= 1 for p in fixed) or total > 1 + 1e-9 or (n_rest == 0 and abs(total - 1) > 1e-9):
-        raise ValueError(f'{where}: probabilities must lie in [0, 1] and sum to 1 (or at most 1 with a "rest" branch), got {spec!r}')
+        raise ParameterError(
+            f'{where}: probabilities must lie in [0, 1] and sum to 1 (or at most 1 with a "rest" branch), got {spec!r}', "branch_shares"
+        )
     return Branches(flows)
 
 
@@ -486,7 +544,7 @@ def _coefficient(where: str, value: object, attribute: Distribution | None) -> f
 def _capacity(lane_id: str, value: object) -> int:
     if isinstance(value, int) and not isinstance(value, bool) and value >= 1:
         return value
-    raise ValueError(f"lanes.{lane_id}.capacity must be a whole number of at least 1, got {value!r}")
+    raise ParameterError(f"lanes.{lane_id}.capacity must be a whole number of at least 1, got {value!r}", "capacity_whole")
 
 
 def _duration(task_id: str, spec: dict, attributes: dict[str, Distribution]) -> Duration:
@@ -498,7 +556,7 @@ def _duration(task_id: str, spec: dict, attributes: dict[str, Distribution]) -> 
     elif set(spec) == {"triangular"}:
         low, mode, high = _triangular(where, spec["triangular"])
         if low < 0:
-            raise ValueError(f"{where}: a duration can't be negative, got min {low}")
+            raise ParameterError(f"{where}: a duration can't be negative, got min {low}", "duration_negative")
         base = Triangular(low, mode, high)
     else:
         raise ValueError(f"{where}: unsupported distribution {spec!r}")

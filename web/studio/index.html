@@ -123,6 +123,8 @@
     import { createParamsPanel } from "./params-panel.mjs";
     import { createSuggestionsPanel } from "./suggestions-panel.mjs";
     import { createResultsPanel } from "./results-panel.mjs";
+    import { formatters } from "./dom.mjs";
+    import { asStudioError, createErrorText, studioError } from "./errors.mjs";
 
     // The default run, as in the spec: 1,000 cases and 10 replications.
     const RUN = { n_cases: 1000, replications: 10, seed: 42 };
@@ -131,23 +133,21 @@
 
     const $ = (id) => document.getElementById(id);
     let TEXT = null;
+    let errorText = (e) => String(e?.code ?? e); // until the text has loaded
 
     function t(key, vars = {}) {
       const s = TEXT.labels[key] ?? key;
       return s.replace(/\{(\w+)\}/g, (m, name) => (name in vars ? vars[name] : m));
     }
 
-    const fmt = (value, digits = 1) =>
-      new Intl.NumberFormat(TEXT.lang, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
-
     function showError(message) {
       $("error").textContent = message;
       $("error").hidden = false;
     }
 
-    async function fetchText(url) {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+    async function fetchText(file) {
+      const response = await fetch(file);
+      if (!response.ok) throw studioError("fetch_failed", { file, status: response.status });
       return response.text();
     }
 
@@ -177,16 +177,17 @@
         if (TEXT) $("status-text").textContent = t(data.stage);
         return;
       }
+      const error = data.type === "error" ? studioError(data.code, data.data, data.detail) : null;
       if (data.type === "ready") return onReady.resolve();
-      if (data.type === "error" && data.id === null) return onReady.reject(new Error(data.message));
+      if (error && data.id === null) return onReady.reject(error);
       const job = pending.get(data.id);
       if (!job) return;
       if (data.type === "progress") return job.onProgress?.(data.done, data.total);
       pending.delete(data.id);
       if (data.type === "result") job.resolve(data.value);
-      else job.reject(new Error(data.message));
+      else job.reject(error);
     };
-    worker.onerror = (e) => onReady.reject(new Error(e.message));
+    worker.onerror = (event) => onReady.reject(asStudioError(event.message));
 
     // ---------- page ----------
 
@@ -215,7 +216,7 @@
 
     function renderRunSettings(run) {
       $("run-settings").textContent = t("run_settings", {
-        cases: new Intl.NumberFormat(TEXT.lang).format(run.n_cases), replications: run.replications, seed: run.seed,
+        cases: formatters(TEXT.lang).whole(run.n_cases), replications: run.replications, seed: run.seed,
       });
     }
 
@@ -243,21 +244,22 @@
 
     async function main() {
       TEXT = await (await fetch(`studio.${LANG}.json`)).json();
+      errorText = createErrorText(TEXT.errors);
       renderText();
       $("status-text").textContent = t(loadingStage);
 
       const modeler = new BpmnJS({ container: "#diagram" });
       window.studio = { modeler }; // for the headless browser checks
       runGate.lint = createLintPanel({
-        container: $("lint"), modeler, t, onChange: updateRun,
+        container: $("lint"), modeler, t, errorText, onChange: updateRun,
         lint: (xml) => call("lint_xml", { xml }),
       });
       const results = createResultsPanel({
-        container: $("results"), t, lang: TEXT.lang, compare: (baseline, variant) => call("compare", { baseline, variant }),
+        container: $("results"), t, errorText, lang: TEXT.lang, compare: (baseline, variant) => call("compare", { baseline, variant }),
       });
       let suggestions = null; // the suggestions panel below follows the parameter panel's changes
       const panel = createParamsPanel({
-        root: $("params-panel"), modeler, call, t, lang: TEXT.lang, run: RUN, onError: showError,
+        root: $("params-panel"), modeler, call, t, errorText, lang: TEXT.lang, run: RUN, onError: showError,
         onRunChange: (run) => { renderRunSettings(run); results.runChanged(run); },
         onParamsChange: () => suggestions?.paramsChanged(),
       });
@@ -265,22 +267,22 @@
       const [xml, paramsToml] = await Promise.all([fetchText(PRESET.xml), fetchText(PRESET.params)]);
       let presetParams;
       suggestions = createSuggestionsPanel({
-        root: $("suggestions"), modeler, call, t, params: panel, onError: showError,
+        root: $("suggestions"), modeler, call, t, errorText, params: panel, onError: showError,
         backToPreset: () => panel.load({ xml, params: presetParams, name: "as_is" }),
       });
       window.studio.suggestions = suggestions;
       modeler.on("import.done", ({ error }) => { if (!error) fitDiagram(modeler); });
       try {
         await modeler.importXML(xml);
-      } catch (e) {
-        showError(t("diagram_error", { error: e.message }));
+      } catch (thrown) {
+        showError(t("diagram_error", { error: errorText(thrown) }));
       }
 
       try {
         await workerReady;
-      } catch (e) {
+      } catch (thrown) {
         $("status-text").textContent = "";
-        showError(t("load_failed", { error: e.message }));
+        showError(t("load_failed", { error: errorText(thrown) }));
         return;
       }
       $("status-text").textContent = t("load_preset");
@@ -314,9 +316,9 @@
           timer.finish(seconds);
           await results.show(summary, seconds);
           $("status-text").textContent = t("ready");
-        } catch (e) {
+        } catch (thrown) {
           $("status-text").textContent = "";
-          showError(t("run_failed", { error: e.message }));
+          showError(t("run_failed", { error: errorText(thrown) }));
         } finally {
           runGate.running = false;
           updateRun();
@@ -324,7 +326,7 @@
       });
     }
 
-    main().catch((e) => showError(e.message));
+    main().catch((thrown) => showError(errorText(thrown)));
   </script>
 </body>
 </html>

@@ -141,6 +141,29 @@
     "waiting_hint": "Mean wait before each activity starts, in working days, longest first.",
     "activity": "Activity",
     "mean_wait": "Mean wait, days",
-    "show_table": "Show as a table"
+    "show_table": "Show as a table",
+    "setting_cycle_end": "Cycle time ends at",
+    "setting_cycle_end_default": "The end events"
+  },
+  "errors": {
+    "unreadable_xml": "The file isn't well-formed XML (line {line}, column {column}).",
+    "unreadable_attribute": "An element has no {attribute} attribute.",
+    "unreadable_process": "A BPMN document needs exactly one process.",
+    "unreadable_toml": "The file isn't valid TOML (line {line}, column {column}).",
+    "hand_edited": "the diagram was changed by hand, so the suggestions no longer fit it",
+    "unknown_changes": "the change catalog has no {changes}",
+    "not_comparable": "the run settings differ from the baseline's",
+    "not_settable": "the studio can't set {entry}",
+    "unknown_element": "the model has no element {entry}",
+    "not_a_task": "{task} isn't a task of the model",
+    "duration_order": "the duration needs min ≤ most likely ≤ max, with min below max",
+    "duration_negative": "a duration can't be negative",
+    "branch_shares": "each share must be between 0 and 1, and together they must add up to 1",
+    "capacity_whole": "the capacity must be a whole number of at least 1",
+    "rate_positive": "the arrival rate must be above 0",
+    "warm_up_negative": "the warm-up can't be negative",
+    "invalid_value": "the value for {entry} isn't valid",
+    "fetch_failed": "couldn't load {file} (HTTP {status})",
+    "internal": "something went wrong in the studio. The browser console has the details"
   }
 }

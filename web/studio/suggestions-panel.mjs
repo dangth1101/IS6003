@@ -14,16 +14,18 @@
 // "Back to the as-is model" can't be undone with Ctrl+Z (an import clears the undo history), so
 // the panel offers "Restore my edited model" (#restore-edit) until the next edit or step.
 //
-//   const panel = createSuggestionsPanel({ root, modeler, call, t, params, backToPreset, onError });
+//   const panel = createSuggestionsPanel({ root, modeler, call, t, errorText, params, backToPreset, onError });
 //   panel.refresh()          once the parameter panel has its first parameters; later refreshes are automatic
 //   panel.paramsChanged()    the page calls this when the parameter panel's values change
 // params is the parameter panel (load, params, name). backToPreset() reloads the as-is preset.
 // root carries data-available, data-applied (JSON) and data-highlighted (JSON) for the browser check.
 
+import { el, splitEntry } from "./dom.mjs";
+
 const DEBOUNCE_MS = 300;
 const MARKER = "studio-changed";
 
-export function createSuggestionsPanel({ root, modeler, call, t, params: paramsPanel, backToPreset, onError = () => {} }) {
+export function createSuggestionsPanel({ root, modeler, call, t, errorText, params: paramsPanel, backToPreset, onError = () => {} }) {
   const canvas = modeler.get("canvas");
   const registry = modeler.get("elementRegistry");
   let state = null; // suggestions() for the current design
@@ -43,12 +45,6 @@ export function createSuggestionsPanel({ root, modeler, call, t, params: paramsP
   const trade = { better: t("trade_better"), worse: t("trade_worse"), neutral: t("trade_neutral") };
   const dimensions = [["time", t("trade_time")], ["cost", t("trade_cost")], ["quality", t("trade_quality")], ["flexibility", t("trade_flexibility")]];
 
-  function el(tag, props = {}, ...children) {
-    const node = Object.assign(document.createElement(tag), props);
-    node.append(...children.filter((c) => c !== null && c !== undefined));
-    return node;
-  }
-
   // ---------- what the current design is ----------
 
   async function currentDesign() {
@@ -67,7 +63,7 @@ export function createSuggestionsPanel({ root, modeler, call, t, params: paramsP
       const next = await call("suggestions", { xml, params });
       if (request !== latest) return;
       state = next;
-    } catch (e) {
+    } catch (thrown) {
       // An unreadable diagram (mid-edit) is no preset design; the lint panel says why.
       if (request !== latest) return;
       state = { ...(state ?? { changes: [] }), available: false, applied: null, exact: null };
@@ -109,8 +105,8 @@ export function createSuggestionsPanel({ root, modeler, call, t, params: paramsP
         before_xml: before.xml, before_params: before.params, after_xml: after.xml, after_params: after.params,
       });
       highlight();
-    } catch (e) {
-      onError(t("suggestion_failed", { error: e.message }));
+    } catch (thrown) {
+      onError(t("suggestion_failed", { error: errorText(thrown) }));
     } finally {
       busy = false;
       stepping = false;
@@ -130,8 +126,8 @@ export function createSuggestionsPanel({ root, modeler, call, t, params: paramsP
       const edited = { ...(await currentDesign()), name: paramsPanel.name() };
       await backToPreset();
       beforeBack = edited;
-    } catch (e) {
-      onError(t("suggestion_failed", { error: e.message }));
+    } catch (thrown) {
+      onError(t("suggestion_failed", { error: errorText(thrown) }));
     } finally {
       busy = false;
       await refresh();
@@ -145,8 +141,8 @@ export function createSuggestionsPanel({ root, modeler, call, t, params: paramsP
     try {
       await paramsPanel.load(edited); // xml, params and the export's file name
       beforeBack = null;
-    } catch (e) {
-      onError(t("suggestion_failed", { error: e.message }));
+    } catch (thrown) {
+      onError(t("suggestion_failed", { error: errorText(thrown) }));
     } finally {
       busy = false;
       await refresh();
@@ -159,7 +155,7 @@ export function createSuggestionsPanel({ root, modeler, call, t, params: paramsP
     const ids = [
       ...lastStep.added.map((r) => r.id),
       ...lastStep.rerouted.map((r) => r.id),
-      ...lastStep.parameters.map((key) => key.split(/\.(.*)/s)[1]).filter(Boolean),
+      ...lastStep.parameters.map((key) => splitEntry(key)[1]).filter(Boolean),
     ];
     return [...new Set(ids)].filter((id) => registry.get(id));
   }
