@@ -249,7 +249,14 @@ _COLLECTIONS = {"attributes": "distribution", "lanes": "capacity", "tasks": "dur
 def load_parameters(path: str | Path, model: ProcessModel | None = None) -> Parameters:
     """Read and validate a parameter file. With a model, also check every ID against it (see check_parameters)."""
     with open(path, "rb") as f:
-        raw = tomllib.load(f)
+        return parse_parameters(tomllib.load(f), model)
+
+
+def parse_parameters(raw: dict, model: ProcessModel | None = None) -> Parameters:
+    """Validate a parameter file already read into a dict (its TOML tables as dicts), e.g. one sent by the studio page.
+
+    Same rules as load_parameters.
+    """
     rationales = _check_layout(raw)
     arrival_rate = float(raw["arrivals"]["rate"]) if "arrivals" in raw else None
     if arrival_rate is not None and arrival_rate <= 0:

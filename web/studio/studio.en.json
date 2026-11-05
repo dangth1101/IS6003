@@ -1,0 +1,26 @@
+{
+  "lang": "en",
+  "title": "Simulation studio",
+  "subtitle": "Run the app development process model in your browser with the same simulator as the report.",
+  "labels": {
+    "report_link": "Back to the report",
+    "first_load": "The first visit downloads Python and its packages, about 36 MB. Your browser keeps them for the next visit.",
+    "load_python": "Starting Python…",
+    "load_packages": "Loading NumPy, pandas and SciPy…",
+    "load_simpy": "Installing SimPy…",
+    "load_bpmopt": "Installing the simulator…",
+    "load_preset": "Loading the as-is model…",
+    "ready": "Ready.",
+    "load_failed": "The studio couldn't start: {error}",
+    "preset_as_is": "As-is model",
+    "diagram_error": "Couldn't draw this model: {error}",
+    "run": "Run",
+    "running": "Running replication {done} of {total}…",
+    "run_settings": "{cases} cases per run, {replications} runs, seed {seed}.",
+    "run_failed": "The run failed: {error}",
+    "mean_cycle_time": "Mean cycle time",
+    "days": "days",
+    "ci": "95% CI {low} to {high}",
+    "run_time": "Took {seconds} s."
+  }
+}

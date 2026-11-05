@@ -259,11 +259,11 @@ def run_scenarios(catalog: Catalog, *, n_cases: int, seed: int, replications: in
     as_is = stats[()]["mean"]
     scenarios = []
     for combo, s in stats.items():
-        saving = _estimate(as_is - s["mean"])
+        saving = estimate(as_is - s["mean"])
         scenarios.append(
             {
                 "changes": list(combo),
-                "cycle_time": {name: _estimate(values) for name, values in s.items()},
+                "cycle_time": {name: estimate(values) for name, values in s.items()},
                 "saving": saving,
                 "saving_share": saving_share(saving, float(as_is.mean())),
                 "replication_means": [float(m) for m in s["mean"]],
@@ -298,7 +298,7 @@ def ablation(scenarios: list[dict]) -> list[dict]:
         {
             "change": change_id,
             "alone": find_scenario(scenarios, [change_id])["saving"],
-            "full_minus": _estimate(np.array(find_scenario(scenarios, set(full["changes"]) - {change_id})["replication_means"]) - full_means),
+            "full_minus": estimate(np.array(find_scenario(scenarios, set(full["changes"]) - {change_id})["replication_means"]) - full_means),
         }
         for change_id in full["changes"]
     ]
@@ -329,7 +329,7 @@ def full_design(scenarios: list[dict]) -> dict:
     return max(scenarios, key=lambda s: len(s["changes"]))
 
 
-def _estimate(values: np.ndarray) -> dict[str, float]:
+def estimate(values: np.ndarray) -> dict[str, float]:
     """Mean of the values with a 95% t-interval."""
     mean = float(values.mean())
     half_width = float(student_t.ppf(0.975, len(values) - 1)) * float(values.std(ddof=1)) / math.sqrt(len(values))

@@ -71,6 +71,7 @@
     "labels": {
       "fake_notice": "Fake data. These numbers are made up so the page could be built before the real results exist.",
       "pending": "Not available yet.",
+      "studio_link": "Open the simulation studio to run the model yourself",
       "diagram_error": "Couldn't draw this model: {error}",
       "run_summary": "Seed: {seed}. Cases per run: {cases}, after a warm-up of {warm_up} days. Each scenario ran {replications} times. Parameters: {version}. Generated {date}.",
       "headline": "The to-be process is {share} faster than the as-is process (95% CI {low} to {high}).",

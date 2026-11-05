@@ -202,6 +202,7 @@
       return [
         el("h1", {}, TEXT.title),
         el("p", { class: "muted" }, TEXT.subtitle),
+        el("p", { class: "small" }, el("a", { href: "studio/" }, t("studio_link"))),
         meta.fake ? el("p", { class: "notice" }, t("fake_notice")) : null,
         el("p", { class: "muted small" }, t("run_summary", {
           seed: meta.seed, replications: meta.replications, cases: meta.case_count,

@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>…</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.31.1/dist/assets/diagram-js.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.31.1/dist/assets/bpmn-js.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.31.1/dist/assets/bpmn-font/css/bpmn.css">
+  <style>
+    /* No wording in this file: every visible string comes from studio.<lang>.json
+       (built from src/bpmopt/content/studio.<lang>.toml) or from the BPMN labels. */
+    :root {
+      color-scheme: light;
+      --bg: #fafaf8;
+      --surface: #ffffff;
+      --canvas: #ffffff;
+      --text: #1d1d1b;
+      --muted: #5f5e59;
+      --border: #e2e1dc;
+      --accent: #2a78d6;
+      --accent-text: #ffffff;
+      --track: #ecebe6;
+      --notice-bg: #fff4d6;
+      --notice-text: #5c4300;
+      --error: #b3261e;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --bg: #161615;
+        --surface: #1f1f1d;
+        --canvas: #fafaf8; /* the diagram keeps a light canvas so BPMN strokes stay readable */
+        --text: #ecebe6;
+        --muted: #b0afa8;
+        --border: #34332f;
+        --accent: #3987e5;
+        --accent-text: #ffffff;
+        --track: #2c2b28;
+        --notice-bg: #3a2f10;
+        --notice-text: #f3dc9c;
+        --error: #f2b8b5;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main { max-width: 1280px; margin: 0 auto; padding: 24px 16px 64px; }
+    h1 { font-size: 1.6rem; line-height: 1.2; margin: 0 0 4px; }
+    p { margin: 0 0 12px; max-width: 70ch; }
+    a { color: var(--accent); }
+    .muted { color: var(--muted); }
+    .small { font-size: 0.875rem; }
+    .top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 16px; }
+    .notice { background: var(--notice-bg); color: var(--notice-text); padding: 10px 14px; border-radius: 8px; margin: 12px 0; }
+    .error { color: var(--error); white-space: pre-wrap; }
+
+    .status { display: flex; align-items: center; gap: 12px; margin: 12px 0; min-height: 28px; }
+    .status progress { width: 160px; accent-color: var(--accent); }
+
+    .diagram { height: 520px; border: 1px solid var(--border); border-radius: 8px; background: var(--canvas); overflow: hidden; }
+    @media (max-width: 640px) { .diagram { height: 380px; } }
+
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 12px 0; }
+    button {
+      font: inherit; font-weight: 600; padding: 8px 20px; border-radius: 8px; cursor: pointer;
+      border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text);
+    }
+    button:disabled { opacity: 0.5; cursor: default; }
+
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 12px 0; }
+    .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin: 0; }
+    .tile dt { color: var(--muted); font-size: 0.875rem; }
+    .tile dd { margin: 0; font-size: 1.6rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .tile dd span { font-size: 0.9rem; font-weight: 400; color: var(--muted); }
+    .tile .sub { font-size: 0.8rem; color: var(--muted); font-weight: 400; display: block; }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="top">
+      <div>
+        <h1 id="title"></h1>
+        <p id="subtitle" class="muted"></p>
+      </div>
+      <a id="report-link" href="../"></a>
+    </header>
+    <p id="first-load" class="notice small"></p>
+    <div class="status" role="status" aria-live="polite">
+      <progress id="load-progress" max="1" value="0"></progress>
+      <span id="status-text" class="muted small"></span>
+    </div>
+    <p id="error" class="error" role="alert" hidden></p>
+
+    <div id="diagram" class="diagram" aria-label=""></div>
+
+    <div class="toolbar">
+      <button id="run" type="button" disabled></button>
+      <span id="run-settings" class="muted small"></span>
+    </div>
+    <section id="results" aria-live="polite" hidden></section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bpmn-js@18.31.1/dist/bpmn-modeler.production.min.js"></script>
+  <script type="module">
+    // The default run, as in the spec: 1,000 cases and 10 replications.
+    const RUN = { n_cases: 1000, replications: 10, seed: 42 };
+    const PRESET = { xml: "presets/as_is.bpmn", params: "presets/as_is.params.toml" };
+    const LANG = "en";
+
+    const $ = (id) => document.getElementById(id);
+    let TEXT = null;
+
+    function t(key, vars = {}) {
+      const s = TEXT.labels[key] ?? key;
+      return s.replace(/\{(\w+)\}/g, (m, name) => (name in vars ? vars[name] : m));
+    }
+
+    const fmt = (value, digits = 1) =>
+      new Intl.NumberFormat(TEXT.lang, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
+
+    function showError(message) {
+      $("error").textContent = message;
+      $("error").hidden = false;
+    }
+
+    async function fetchText(url) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+      return response.text();
+    }
+
+    // ---------- worker ----------
+
+    const worker = new Worker(new URL("./worker.mjs", import.meta.url), { type: "module" });
+    const pending = new Map();
+    let nextId = 1;
+    let onReady;
+    let loadingStage = "load_python"; // worker messages can arrive before the text has loaded
+    const workerReady = new Promise((resolve, reject) => { onReady = { resolve, reject }; });
+
+    /** Call a bpmopt.studio function in the worker. onProgress gets (done, total) per replication. */
+    function call(name, args, onProgress) {
+      const id = nextId++;
+      return new Promise((resolve, reject) => {
+        pending.set(id, { resolve, reject, onProgress });
+        worker.postMessage({ id, call: name, args });
+      });
+    }
+
+    worker.onmessage = ({ data }) => {
+      if (data.type === "loading") {
+        $("load-progress").max = data.steps + 1;
+        $("load-progress").value = data.step - 1;
+        loadingStage = data.stage;
+        if (TEXT) $("status-text").textContent = t(data.stage);
+        return;
+      }
+      if (data.type === "ready") return onReady.resolve();
+      if (data.type === "error" && data.id === null) return onReady.reject(new Error(data.message));
+      const job = pending.get(data.id);
+      if (!job) return;
+      if (data.type === "progress") return job.onProgress?.(data.done, data.total);
+      pending.delete(data.id);
+      if (data.type === "result") job.resolve(data.value);
+      else job.reject(new Error(data.message));
+    };
+    worker.onerror = (e) => onReady.reject(new Error(e.message));
+
+    // ---------- page ----------
+
+    function renderText() {
+      document.documentElement.lang = TEXT.lang;
+      document.title = TEXT.title;
+      $("title").textContent = TEXT.title;
+      $("subtitle").textContent = TEXT.subtitle;
+      $("report-link").textContent = t("report_link");
+      $("first-load").textContent = t("first_load");
+      $("run").textContent = t("run");
+      $("diagram").setAttribute("aria-label", t("preset_as_is"));
+      $("run-settings").textContent = t("run_settings", {
+        cases: new Intl.NumberFormat(TEXT.lang).format(RUN.n_cases), replications: RUN.replications, seed: RUN.seed,
+      });
+    }
+
+    function renderSummary(summary, seconds) {
+      const mean = summary.cycle_time.mean;
+      const results = $("results");
+      results.replaceChildren();
+      const tiles = document.createElement("dl");
+      tiles.className = "tiles";
+      const tile = document.createElement("div");
+      tile.className = "tile";
+      const dt = document.createElement("dt");
+      dt.textContent = t("mean_cycle_time");
+      const dd = document.createElement("dd");
+      dd.id = "mean-cycle-time";
+      dd.append(fmt(mean.value), " ");
+      const unit = document.createElement("span");
+      unit.textContent = t("days");
+      const ci = document.createElement("span");
+      ci.className = "sub";
+      ci.id = "mean-cycle-time-ci";
+      ci.textContent = t("ci", { low: fmt(mean.ci_low), high: fmt(mean.ci_high) });
+      dd.append(unit, ci);
+      tile.append(dt, dd);
+      tiles.append(tile);
+      const time = document.createElement("p");
+      time.className = "muted small";
+      time.textContent = t("run_time", { seconds: fmt(seconds) });
+      results.append(tiles, time);
+      // Full precision for pairing runs later and for the browser parity check.
+      results.dataset.summary = JSON.stringify(summary);
+      results.hidden = false;
+    }
+
+    async function main() {
+      TEXT = await (await fetch(`studio.${LANG}.json`)).json();
+      renderText();
+      $("status-text").textContent = t(loadingStage);
+
+      const modeler = new BpmnJS({ container: "#diagram" });
+      const [xml, paramsToml] = await Promise.all([fetchText(PRESET.xml), fetchText(PRESET.params)]);
+      try {
+        await modeler.importXML(xml);
+        modeler.get("canvas").zoom("fit-viewport");
+      } catch (e) {
+        showError(t("diagram_error", { error: e.message }));
+      }
+
+      try {
+        await workerReady;
+      } catch (e) {
+        $("status-text").textContent = "";
+        showError(t("load_failed", { error: e.message }));
+        return;
+      }
+      $("status-text").textContent = t("load_preset");
+      const params = await call("params_from_toml", { text: paramsToml });
+      $("load-progress").value = $("load-progress").max;
+      $("status-text").textContent = t("ready");
+      $("run").disabled = false;
+
+      $("run").addEventListener("click", async () => {
+        $("run").disabled = true;
+        $("error").hidden = true;
+        const started = performance.now();
+        $("load-progress").max = RUN.replications;
+        $("load-progress").value = 0;
+        $("status-text").textContent = t("running", { done: 1, total: RUN.replications });
+        try {
+          const { xml: current } = await modeler.saveXML();
+          const summary = await call("simulate_summary", { xml: current, params, ...RUN }, (done, total) => {
+            $("load-progress").value = done;
+            $("status-text").textContent = t("running", { done: Math.min(done + 1, total), total });
+          });
+          renderSummary(summary, (performance.now() - started) / 1000);
+          $("status-text").textContent = t("ready");
+        } catch (e) {
+          $("status-text").textContent = "";
+          showError(t("run_failed", { error: e.message }));
+        } finally {
+          $("run").disabled = false;
+        }
+      });
+    }
+
+    main().catch((e) => showError(e.message));
+  </script>
+</body>
+</html>

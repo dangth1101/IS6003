@@ -12,6 +12,7 @@ Plan: `PLAN.md`. Spec and tickets: `.scratch/bpmn-time-optimization/`.
 - `notebooks/time_optimization.ipynb`: runs the whole study (lint, simulation, baseline, value-added, ML, drivers vs planted effects, redesign, all 16 scenarios with 30 replications, ablation) and writes `web/results.json`, plus the event log as CSV in `notebooks/output/` (not committed). Takes about 8 minutes
 - `docs/analysis/phase1-qualitative.md`: Phase 1 draft (value-added, waste, issue register, objective), awaiting the student's review
 - `web/`: the static page, `results.json` and the two BPMN models it shows (`web/models/`, copied there by the notebook)
+- `web/studio/`: the simulation studio, a second static page that runs `bpmopt` in the browser (Pyodide in a Web Worker) on the bpmn-js Modeler. It loads the committed `bpmopt` wheel, the as-is preset in `presets/` and its text in `studio.en.json`, all built by `scripts/build_studio.py`. Its Python side is `bpmopt.studio` (JSON in, JSON out). Runtime decisions: `docs/research/studio-browser-runtime.md`
 - `web/fixtures/`: a fake results file with every section filled, and its models, for building the page and for the tests. The real page never reads it
 
 ## Setup
@@ -34,8 +35,11 @@ python3 -m venv .venv
 ```sh
 .venv/bin/pytest                                              # tests
 cd notebooks && ../.venv/bin/jupyter execute time_optimization.ipynb   # regenerate web/results.json
-cd web && ../.venv/bin/python -m http.server 8000             # page at http://localhost:8000
+cd web && ../.venv/bin/python -m http.server 8000             # page at http://localhost:8000, studio at /studio/
+uv run python scripts/build_studio.py                         # rebuild the studio's wheel, preset and text
 ```
+
+Rebuild the studio after any change under `src/bpmopt/` or to `models/as_is.*`, and commit `web/studio/`. A test fails while the wheel, the preset or the studio text is stale. The studio's default run (as-is preset, seed 42, 1,000 cases, 10 replications) must give the per-replication means in `tests/fixtures/studio_parity.json`, natively and in the browser; a NumPy or Pyodide bump that changes a random stream shows up there first.
 
 `export_results` lints every model it copies, so the page shows the rule check for each. A rework gateway whose training or test cases all went the same way isn't fitted; its ML task carries `skipped` with the reason instead of scores, and the run goes on.
 
