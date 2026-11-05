@@ -4,7 +4,7 @@
 
 **Blocked by:** 02, 03
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Editing a duration, probability or capacity changes the next run's result in the expected direction
 - [ ] Importing a model without a parameter file runs at once, with every default visible
@@ -13,3 +13,4 @@
 - [ ] Checked in headless Chrome, no console errors
 
 ## Comments
+- 2026-11-05: claimed. Implementer started.

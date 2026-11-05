@@ -4,7 +4,7 @@
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] The as-is preset shows no violations; the full to-be shows only the G7 warning
 - [ ] Drawing an unconnected task shows the reachability error and disables Run
@@ -12,3 +12,4 @@
 - [ ] Checked in headless Chrome, no console errors
 
 ## Comments
+- 2026-11-05: claimed. Implementer started.
