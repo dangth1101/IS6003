@@ -19,29 +19,6 @@
 // The root element carries data-params and data-defaults (JSON) for the browser check.
 
 const DEBOUNCE_MS = 300;
-const STYLE = `
-.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; align-items: start; }
-@media (max-width: 900px) { .workspace { grid-template-columns: minmax(0, 1fr); } }
-.params-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 0.9rem; min-width: 0; }
-.params-panel h2 { font-size: 1rem; margin: 0 0 8px; }
-.params-panel h3 { font-size: 0.95rem; margin: 0 0 2px; overflow-wrap: anywhere; }
-.params-panel section + section { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; }
-.params-panel .io { display: flex; flex-wrap: wrap; gap: 6px; }
-.params-panel button { font-size: 0.85rem; padding: 5px 12px; }
-.params-panel button.secondary { background: transparent; color: var(--accent); }
-.params-panel form { display: grid; gap: 8px; margin: 8px 0 0; }
-.params-panel .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.params-panel label { display: grid; gap: 2px; color: var(--muted); font-size: 0.8rem; min-width: 0; }
-.params-panel input { font: inherit; font-size: 0.9rem; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; width: 100%; min-width: 0; }
-.params-panel .settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.params-panel .badge { display: inline-block; font-size: 0.75rem; font-weight: 600; color: var(--notice-text); background: var(--notice-bg); border-radius: 4px; padding: 0 6px; }
-.params-panel .note { color: var(--muted); font-size: 0.8rem; margin: 4px 0 0; overflow-wrap: anywhere; }
-.params-panel .error { margin: 4px 0 0; font-size: 0.85rem; }
-.params-panel ul { margin: 6px 0 0; padding-left: 18px; }
-.params-panel li { margin: 2px 0; overflow-wrap: anywhere; }
-.params-panel li button { all: unset; cursor: pointer; color: var(--accent); text-decoration: underline; }
-.djs-element.studio-default .djs-visual > :first-child { stroke: #c77700 !important; stroke-dasharray: 5 3; }
-`;
 
 export function createParamsPanel({ root, modeler, call, t, lang, run, onRunChange = () => {}, onError = () => {} }) {
   const registry = modeler.get("elementRegistry");
@@ -59,10 +36,7 @@ export function createParamsPanel({ root, modeler, call, t, lang, run, onRunChan
   let timer = null;
   const settings = { ...run };
 
-  const style = document.createElement("style");
-  style.textContent = STYLE;
-  document.head.append(style);
-  root.classList.add("params-panel");
+  root.classList.add("params-panel"); // styles in params-panel.css
 
   /** Run fn(current params) after the pending updates; it returns the new {params, defaults, dropped}.
    *  With a key (an edit), a refusal is shown at that entry; without, the returned promise rejects. */
@@ -90,7 +64,8 @@ export function createParamsPanel({ root, modeler, call, t, lang, run, onRunChan
   function refill() {
     timer = null;
     if (!state) return;
-    update(async (params) => call("default_parameters", { xml: await currentXml(), params })).catch((e) => onError(e.message));
+    // An unreadable diagram (mid-edit) can't be filled; the lint panel shows why and blocks Run.
+    update(async (params) => call("default_parameters", { xml: await currentXml(), params })).catch(() => {});
   }
 
   modeler.on("commandStack.changed", () => {
@@ -365,6 +340,7 @@ export function createParamsPanel({ root, modeler, call, t, lang, run, onRunChan
       if (xml !== undefined) {
         await modeler.importXML(xml);
         canvas.zoom("fit-viewport");
+        await call("lint_xml", { xml: await currentXml() }); // raises "Not a readable BPMN document: ..." for a broken file
       }
       return call("default_parameters", params ? { xml: await currentXml(), params } : { xml: await currentXml() });
     });

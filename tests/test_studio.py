@@ -147,6 +147,21 @@ def test_lint_xml_reports_the_same_violations_as_lint_on_the_file():
     assert len(violations) > 3
 
 
+@pytest.mark.parametrize(
+    "xml",
+    [
+        "not xml",
+        '<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"><process id="P">'
+        '<sequenceFlow id="Flow_Half"/></process></definitions>',
+    ],
+    ids=["not-xml", "flow-without-ends"],
+)
+def test_lint_xml_says_in_one_value_error_that_a_document_it_cannot_read_is_not_readable_bpmn(xml):
+    # The page shows this message in the lint panel and blocks Run, so it must say what is wrong.
+    with pytest.raises(ValueError, match="Not a readable BPMN document"):
+        lint_xml(xml)
+
+
 def test_a_model_without_parameters_simulates_after_default_parameters_with_every_entry_marked():
     xml = (FIXTURES / "proposal_rejected.bpmn").read_text()
 
@@ -400,8 +415,9 @@ def test_the_studio_text_is_the_content_file():
 
 def test_the_studio_uses_exactly_the_labels_of_its_content_file():
     # All studio wording comes from the content file: t("key") in the page, and the
-    # loading stages the worker reports, which the page shows as labels.
-    page = (STUDIO / "index.html").read_text(encoding="utf-8")
+    # loading stages the worker reports, which the page shows as labels. The page's UI
+    # modules (*.mjs next to it, e.g. lint-panel.mjs) count as the page.
+    page = "\n".join(p.read_text(encoding="utf-8") for p in [STUDIO / "index.html", *sorted(STUDIO.glob("*.mjs"))])
     worker = (STUDIO / "worker.mjs").read_text(encoding="utf-8")
     used = set(re.findall(r"""\bt\(["'](\w+)["']""", page)) | set(re.findall(r"""\bloading\(["'](\w+)["']""", worker))
     content = tomllib.loads((ROOT / "src" / "bpmopt" / "content" / "studio.en.toml").read_text(encoding="utf-8"))

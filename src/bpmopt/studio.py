@@ -22,6 +22,7 @@ import json
 import tomllib
 from collections.abc import Callable, Mapping
 from dataclasses import replace
+from xml.etree import ElementTree
 
 import numpy as np
 
@@ -471,9 +472,18 @@ def lint_xml(xml: str) -> list[dict]:
     """The book's lint rules on a BPMN string: the same violations, in the same order, as lint on its file.
 
     Each is {rule, severity ("error" or "warning"), element_id, message}. A
-    document that isn't one readable BPMN process raises (ValueError or an XML parse error).
+    document that isn't one readable BPMN process raises a ValueError that starts
+    "Not a readable BPMN document", which the page shows in place of the violations.
     """
+    try:
+        model = parse_bpmn(xml)
+    except ElementTree.ParseError as e:
+        raise ValueError(f"Not a readable BPMN document: the XML has a {e}.") from e
+    except KeyError as e:
+        raise ValueError(f"Not a readable BPMN document: an element has no {e.args[0]} attribute.") from e
+    except ValueError as e:
+        raise ValueError(f"Not a readable BPMN document: {str(e).removeprefix('BPMN: ')}.") from e
     return [
         {"rule": v.rule, "severity": v.severity, "element_id": v.element_id, "message": v.message}
-        for v in lint_model(parse_bpmn(xml))
+        for v in lint_model(model)
     ]
