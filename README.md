@@ -45,6 +45,30 @@ Rebuild the studio after any change under `src/bpmopt/` or to `models/as_is.*`, 
 
 The page needs a static server. Opening `index.html` as a file doesn't work, because browsers block file fetches. Any static server will do. The page has no backend, but it loads bpmn-js from a CDN, so it needs internet access.
 
+## The report and the studio
+
+Both pages are static and come from the same server:
+
+```sh
+cd web && python3 -m http.server 8000
+```
+
+- Report: http://localhost:8000/. Its evaluation section links to the studio.
+- Studio: http://localhost:8000/studio/. "Back to the report" goes the other way.
+
+The studio downloads Python (Pyodide), NumPy, pandas, SciPy and SimPy from a CDN on the first visit, about 36 MB. That takes 5 to 30 seconds depending on the connection, and the page shows each stage. The browser caches the files, so later visits start in a few seconds. Run stays disabled until Python is ready.
+
+A demo takes about five minutes:
+
+1. The as-is model loads by itself. Click Run (1,000 cases, 10 runs, seed 42, about 9 seconds).
+2. Click "Pin as baseline" under the results.
+3. Apply C1 to C4 under "Suggested changes". Each one changes the diagram and the parameters, and outlines what changed in green. "Why, expected effect and trade-off" opens the reasoning.
+4. Edit by hand: select a task and change its duration, or draw a task into a flow. A new task gets a default duration of [1, 2, 4] days. The suggestions switch off after a diagram edit; "Back to the as-is model" turns them on again, and "Restore my edited model" brings the edit back.
+5. Run again. The comparison shows the saving with a paired 95% CI and the before and after per lane and per activity.
+6. Export BPMN and Export parameters save the design. Both files load in the notebook (`read_bpmn`, `load_parameters`) and import back into the studio.
+
+To reproduce the report's saving in the studio, set 2,000 cases, 30 runs and seed 42 under Run settings, run the as-is model, pin it, apply all four changes and run again. The saving equals the report's exactly (36.3 days, 95% CI 32.0 to 40.5). Each run takes about a minute in the browser. `tests/test_studio.py` checks the same thing natively against `web/results.json`.
+
 ## Publish on GitHub Pages
 
 The page is everything in `web/`. GitHub Pages can only serve a branch from its root or from `/docs`, so push `web/` to a branch of its own, `gh-pages`:

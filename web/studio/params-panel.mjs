@@ -17,6 +17,7 @@
 //   await panel.load({ xml, params, name })     also import xml into the Modeler first (e.g. a suggestion)
 //   await panel.params()                        the current parameters, after pending updates
 //   panel.run()                                 the run settings { n_cases, replications, seed }
+//   panel.name()                                the file name (no extension) the export uses
 // The root element carries data-params and data-defaults (JSON) for the browser check.
 
 const DEBOUNCE_MS = 300;
@@ -340,8 +341,7 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
     editError = null;
     return update(async () => {
       if (xml !== undefined) {
-        await modeler.importXML(xml);
-        canvas.zoom("fit-viewport");
+        await modeler.importXML(xml); // the page fits the diagram to the view on import.done
         await call("lint_xml", { xml: await currentXml() }); // raises "Not a readable BPMN document: ..." for a broken file
       }
       return call("default_parameters", params ? { xml: await currentXml(), params } : { xml: await currentXml() });
@@ -401,5 +401,5 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
     return { ...settings };
   }
 
-  return { load, params: currentParams, run };
+  return { load, params: currentParams, run, name: () => name };
 }

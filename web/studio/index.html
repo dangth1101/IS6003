@@ -102,17 +102,18 @@
     <p id="error" class="error" role="alert" hidden></p>
 
     <div class="workspace">
-      <div id="diagram" class="diagram" aria-label=""></div>
+      <div>
+        <div id="diagram" class="diagram" aria-label=""></div>
+        <div class="toolbar">
+          <button id="run" type="button" disabled></button>
+          <span id="run-settings" class="muted small"></span>
+          <span id="run-blocked" class="small" hidden></span>
+        </div>
+        <section id="lint" class="lint" aria-live="polite"></section>
+      </div>
       <aside id="params-panel"></aside>
     </div>
     <section id="suggestions" aria-live="polite"></section>
-
-    <div class="toolbar">
-      <button id="run" type="button" disabled></button>
-      <span id="run-settings" class="muted small"></span>
-      <span id="run-blocked" class="small" hidden></span>
-    </div>
-    <section id="lint" class="lint" aria-live="polite"></section>
     <section id="results" aria-live="polite" hidden></section>
   </main>
 
@@ -218,6 +219,28 @@
       });
     }
 
+    /**
+     * Fit the diagram into the part of the canvas right of the palette (bpmn-js's own
+     * fit-viewport puts the start under the palette). On a narrow screen the scale stays
+     * at MIN_SCALE and the diagram starts at the left, so the labels stay readable; pan for more.
+     */
+    const MIN_SCALE = 0.2;
+    function fitDiagram(modeler) {
+      const canvas = modeler.get("canvas");
+      const { inner, outer } = canvas.viewbox();
+      if (!inner.width || !inner.height) return;
+      const palette = document.querySelector("#diagram .djs-palette");
+      const container = $("diagram").getBoundingClientRect();
+      const left = (palette ? palette.getBoundingClientRect().right - container.left : 0) + 16;
+      const pad = 16;
+      const fit = Math.min((outer.width - left - pad) / inner.width, (outer.height - 2 * pad) / inner.height, 1);
+      const scale = Math.max(fit, MIN_SCALE);
+      const top = Math.max(pad, (outer.height - inner.height * scale) / 2);
+      canvas.viewbox({
+        x: inner.x - left / scale, y: inner.y - top / scale, width: outer.width / scale, height: outer.height / scale,
+      });
+    }
+
     async function main() {
       TEXT = await (await fetch(`studio.${LANG}.json`)).json();
       renderText();
@@ -246,9 +269,9 @@
         backToPreset: () => panel.load({ xml, params: presetParams, name: "as_is" }),
       });
       window.studio.suggestions = suggestions;
+      modeler.on("import.done", ({ error }) => { if (!error) fitDiagram(modeler); });
       try {
         await modeler.importXML(xml);
-        modeler.get("canvas").zoom("fit-viewport");
       } catch (e) {
         showError(t("diagram_error", { error: e.message }));
       }

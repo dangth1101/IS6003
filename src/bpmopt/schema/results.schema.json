@@ -414,7 +414,7 @@
       "description": "Short UI strings. Every key the page uses is required here (a test checks it).",
       "additionalProperties": { "type": "string" },
       "required": [
-        "fake_notice", "pending", "studio_link", "diagram_error", "run_summary",
+        "fake_notice", "pending", "studio_link", "studio_try", "diagram_error", "run_summary",
         "headline", "headline_detail", "headline_top", "headline_best", "share_method", "range", "baseline_one_run",
         "as_is_model", "to_be_model", "to_be_missing",
         "lint", "lint_clean", "lint_not_checked", "lint_rule", "lint_element", "lint_message", "severity_error", "severity_warning",

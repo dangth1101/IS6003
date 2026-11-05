@@ -334,6 +334,26 @@ def test_compare_of_the_as_is_and_the_full_design_gives_the_runners_paired_savin
     assert comparison["variant"]["cycle_time"] == proposed["cycle_time"]
 
 
+def test_the_studio_gives_the_reports_full_design_saving_with_the_reports_settings():
+    # The lecturer's check: run the studio with the case count, replications and seed the
+    # report states, and get the report's saving. The expected values are the notebook's,
+    # read from the published results.json. Slow: 2,000 cases x 30 replications, twice.
+    report = json.loads((ROOT / "web" / "results.json").read_text(encoding="utf-8"))
+    meta, changes = report["meta"], report["headline"]["changes"]
+    expected = next(s for s in report["scenarios"] if sorted(s["changes"]) == sorted(changes))
+    xml, params = as_is_preset()
+    assert (params["version"], params["warm_up"]["length"]) == (meta["parameter_version"], meta["warm_up"])
+    run = {"n_cases": meta["case_count"], "seed": meta["seed"], "replications": meta["replications"]}
+
+    as_is = simulate_summary(xml, params, **run)
+    full = apply_suggestion(xml, changes, preset())
+    comparison = compare(as_is, simulate_summary(full["xml"], full["params"], **run))
+
+    assert comparison["variant"]["cycle_time"] == expected["cycle_time"]
+    assert comparison["saving"] == expected["saving"]
+    assert comparison["saving_share"] == expected["saving_share"]
+
+
 def test_compare_puts_each_lane_and_activity_before_and_after_side_by_side(catalog):
     as_is = simulate_summary(*as_is_preset(), n_cases=40, seed=3, replications=3)
     c2 = apply_suggestion(AS_IS.read_text(), ["C2", "C4"], preset())
@@ -431,3 +451,15 @@ def test_the_report_page_and_the_studio_link_to_each_other():
 
     assert re.search(r"""href:?=?\s*["']studio/["']""", report)
     assert re.search(r"""href=["']\.\./["']""", studio)
+
+
+def test_the_reports_evaluation_section_sends_the_reader_to_the_studio_with_its_settings():
+    # The lecturer reads the saving in the evaluation, then checks it in the studio.
+    report = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
+    evaluation = report[report.index("function evaluationSection"):]
+    evaluation = evaluation[: evaluation.index("\n    function ", 1)]
+    labels = tomllib.loads((ROOT / "src" / "bpmopt" / "content" / "page.en.toml").read_text(encoding="utf-8"))["labels"]
+
+    assert re.search(r"""href:\s*["']studio/["']""", evaluation)
+    assert 't("studio_try"' in evaluation
+    assert {"cases", "replications", "seed"} <= set(re.findall(r"\{(\w+)\}", labels["studio_try"]))

@@ -76,6 +76,7 @@ paragraphs = [
 fake_notice = "Fake data. These numbers are made up so the page could be built before the real results exist."
 pending = "Not available yet."
 studio_link = "Open the simulation studio to run the model yourself"
+studio_try = "To check these numbers or try your own change, open the studio, load the as-is model, apply the changes, edit the diagram and run it. With {cases} cases, {replications} runs and seed {seed} it gives the same saving as this page. The two runs take about two minutes in the browser; the studio's default run is smaller."
 diagram_error = "Couldn't draw this model: {error}"
 run_summary = "Seed: {seed}. Cases per run: {cases}, after a warm-up of {warm_up} days. Each scenario ran {replications} times. Parameters: {version}. Generated {date}."
 headline = "The to-be process is {share} faster than the as-is process (95% CI {low} to {high})."

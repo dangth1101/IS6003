@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>…</title>
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.28.0/dist/assets/diagram-js.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.28.0/dist/assets/bpmn-js.css">
   <style>
@@ -511,6 +512,10 @@
         })));
       out.push(result);
       render();
+      const { meta } = results;
+      out.push(el("p", { class: "small" },
+        t("studio_try", { cases: fmt(meta.case_count, 0), replications: meta.replications, seed: meta.seed }), " ",
+        el("a", { href: "studio/" }, t("studio_link"))));
 
       // Ablation, as the notebook computed it from the full factorial: each change alone, and the full design without it.
       out.push(el("h3", {}, t("ablation")));

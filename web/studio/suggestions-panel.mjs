@@ -11,11 +11,13 @@
 // C2 as applied, and Ctrl+Z after a hand edit makes the suggestions available again.
 // Undo of a change is applying the current set without it, which gives back the earlier design
 // exactly (the catalog's parameters, whatever they were before).
+// "Back to the as-is model" can't be undone with Ctrl+Z (an import clears the undo history), so
+// the panel offers "Restore my edited model" (#restore-edit) until the next edit or step.
 //
 //   const panel = createSuggestionsPanel({ root, modeler, call, t, params, backToPreset, onError });
 //   panel.refresh()          once the parameter panel has its first parameters; later refreshes are automatic
 //   panel.paramsChanged()    the page calls this when the parameter panel's values change
-// params is the parameter panel (load, params). backToPreset() reloads the as-is preset.
+// params is the parameter panel (load, params, name). backToPreset() reloads the as-is preset.
 // root carries data-available, data-applied (JSON) and data-highlighted (JSON) for the browser check.
 
 const DEBOUNCE_MS = 300;
@@ -31,6 +33,10 @@ export function createSuggestionsPanel({ root, modeler, call, t, params: paramsP
   let lastStep = null; // diff_designs of the last step
   let latest = 0;
   let timer = null;
+  const opened = new Set(); // cards whose details the user opened
+  // "Back to the as-is model" imports the preset, which clears the Modeler's undo history.
+  // So the panel keeps the hand-edited design and offers it back until the next edit or step.
+  let beforeBack = null;
 
   root.classList.add("suggestions-panel"); // styles in suggestions-panel.css
 
@@ -75,7 +81,10 @@ export function createSuggestionsPanel({ root, modeler, call, t, params: paramsP
     timer = setTimeout(refresh, DEBOUNCE_MS);
   }
 
-  modeler.on("commandStack.changed", later);
+  modeler.on("commandStack.changed", ({ trigger }) => {
+    if (trigger !== "clear") beforeBack = null; // an import clears the stack; a real edit drops the restore
+    later();
+  });
   modeler.on("import.done", () => {
     if (stepping) return;
     lastStep = null; // a new model from elsewhere (import, back to preset)
@@ -88,6 +97,7 @@ export function createSuggestionsPanel({ root, modeler, call, t, params: paramsP
     if (busy || !state?.available) return;
     busy = true;
     stepping = true;
+    beforeBack = null;
     render();
     try {
       const before = await currentDesign();
@@ -117,7 +127,24 @@ export function createSuggestionsPanel({ root, modeler, call, t, params: paramsP
     busy = true;
     render();
     try {
+      const edited = { ...(await currentDesign()), name: paramsPanel.name() };
       await backToPreset();
+      beforeBack = edited;
+    } catch (e) {
+      onError(t("suggestion_failed", { error: e.message }));
+    } finally {
+      busy = false;
+      await refresh();
+    }
+  }
+
+  async function restore() {
+    const edited = beforeBack;
+    busy = true;
+    render();
+    try {
+      await paramsPanel.load(edited); // xml, params and the export's file name
+      beforeBack = null;
     } catch (e) {
       onError(t("suggestion_failed", { error: e.message }));
     } finally {
@@ -158,10 +185,18 @@ export function createSuggestionsPanel({ root, modeler, call, t, params: paramsP
         el("h3", {}, el("span", { className: "id" }, change.id), " ", change.title),
         applied ? el("span", { className: "badge" }, t("suggestion_applied")) : null),
       el("p", { className: "heuristic" }, t("suggestion_heuristic", { name: change.heuristic.name, ref: change.heuristic.ref })),
-      el("dl", {},
-        el("dt", {}, t("suggestion_driver")), el("dd", {}, change.driver),
-        el("dt", {}, t("suggestion_effect")), el("dd", {}, change.expected_effect),
-        el("dt", {}, t("suggestion_trade_off")), el("dd", {}, chips, el("span", { className: "note" }, change.trade_off.note))),
+      chips,
+      // The long texts fold away, so the four cards stay short and the results stay close to Run.
+      // A render replaces the cards, so remember which ones the user opened.
+      el("details", {
+        open: opened.has(change.id),
+        ontoggle: (e) => { if (e.target.open) opened.add(change.id); else opened.delete(change.id); },
+      },
+        el("summary", {}, t("suggestion_more")),
+        el("dl", {},
+          el("dt", {}, t("suggestion_driver")), el("dd", {}, change.driver),
+          el("dt", {}, t("suggestion_effect")), el("dd", {}, change.expected_effect),
+          el("dt", {}, t("suggestion_trade_off")), el("dd", { className: "note" }, change.trade_off.note))),
       el("div", { className: "actions" }, button));
     article.dataset.change = change.id;
     return article;
@@ -174,6 +209,11 @@ export function createSuggestionsPanel({ root, modeler, call, t, params: paramsP
         el("button", { type: "button", id: "back-to-preset", disabled: busy, onclick: goBack }, t("suggestions_back")));
     }
     if (busy) return el("p", { className: "muted" }, t("suggestions_applying"));
+    if (beforeBack) {
+      return el("div", { className: "unavailable", role: "status" },
+        el("p", {}, t("suggestions_went_back")),
+        el("button", { type: "button", id: "restore-edit", className: "secondary", onclick: restore }, t("suggestions_restore")));
+    }
     if (state.exact === false) return el("p", { className: "hand-params" }, t("suggestions_hand_params"));
     return null;
   }

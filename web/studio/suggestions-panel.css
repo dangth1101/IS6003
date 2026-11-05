@@ -7,6 +7,7 @@
 .suggestions-panel h2 { font-size: 1.1rem; margin: 0 0 4px; }
 .suggestions-panel .unavailable { background: var(--notice-bg); color: var(--notice-text); padding: 10px 14px; border-radius: 8px; margin: 8px 0; }
 .suggestions-panel .unavailable p { margin: 0 0 8px; }
+.suggestions-panel .unavailable button.secondary { background: transparent; color: var(--accent); }
 .suggestions-panel .hand-params { background: var(--notice-bg); color: var(--notice-text); padding: 8px 12px; border-radius: 8px; font-size: 0.9rem; }
 .suggestions-panel .step { font-size: 0.9rem; }
 .suggestion-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 8px; }
@@ -31,3 +32,5 @@
 .suggestions-panel.disabled .suggestion { opacity: 0.6; }
 /* What the last suggestion step changed: a solid green outline on the diagram. */
 .djs-element.studio-changed .djs-visual > :first-child { stroke: var(--changed) !important; stroke-width: 3px !important; }
+.suggestion details summary { cursor: pointer; color: var(--accent); }
+.suggestion details[open] summary { margin-bottom: 4px; }
