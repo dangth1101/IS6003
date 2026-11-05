@@ -4,7 +4,7 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Applying any combination of C1-C4 gives the same model and parameters as `catalog.resolve`
 - [ ] Undo returns to the previous combination exactly
@@ -12,3 +12,4 @@
 - [ ] Checked in headless Chrome, no console errors
 
 ## Comments
+- 2026-11-05: claimed. Implementer started.

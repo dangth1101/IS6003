@@ -4,7 +4,7 @@
 
 **Blocked by:** 03, 04
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Progress updates during a run and the page stays responsive
 - [ ] The comparison numbers match `compare` for the same two runs
@@ -12,3 +12,4 @@
 - [ ] Checked in headless Chrome, no console errors
 
 ## Comments
+- 2026-11-05: claimed. Implementer started.
