@@ -17,6 +17,8 @@
 .params-panel .note { color: var(--muted); font-size: 0.8rem; margin: 4px 0 0; overflow-wrap: anywhere; }
 .params-panel .error { margin: 4px 0 0; font-size: 0.85rem; }
 .params-panel ul { margin: 6px 0 0; padding-left: 18px; }
+/* An imported model can have dozens of defaults; keep the panel about as tall as the diagram. */
+.params-panel #defaults-list { max-height: 220px; overflow-y: auto; }
 .params-panel li { margin: 2px 0; overflow-wrap: anywhere; }
 .params-panel li button { all: unset; cursor: pointer; color: var(--accent); text-decoration: underline; }
 /* Elements whose parameters are studio defaults: a dashed amber outline on the diagram. */

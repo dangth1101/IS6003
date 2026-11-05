@@ -9,6 +9,9 @@
 //   compare             { baseline, variant }                         two simulate_summary results
 //   suggestions         { xml }
 //   apply_suggestion    { xml, change_ids }
+//   set_parameter       { xml, params, entry, fields }   one entry from the parameter panel
+//   fixed_branches      { params, gateway_id }           "reset to fixed" for logistic branches
+//   params_to_toml      { params }                       the parameter file's text, for export
 //   params_from_toml    { text }    a parameter file's text to the dict the studio takes
 // The worker adds two arguments itself: progress (a function that posts progress messages)
 // and preset (the PRESET_FILES below, file name -> text) to the functions that take them.

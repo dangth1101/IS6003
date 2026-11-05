@@ -20,7 +20,7 @@
 
 const DEBOUNCE_MS = 300;
 
-export function createParamsPanel({ root, modeler, call, t, lang, run, onRunChange = () => {}, onError = () => {} }) {
+export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaults, onRunChange = () => {}, onError = () => {} }) {
   const registry = modeler.get("elementRegistry");
   const canvas = modeler.get("canvas");
   const selection = modeler.get("selection");
@@ -34,7 +34,7 @@ export function createParamsPanel({ root, modeler, call, t, lang, run, onRunChan
   let marked = [];
   let queue = Promise.resolve();
   let timer = null;
-  const settings = { ...run };
+  const settings = { ...runDefaults };
 
   root.classList.add("params-panel"); // styles in params-panel.css
 
