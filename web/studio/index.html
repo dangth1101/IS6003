@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.31.1/dist/assets/diagram-js.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.31.1/dist/assets/bpmn-js.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.31.1/dist/assets/bpmn-font/css/bpmn.css">
+  <link rel="stylesheet" href="lint-panel.css">
   <style>
     /* No wording in this file: every visible string comes from studio.<lang>.json
        (built from src/bpmopt/content/studio.<lang>.toml) or from the BPMN labels. */
@@ -102,12 +103,16 @@
     <div class="toolbar">
       <button id="run" type="button" disabled></button>
       <span id="run-settings" class="muted small"></span>
+      <span id="run-blocked" class="small" hidden></span>
     </div>
+    <section id="lint" class="lint" aria-live="polite"></section>
     <section id="results" aria-live="polite" hidden></section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/bpmn-js@18.31.1/dist/bpmn-modeler.production.min.js"></script>
   <script type="module">
+    import { createLintPanel, blocksRun, runBlockedReason } from "./lint-panel.mjs";
+
     // The default run, as in the spec: 1,000 cases and 10 replications.
     const RUN = { n_cases: 1000, replications: 10, seed: 42 };
     const PRESET = { xml: "presets/as_is.bpmn", params: "presets/as_is.params.toml" };
@@ -174,6 +179,17 @@
 
     // ---------- page ----------
 
+    // Run is enabled once Python is ready, while no run is going, and while lint finds no errors.
+    const runGate = { ready: false, running: false, lint: null };
+    function updateRun() {
+      const lint = runGate.lint?.state ?? { status: "checking" };
+      $("run").disabled = !runGate.ready || runGate.running || blocksRun(lint);
+      const reason = runGate.ready ? runBlockedReason(lint, t) : "";
+      $("run-blocked").textContent = reason;
+      $("run-blocked").hidden = !reason;
+      $("run-blocked").className = lint.status === "checking" ? "small muted" : "small error";
+    }
+
     function renderText() {
       document.documentElement.lang = TEXT.lang;
       document.title = TEXT.title;
@@ -225,6 +241,11 @@
       $("status-text").textContent = t(loadingStage);
 
       const modeler = new BpmnJS({ container: "#diagram" });
+      window.studio = { modeler }; // for the headless browser checks
+      runGate.lint = createLintPanel({
+        container: $("lint"), modeler, t, onChange: updateRun,
+        lint: (xml) => call("lint_xml", { xml }),
+      });
       const [xml, paramsToml] = await Promise.all([fetchText(PRESET.xml), fetchText(PRESET.params)]);
       try {
         await modeler.importXML(xml);
@@ -244,10 +265,13 @@
       const params = await call("params_from_toml", { text: paramsToml });
       $("load-progress").value = $("load-progress").max;
       $("status-text").textContent = t("ready");
-      $("run").disabled = false;
+      runGate.ready = true;
+      updateRun();
 
       $("run").addEventListener("click", async () => {
-        $("run").disabled = true;
+        if (blocksRun(runGate.lint.state)) return;
+        runGate.running = true;
+        updateRun();
         $("error").hidden = true;
         const started = performance.now();
         $("load-progress").max = RUN.replications;
@@ -265,7 +289,8 @@
           $("status-text").textContent = "";
           showError(t("run_failed", { error: e.message }));
         } finally {
-          $("run").disabled = false;
+          runGate.running = false;
+          updateRun();
         }
       });
     }
