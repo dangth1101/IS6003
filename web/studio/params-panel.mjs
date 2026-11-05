@@ -11,7 +11,8 @@
 // edit and a value edit never overwrite each other.
 //
 // For the page (and tickets 06 / 07):
-//   const panel = createParamsPanel({ root, modeler, call, t, lang, run, onRunChange, onError });
+//   const panel = createParamsPanel({ root, modeler, call, t, lang, run, onRunChange, onError, onParamsChange });
+//   onParamsChange(params) after every update of the parameters (edit, diagram edit, load)
 //   await panel.load({ params, name })          after the worker is ready: fill and show these parameters
 //   await panel.load({ xml, params, name })     also import xml into the Modeler first (e.g. a suggestion)
 //   await panel.params()                        the current parameters, after pending updates
@@ -20,7 +21,7 @@
 
 const DEBOUNCE_MS = 300;
 
-export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaults, onRunChange = () => {}, onError = () => {} }) {
+export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaults, onRunChange = () => {}, onError = () => {}, onParamsChange = () => {} }) {
   const registry = modeler.get("elementRegistry");
   const canvas = modeler.get("canvas");
   const selection = modeler.get("selection");
@@ -45,6 +46,7 @@ export function createParamsPanel({ root, modeler, call, t, lang, run: runDefaul
       try {
         state = await fn(state?.params);
         if (key) editError = null;
+        onParamsChange(state.params);
       } catch (e) {
         if (!key) throw e;
         editError = { key, message: e.message };

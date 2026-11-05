@@ -247,29 +247,135 @@ def apply_suggestion(xml: str, change_ids: list[str], preset: Mapping[str, str])
     if unknown:
         raise ValueError(f"no changes {', '.join(unknown)} in the catalog, which has {', '.join(catalog.ids)}")
     combo = [change_id for change_id in catalog.ids if change_id in change_ids]
-    model, _ = catalog.resolve(combo)
-
-    files = {frozenset(part.strip() for part in key.split("+")): file for key, file in raw["catalog"].get("models", {}).items()}
-    structural = set().union(*files)
-    xml_out = preset[files[frozenset(combo) & structural]] if frozenset(combo) & structural else preset[PRESET_MODEL]
-    params = copy.deepcopy(raw["params"])
-    for change in catalog.changes:
-        if change.id in combo:
-            for section, entries in change.overrides.items():
-                params.setdefault(section, {}).update(copy.deepcopy(entries))
-    return {"xml": xml_out, "params": _restrict(params, model), "changes": combo}
+    xml_out, params = _preset_design(catalog, raw, preset, combo)
+    return {"xml": xml_out, "params": params, "changes": combo}
 
 
-def suggestions(xml: str, preset: Mapping[str, str]) -> dict:
-    """The change catalog for the suggestions panel, and whether it applies to the current model.
+def suggestions(xml: str, preset: Mapping[str, str], params: dict | None = None) -> dict:
+    """The change catalog for the suggestions panel, and what the current design is.
 
     changes: the catalog's changes in order, each {id, title, driver, heuristic
     {name, ref}, expected_effect, trade_off {time, cost, quality, flexibility,
     note}}, as in the results file. available: whether xml is the preset's model
     with some set of structural changes, so apply_suggestion accepts it.
+
+    With the current params (the panel's), also: applied, the changes the design
+    carries in catalog order (a structural one when the model has it, a
+    parameter one while every entry it overrides has the catalog's values), and
+    exact, whether params are the catalog's for that set, so applying or undoing
+    loses no value set by hand. Rationales are not compared. Both are None when
+    the suggestions aren't available or params isn't given.
     """
-    catalog, _ = _preset_catalog(preset)
-    return {"changes": catalog.entries(), "available": parse_bpmn(xml) in _scenario_models(catalog)}
+    catalog, raw = _preset_catalog(preset)
+    model = parse_bpmn(xml)
+    matches = [combo for combo, (scenario_model, _) in catalog.scenarios.items() if scenario_model == model]
+    applied = exact = None
+    if matches and params is not None:
+        structural = _structural_ids(raw)
+        carried = matches[0] & structural  # every scenario on this model has the same structural changes
+        applied = [
+            change.id
+            for change in catalog.changes
+            if change.id in carried or (change.id not in structural and _carries(params, change.overrides))
+        ]
+        _, expected = _preset_design(catalog, raw, preset, applied)
+        exact = _values(params) == _values(expected)
+    return {"changes": catalog.entries(), "available": bool(matches), "applied": applied, "exact": exact}
+
+
+def _model_files(raw: dict) -> dict[frozenset[str], str]:
+    """The catalog's [models] table: set of structural change IDs -> model file name."""
+    return {frozenset(part.strip() for part in key.split("+")): file for key, file in raw["catalog"].get("models", {}).items()}
+
+
+def _structural_ids(raw: dict) -> set[str]:
+    return set().union(*_model_files(raw))
+
+
+def _preset_design(catalog: Catalog, raw: dict, preset: Mapping[str, str], combo: list[str]) -> tuple[str, dict]:
+    """The model text and parameter dict of the catalog scenario combo, as Catalog.resolve builds it."""
+    model, _ = catalog.resolve(combo)
+    files = _model_files(raw)
+    structural = frozenset(combo) & _structural_ids(raw)
+    xml = preset[files[structural]] if structural else preset[PRESET_MODEL]
+    params = copy.deepcopy(raw["params"])
+    for change in catalog.changes:
+        if change.id in combo:
+            for section, entries in change.overrides.items():
+                params.setdefault(section, {}).update(copy.deepcopy(entries))
+    return xml, _restrict(params, model)
+
+
+def _carries(params: dict, overrides: dict) -> bool:
+    """Whether every entry the overrides set has their values in params."""
+    return all(
+        _values(params.get(section, {}).get(element_id)) == _values(entry)
+        for section, entries in overrides.items()
+        for element_id, entry in entries.items()
+    )
+
+
+def _values(value):
+    """A parameter dict or entry without its rationales: what the simulation uses."""
+    if isinstance(value, dict):
+        return {key: _values(item) for key, item in value.items() if key != "rationale"}
+    if isinstance(value, list):
+        return [_values(item) for item in value]
+    return value
+
+
+_PER_ELEMENT = ("tasks", "gateways", "lanes")
+
+
+def diff_designs(before_xml: str, before_params: dict, after_xml: str, after_params: dict) -> dict:
+    """What changed from one design to the next, so the page can highlight it.
+
+    {added, removed, rerouted, parameters}: added and removed are the nodes and
+    flows only one model has, rerouted the flows both have with another source
+    or target, each as {id, label} in model order (removed in the old model's).
+    parameters are the entry keys ("tasks.<id>", "lanes.<id>", "arrivals", ...)
+    whose values differ, rationales not compared, leaving out entries of removed
+    elements. Layout (diagram positions) is not part of the model, so moving
+    shapes changes nothing.
+    """
+    before, after = parse_bpmn(before_xml), parse_bpmn(after_xml)
+
+    def elements(model: ProcessModel) -> dict:
+        return {**model.nodes, **model.flows}
+
+    def row(element) -> dict:
+        return {"id": element.id, "label": element.label}
+
+    old, new = elements(before), elements(after)
+    rerouted = [
+        row(flow)
+        for flow_id, flow in after.flows.items()
+        if flow_id in before.flows and (before.flows[flow_id].source, before.flows[flow_id].target) != (flow.source, flow.target)
+    ]
+
+    def entries(params: dict) -> dict:
+        out = {}
+        for section, value in params.items():
+            if section in _PER_ELEMENT:
+                out |= {f"{section}.{element_id}": _values(entry) for element_id, entry in value.items()}
+            else:
+                out[section] = _values(value)
+        return out
+
+    old_entries, new_entries = entries(before_params), entries(after_params)
+    keys = [*new_entries, *(key for key in old_entries if key not in new_entries)]
+    present = set(new) | set(after.lanes)
+    parameters = [
+        key
+        for key in keys
+        if old_entries.get(key) != new_entries.get(key) and (key.split(".")[0] not in _PER_ELEMENT or key.split(".", 1)[1] in present)
+    ]
+    return {
+        "added": [row(element) for element_id, element in new.items() if element_id not in old],
+        "removed": [row(element) for element_id, element in old.items() if element_id not in new],
+        "rerouted": rerouted,
+        "parameters": parameters,
+    }
 
 
 def _preset_catalog(preset: Mapping[str, str]) -> tuple[Catalog, dict]:

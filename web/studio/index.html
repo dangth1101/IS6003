@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.31.1/dist/assets/bpmn-font/css/bpmn.css">
   <link rel="stylesheet" href="lint-panel.css">
   <link rel="stylesheet" href="params-panel.css">
+  <link rel="stylesheet" href="suggestions-panel.css">
   <style>
     /* No wording in this file: every visible string comes from studio.<lang>.json
        (built from src/bpmopt/content/studio.<lang>.toml) or from the BPMN labels. */
@@ -103,6 +104,7 @@
       <div id="diagram" class="diagram" aria-label=""></div>
       <aside id="params-panel"></aside>
     </div>
+    <section id="suggestions" aria-live="polite"></section>
 
     <div class="toolbar">
       <button id="run" type="button" disabled></button>
@@ -117,6 +119,7 @@
   <script type="module">
     import { createLintPanel, blocksRun, runBlockedReason } from "./lint-panel.mjs";
     import { createParamsPanel } from "./params-panel.mjs";
+    import { createSuggestionsPanel } from "./suggestions-panel.mjs";
 
     // The default run, as in the spec: 1,000 cases and 10 replications.
     const RUN = { n_cases: 1000, replications: 10, seed: 42 };
@@ -255,11 +258,19 @@
         container: $("lint"), modeler, t, onChange: updateRun,
         lint: (xml) => call("lint_xml", { xml }),
       });
+      let suggestions = null; // the suggestions panel below follows the parameter panel's changes
       const panel = createParamsPanel({
         root: $("params-panel"), modeler, call, t, lang: TEXT.lang, run: RUN, onRunChange: renderRunSettings, onError: showError,
+        onParamsChange: () => suggestions?.paramsChanged(),
       });
       window.studio.panel = panel;
       const [xml, paramsToml] = await Promise.all([fetchText(PRESET.xml), fetchText(PRESET.params)]);
+      let presetParams;
+      suggestions = createSuggestionsPanel({
+        root: $("suggestions"), modeler, call, t, params: panel, onError: showError,
+        backToPreset: () => panel.load({ xml, params: presetParams, name: "as_is" }),
+      });
+      window.studio.suggestions = suggestions;
       try {
         await modeler.importXML(xml);
         modeler.get("canvas").zoom("fit-viewport");
@@ -275,7 +286,9 @@
         return;
       }
       $("status-text").textContent = t("load_preset");
-      await panel.load({ params: await call("params_from_toml", { text: paramsToml }), name: "as_is" });
+      presetParams = await call("params_from_toml", { text: paramsToml });
+      await panel.load({ params: presetParams, name: "as_is" });
+      await suggestions.refresh();
       $("load-progress").value = $("load-progress").max;
       $("status-text").textContent = t("ready");
       runGate.ready = true;

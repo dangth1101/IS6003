@@ -300,7 +300,7 @@ def test_suggestions_lists_the_catalog_and_whether_they_apply_to_the_current_mod
     hand_edited = AS_IS.read_text().replace('name="Run functional tests"', 'name="Run all functional tests"')
     full = apply_suggestion(AS_IS.read_text(), catalog.ids, preset())
 
-    assert suggestions(AS_IS.read_text(), preset()) == {"changes": catalog.entries(), "available": True}
+    assert suggestions(AS_IS.read_text(), preset()) == {"changes": catalog.entries(), "available": True, "applied": None, "exact": None}
     assert suggestions(full["xml"], preset())["available"] is True
     assert suggestions(hand_edited, preset())["available"] is False
 

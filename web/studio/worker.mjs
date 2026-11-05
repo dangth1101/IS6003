@@ -7,8 +7,9 @@
 //   default_parameters  { xml, params? }
 //   simulate_summary    { xml, params, n_cases, seed, replications }   sends progress
 //   compare             { baseline, variant }                         two simulate_summary results
-//   suggestions         { xml }
+//   suggestions         { xml, params? }   the catalog, and which changes the design carries
 //   apply_suggestion    { xml, change_ids }
+//   diff_designs        { before_xml, before_params, after_xml, after_params }   what a step changed
 //   set_parameter       { xml, params, entry, fields }   one entry from the parameter panel
 //   fixed_branches      { params, gateway_id }           "reset to fixed" for logistic branches
 //   params_to_toml      { params }                       the parameter file's text, for export
