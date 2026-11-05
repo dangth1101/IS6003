@@ -1,0 +1,54 @@
+/* The results panel (results-panel.mjs). Tokens from index.html; the bars and CI plot follow
+   the report page's (web/index.html). This run is the accent, the baseline is grey. */
+:root { --baseline: #8d8c86; }
+.results-panel { margin: 16px 0; }
+.results-panel h2 { font-size: 1.1rem; margin: 0 0 8px; }
+.results-panel h3 { font-size: 1rem; margin: 24px 0 6px; }
+.results-panel section > h3:first-child { margin-top: 16px; }
+.results-panel button { font-size: 0.85rem; padding: 5px 12px; }
+.results-panel button.secondary { background: transparent; color: var(--accent); }
+.results-panel .tile dd { font-variant-numeric: normal; }
+
+.baseline-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0; }
+.baseline-box { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 4px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; }
+
+.results-panel .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 4px 0 8px; padding: 0; list-style: none; font-size: 0.875rem; }
+.results-panel .legend li { display: flex; align-items: center; gap: 6px; }
+.results-panel .swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; display: inline-block; }
+.swatch.baseline { background: var(--baseline); }
+.swatch.variant { background: var(--accent); }
+
+.results-panel .bars { display: grid; grid-template-columns: minmax(90px, max-content) minmax(0, 1fr); gap: 6px 12px; align-items: center; margin: 8px 0; font-size: 0.9rem; }
+.results-panel .bars.paired { gap: 10px 12px; }
+.results-panel .bar-label { min-width: 0; overflow-wrap: anywhere; }
+.results-panel .bar-pair { display: grid; gap: 2px; }
+.results-panel .bar-track { position: relative; height: 18px; }
+.results-panel .paired .bar-track { height: 12px; }
+.results-panel .bar { height: 100%; border-radius: 0 4px 4px 0; min-width: 2px; }
+.results-panel .bar.variant { background: var(--accent); }
+.results-panel .bar.baseline { background: var(--baseline); }
+.results-panel .bar-track:hover .bar { filter: brightness(1.15); }
+.results-panel .bar-value { position: absolute; top: 0; font-size: 0.8rem; line-height: 18px; color: var(--muted); padding-left: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.results-panel .paired .bar-value { line-height: 12px; font-size: 0.75rem; }
+
+.results-panel .ci-plot { margin: 8px 0 12px; display: grid; grid-template-columns: minmax(90px, max-content) 1fr; gap: 10px 12px; align-items: center; font-size: 0.9rem; }
+.results-panel .ci-track { position: relative; height: 22px; background: var(--track); border-radius: 4px; }
+.results-panel .ci-range { position: absolute; top: 9px; height: 4px; background: var(--accent); border-radius: 2px; }
+.results-panel .ci-dot { position: absolute; top: 5px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--surface); }
+.results-panel .ci-track.baseline .ci-range, .results-panel .ci-track.baseline .ci-dot { background: var(--baseline); }
+
+.results-panel .table-scroll { overflow-x: auto; margin: 8px 0; }
+.results-panel table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+.results-panel th, .results-panel td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+.results-panel th { color: var(--muted); font-weight: 500; }
+.results-panel td.num, .results-panel th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.results-panel td.num { white-space: nowrap; }
+.results-panel .ci-sub { font-size: 0.8rem; color: var(--muted); }
+.results-panel details.table-view { margin: 4px 0 8px; font-size: 0.875rem; }
+.results-panel details.table-view summary { cursor: pointer; color: var(--accent); }
+.results-panel .tiles { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.results-panel .tile dd { font-size: 1.4rem; }
+@media (max-width: 640px) {
+  .results-panel .bars, .results-panel .bars.paired { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .results-panel .bar-pair { margin-bottom: 8px; }
+}
