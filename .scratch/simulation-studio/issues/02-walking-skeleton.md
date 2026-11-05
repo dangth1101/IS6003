@@ -4,7 +4,7 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] `simulate_summary` on the as-is preset gives the same per-replication means as `run_scenarios` for the empty scenario (same seed, cases, replications)
 - [ ] `read_bpmn` and `load_parameters` keep their file APIs; new string / dict entry points are tested
@@ -13,3 +13,4 @@
 - [ ] Studio text comes from a content file
 
 ## Comments
+- 2026-11-05: claimed. Implementer started.
