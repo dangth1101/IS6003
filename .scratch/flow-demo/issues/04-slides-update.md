@@ -4,11 +4,12 @@
 
 **Blocked by:** 03
 
-**Status:** claimed
+**Status:** done
 
-- [ ] Slide 10 shows the demo, caption and notes match it
-- [ ] No studio wording left in the deck
-- [ ] Deck validates and renders cleanly in PowerPoint
+- [x] Slide 10 shows the demo, caption and notes match it
+- [x] No studio wording left in the deck
+- [x] Deck validates and renders cleanly in PowerPoint
 
 ## Comments
 - 2026-11-06: claimed.
+- 2026-11-06: done. Slide 10 shows the demo in compare mode (screenshot at about 60% of the replay), with a new caption and notes. No studio wording left. Deck validates and renders in PowerPoint; preview PDF rebuilt.
