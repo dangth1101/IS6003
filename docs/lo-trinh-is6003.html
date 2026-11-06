@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Lộ trình IS6003</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: một cột đọc, giống một sơ đồ BPMN: dải lane làm vạch chia mục, task là hộp bo góc nhỏ, sự kiện là vòng tròn. */
+:root {
+  --bg: #f4f7f7;
+  --surface: #ffffff;
+  --ink: #15201f;
+  --muted: #566664;
+  --line: #d3dedc;
+  --accent: #0a746f;
+  --accent-soft: #e2f1ef;
+  --done: #2f7a35;
+  --done-soft: #e5f2e3;
+  --ready: #a35c00;
+  --ready-soft: #fbefdc;
+  --wait: #66737a;
+  --wait-soft: #eceff1;
+  --human: #6d43b5;
+  --human-soft: #efe8fa;
+  --f-display: "Be Vietnam Pro", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Be Vietnam Pro", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1515; --surface: #162020; --ink: #e2ecea; --muted: #94a7a4; --line: #2a3938;
+    --accent: #43c2b9; --accent-soft: #15302e;
+    --done: #78c87c; --done-soft: #1a2e1b; --ready: #f0a94a; --ready-soft: #33260f;
+    --wait: #9aa8ae; --wait-soft: #1f292b; --human: #b79af0; --human-soft: #261d38;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1515; --surface: #162020; --ink: #e2ecea; --muted: #94a7a4; --line: #2a3938;
+  --accent: #43c2b9; --accent-soft: #15302e;
+  --done: #78c87c; --done-soft: #1a2e1b; --ready: #f0a94a; --ready-soft: #33260f;
+  --wait: #9aa8ae; --wait-soft: #1f292b; --human: #b79af0; --human-soft: #261d38;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16px;
+  line-height: 1.6;
+}
+.wrap {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 72px;
+  display: grid;
+  gap: 56px;
+}
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.25; }
+h1 { font-size: clamp(1.8rem, 4.2vw, 2.7rem); font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 1.45rem; font-weight: 700; }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; }
+.prose { max-width: 68ch; display: grid; gap: 12px; }
+.muted { color: var(--muted); }
+code, .mono { font-family: var(--f-mono); font-size: 0.88em; }
+code { background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Section header styled like a BPMN lane label */
+.lane { display: grid; gap: 20px; }
+.lane-head { display: flex; align-items: baseline; gap: 12px; border-top: 2px solid var(--ink); padding-top: 14px; flex-wrap: wrap; }
+.lane-head .tag { font-family: var(--f-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+/* Hero */
+.hero { display: grid; gap: 18px; }
+.eyebrow { font-family: var(--f-mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lead { font-size: 1.12rem; max-width: 62ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 0.9rem; color: var(--muted); }
+.facts b { color: var(--ink); font-weight: 600; }
+.progress { display: grid; gap: 8px; max-width: 520px; }
+.bar { display: grid; grid-template-columns: repeat(16, 1fr); gap: 3px; }
+.bar span { height: 10px; border-radius: 2px; background: var(--wait-soft); border: 1px solid var(--line); }
+.bar span.d { background: var(--done); border-color: var(--done); }
+.bar span.r { background: var(--ready-soft); border-color: var(--ready); }
+
+.answer {
+  border: 1.5px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 8px;
+  padding: 16px 18px;
+  max-width: 68ch;
+  font-weight: 500;
+}
+
+/* Pipeline drawn as a BPMN sequence */
+.flow-scroll { overflow-x: auto; padding-bottom: 6px; }
+.flow { display: flex; align-items: flex-start; gap: 0; min-width: 980px; }
+.ev { flex: 0 0 auto; display: grid; justify-items: center; gap: 6px; width: 64px; padding-top: 22px; }
+.ev .c { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--ink); background: var(--surface); }
+.ev.end .c { border-width: 5px; }
+.ev small { font-size: 0.72rem; color: var(--muted); text-align: center; line-height: 1.3; }
+.arrow { flex: 0 0 18px; height: 2px; background: var(--ink); margin-top: 39px; position: relative; }
+.arrow::after { content: ""; position: absolute; right: -1px; top: -4px; border-left: 7px solid var(--ink); border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+.task {
+  flex: 1 1 0; min-width: 0;
+  border: 1.5px solid var(--ink); border-radius: 8px; background: var(--surface);
+  padding: 10px 10px 12px; display: grid; gap: 6px; align-content: start; min-height: 132px;
+}
+.task .n { font-family: var(--f-mono); font-size: 0.7rem; color: var(--muted); }
+.task strong { font-size: 0.86rem; line-height: 1.35; }
+.task .tks { display: flex; flex-wrap: wrap; gap: 4px; margin-top: auto; }
+.task .tks span { font-family: var(--f-mono); font-size: 0.7rem; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); background: var(--bg); }
+.task .tks span.d { border-color: var(--done); color: var(--done); }
+.task.ml { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* Waves */
+.waves-scroll { overflow-x: auto; padding-bottom: 6px; }
+.waves { display: grid; grid-template-columns: repeat(7, minmax(132px, 1fr)); gap: 10px; min-width: 980px; }
+.wave { display: grid; gap: 8px; align-content: start; }
+.wave h4 { margin: 0; font-family: var(--f-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding-bottom: 6px; border-bottom: 1px dashed var(--line); }
+.mini { border: 1px solid var(--line); border-radius: 6px; padding: 8px 9px; background: var(--surface); display: grid; gap: 2px; }
+.mini .top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.mini .id { font-family: var(--f-mono); font-weight: 600; font-size: 0.82rem; }
+.mini .nm { font-size: 0.82rem; line-height: 1.3; }
+.mini .dep { font-family: var(--f-mono); font-size: 0.68rem; color: var(--muted); }
+.mini.done { border-color: var(--done); background: var(--done-soft); }
+.mini.ready { border-color: var(--ready); background: var(--ready-soft); }
+.mini.next { box-shadow: 0 0 0 2px var(--ready); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--human); flex: 0 0 auto; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.85rem; color: var(--muted); align-items: center; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; border: 1px solid var(--line); }
+.legend i.done { background: var(--done-soft); border-color: var(--done); }
+.legend i.ready { background: var(--ready-soft); border-color: var(--ready); }
+.legend i.wait { background: var(--surface); }
+.legend i.human { background: var(--human); border-radius: 50%; border-color: var(--human); }
+
+/* Ticket cards */
+.tickets { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 14px; }
+.tk { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.tk header { display: flex; gap: 10px; align-items: flex-start; }
+.tk .id { font-family: var(--f-mono); font-weight: 600; font-size: 0.95rem; color: var(--accent); padding-top: 1px; }
+.tk header div { display: grid; gap: 6px; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid; line-height: 1.5; }
+.chip.done { color: var(--done); border-color: var(--done); background: var(--done-soft); }
+.chip.ready { color: var(--ready); border-color: var(--ready); background: var(--ready-soft); }
+.chip.wait { color: var(--wait); border-color: var(--line); background: var(--wait-soft); }
+.chip.human { color: var(--human); border-color: var(--human); background: var(--human-soft); }
+.chip.phase { color: var(--muted); border-color: var(--line); background: transparent; font-weight: 500; font-family: var(--f-mono); }
+.tk p { font-size: 0.94rem; }
+.tk dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; font-size: 0.86rem; }
+.tk dt { color: var(--muted); }
+.tk dd { margin: 0; min-width: 0; }
+
+/* Next steps */
+.next-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; }
+.box { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 18px 20px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.box.rec { border: 1.5px solid var(--ready); }
+ol.steps, ul.todo { margin: 0; padding-left: 22px; display: grid; gap: 8px; font-size: 0.95rem; }
+ul.todo { list-style: none; padding-left: 0; }
+ul.todo li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; }
+ul.todo li::before { content: ""; width: 14px; height: 14px; border: 1.5px solid var(--muted); border-radius: 3px; margin-top: 5px; }
+
+/* Glossary */
+.gloss { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 0 28px; margin: 0; }
+.gloss div { padding: 10px 0; border-bottom: 1px solid var(--line); display: grid; gap: 2px; }
+.gloss dt { font-weight: 700; font-size: 0.92rem; }
+.gloss dd { margin: 0; font-size: 0.9rem; color: var(--muted); }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+
+<main class="wrap">
+
+  <section class="hero">
+    <div class="eyebrow">IS6003 · Bài cuối kỳ</div>
+    <h1>Rút ngắn thời gian phát triển ứng dụng bằng mô phỏng và ML</h1>
+    <p class="lead">Lấy quy trình phát triển ứng dụng hiện tại (<code>current_process.bpmn</code>), tìm chỗ làm chậm, thiết kế lại, rồi chứng minh bằng số liệu là quy trình mới nhanh hơn bao nhiêu.</p>
+    <div class="facts">
+      <span>Phương pháp: <b>DSRM</b> (Peffers và cộng sự, 2007)</span>
+      <span>Chuẩn vẽ: <b>Fundamentals of BPM</b>, bản 2</span>
+      <span>Dữ liệu: <b>tổng hợp</b>, không dùng dữ liệu thật</span>
+    </div>
+    <div class="progress" aria-label="Tiến độ: 1 trên 16 ticket đã xong">
+      <div class="bar">
+        <span class="d"></span><span class="r"></span><span class="r"></span><span class="r"></span><span class="r"></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <span class="muted" style="font-size:.88rem">1/16 ticket xong · 4 ticket làm được ngay · cập nhật 02/11/2026</span>
+    </div>
+  </section>
+
+  <section class="lane">
+    <div class="lane-head"><h2>Vấn đề và cách giải</h2><span class="tag">Chúng ta đang làm gì</span></div>
+    <div class="prose">
+      <p><b>Vấn đề:</b> đề bài yêu cầu tối ưu thời gian bằng ML, nhưng mình không có dữ liệu thật của công ty. Không có dữ liệu thì không train được mô hình, và cũng không đo được "nhanh hơn" là bao nhiêu.</p>
+      <p><b>Cách giải:</b> dựng một bộ mô phỏng (simulator) chạy theo đúng sơ đồ BPMN. Mô phỏng sinh ra event log tổng hợp, với mọi tham số ghi rõ trong bảng giả định. ML đọc log đó để tìm nguyên nhân gây chậm. Mình thiết kế lại quy trình dựa trên các nguyên nhân đó, rồi chạy lại mô phỏng để so sánh trước và sau.</p>
+      <p class="muted">Điểm yếu cần nói thẳng trong báo cáo: dữ liệu là do mình tạo, nên ML một phần chỉ "tìm lại" những gì mình đã cài vào bộ sinh dữ liệu. Ticket 10 và 14 xử lý chuyện này bằng cách liệt kê các hiệu ứng cài sẵn và so với kết quả ML.</p>
+    </div>
+    <p class="answer">Kết quả cuối cùng phải nói được một câu: "Quy trình to-be nhanh hơn X% (khoảng tin cậy 95% …), và thay đổi Y đóng góp nhiều nhất."</p>
+  </section>
+
+  <section class="lane">
+    <div class="lane-head"><h2>Đường đi của dữ liệu</h2><span class="tag">Từ sơ đồ đến kết luận</span></div>
+    <p class="muted" style="max-width:68ch">Vẽ theo kiểu BPMN: vòng tròn mảnh là sự kiện bắt đầu, vòng đậm là sự kiện kết thúc. Số nhỏ bên dưới mỗi bước là ticket xây bước đó. Bước có viền xanh là phần ML.</p>
+    <div class="flow-scroll">
+      <div class="flow" role="img" aria-label="Quy trình làm bài gồm 8 bước, từ mô hình as-is đến trang kết quả">
+        <div class="ev"><div class="c"></div><small>Có file BPMN gốc</small></div>
+        <div class="arrow"></div>
+        <div class="task"><span class="n">Phase 0</span><strong>Sửa mô hình as-is cho đúng sách</strong><div class="tks"><span>02</span><span>06</span></div></div>
+        <div class="arrow"></div>
+        <div class="task"><span class="n">Phase 1</span><strong>Phân tích định tính: VA/NVA, lãng phí, vấn đề</strong><div class="tks"><span>09</span></div></div>
+        <div class="arrow"></div>
+        <div class="task"><span class="n">Phase 2</span><strong>Mô phỏng ra event log tổng hợp</strong><div class="tks"><span class="d">01</span><span>03</span><span>04</span><span>07</span><span>10</span></div></div>
+        <div class="arrow"></div>
+        <div class="task"><span class="n">Phase 3</span><strong>Đo baseline: cycle time, chờ, rework</strong><div class="tks"><span>08</span></div></div>
+        <div class="arrow"></div>
+        <div class="task ml"><span class="n">Phase 4</span><strong>ML tìm nguyên nhân gây chậm</strong><div class="tks"><span>11</span><span>12</span><span>14</span></div></div>
+        <div class="arrow"></div>
+        <div class="task"><span class="n">Phase 5</span><strong>Thiết kế lại quy trình to-be</strong><div class="tks"><span>15</span></div></div>
+        <div class="arrow"></div>
+        <div class="task"><span class="n">Phase 6</span><strong>Mô phỏng mọi tổ hợp thay đổi, so sánh</strong><div class="tks"><span>13</span><span>16</span></div></div>
+        <div class="arrow"></div>
+        <div class="task"><span class="n">Phase 7</span><strong>Notebook và trang web kết quả</strong><div class="tks"><span>05</span><span>14</span><span>16</span></div></div>
+        <div class="arrow"></div>
+        <div class="ev end"><div class="c"></div><small>Có kết luận X%</small></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="lane">
+    <div class="lane-head"><h2>Lộ trình theo đợt</h2><span class="tag">Ticket nào chờ ticket nào</span></div>
+    <p class="muted" style="max-width:68ch">Một ticket chỉ bắt đầu được khi các ticket nó cần đã xong. Mỗi cột là một đợt: mọi ticket trong cùng cột có thể làm song song.</p>
+    <div class="legend">
+      <span><i class="done"></i>Đã xong</span>
+      <span><i class="ready"></i>Làm được ngay</span>
+      <span><i class="wait"></i>Đang chờ ticket khác</span>
+      <span><i class="human"></i>Cần bạn quyết định hoặc duyệt</span>
+    </div>
+    <div class="waves-scroll">
+      <div class="waves">
+        <div class="wave"><h4>Đợt 1</h4>
+          <div class="mini done"><div class="top"><span class="id">01</span></div><span class="nm">Bộ khung chạy xuyên suốt</span><span class="dep">xong</span></div>
+        </div>
+        <div class="wave"><h4>Đợt 2</h4>
+          <div class="mini ready next"><div class="top"><span class="id">02</span></div><span class="nm">Linter theo luật sách</span><span class="dep">cần 01 · làm tiếp theo</span></div>
+          <div class="mini ready"><div class="top"><span class="id">03</span></div><span class="nm">Gateway, rework, flow analysis</span><span class="dep">cần 01</span></div>
+          <div class="mini ready"><div class="top"><span class="id">04</span></div><span class="nm">Nguồn lực và thời gian chờ</span><span class="dep">cần 01</span></div>
+          <div class="mini ready"><div class="top"><span class="id">05</span></div><span class="nm">Schema kết quả và trang web</span><span class="dep">cần 01</span></div>
+        </div>
+        <div class="wave"><h4>Đợt 3</h4>
+          <div class="mini"><div class="top"><span class="id">06</span><span class="dot" title="Cần bạn"></span></div><span class="nm">Mô hình as-is đã sửa</span><span class="dep">cần 02</span></div>
+          <div class="mini"><div class="top"><span class="id">07</span></div><span class="nm">Thuộc tính case và tham số</span><span class="dep">cần 03</span></div>
+          <div class="mini"><div class="top"><span class="id">08</span></div><span class="nm">Phân tích baseline</span><span class="dep">cần 03, 04</span></div>
+        </div>
+        <div class="wave"><h4>Đợt 4</h4>
+          <div class="mini"><div class="top"><span class="id">09</span><span class="dot" title="Cần bạn"></span></div><span class="nm">Phân tích định tính</span><span class="dep">cần 05, 06</span></div>
+          <div class="mini"><div class="top"><span class="id">10</span></div><span class="nm">Tham số as-is và event log</span><span class="dep">cần 04, 06, 07</span></div>
+          <div class="mini"><div class="top"><span class="id">11</span></div><span class="nm">ML A: dự đoán cycle time</span><span class="dep">cần 07</span></div>
+          <div class="mini"><div class="top"><span class="id">12</span></div><span class="nm">ML B: dự đoán rework</span><span class="dep">cần 07</span></div>
+          <div class="mini"><div class="top"><span class="id">13</span></div><span class="nm">Bộ chạy kịch bản</span><span class="dep">cần 04, 07</span></div>
+        </div>
+        <div class="wave"><h4>Đợt 5</h4>
+          <div class="mini"><div class="top"><span class="id">14</span></div><span class="nm">Chạy as-is từ đầu đến cuối</span><span class="dep">cần 05, 08–12</span></div>
+        </div>
+        <div class="wave"><h4>Đợt 6</h4>
+          <div class="mini"><div class="top"><span class="id">15</span><span class="dot" title="Cần bạn"></span></div><span class="nm">Thiết kế lại (to-be)</span><span class="dep">cần 13, 14</span></div>
+        </div>
+        <div class="wave"><h4>Đợt 7</h4>
+          <div class="mini"><div class="top"><span class="id">16</span></div><span class="nm">Đánh giá cuối và trang</span><span class="dep">cần 15</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="muted" style="max-width:68ch">Hai chuỗi dài nhất, mỗi chuỗi 7 ticket, quyết định ngày xong sớm nhất: <span class="mono">01 → 02 → 06 → 10 → 14 → 15 → 16</span> và <span class="mono">01 → 03 → 07 → 10 → 14 → 15 → 16</span>. Chậm ở bất kỳ ticket nào trong hai chuỗi này là cả bài chậm theo.</p>
+  </section>
+
+  <section class="lane">
+    <div class="lane-head"><h2>Mỗi ticket làm gì</h2><span class="tag">16 ticket · <code>.scratch/bpmn-time-optimization/issues/</code></span></div>
+    <div class="tickets">
+
+      <article class="tk">
+        <header><span class="id">01</span><div><h3>Bộ khung chạy xuyên suốt</h3><div class="chips"><span class="chip done">Đã xong</span><span class="chip phase">Hạ tầng</span></div></div></header>
+        <p>Dựng đường đi mỏng nhất từ đầu đến cuối: đọc một file BPMN đơn giản (3 task nối tiếp), mô phỏng với thời gian cố định, ra event log, tính cycle time trung bình, ghi <code>results.json</code>, rồi trang web hiển thị. Các ticket sau chỉ làm dày thêm bộ khung này.</p>
+        <dl><dt>Kết quả</dt><dd>Package <code>bpmopt</code>, 8 test, notebook, trang web. Cycle time 10,5 ngày, khớp công thức §7.1.1.</dd><dt>Cần trước</dt><dd>Không</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">02</span><div><h3>Linter theo luật của sách</h3><div class="chips"><span class="chip ready">Làm được ngay</span><span class="chip phase">Phase 0</span></div></div></header>
+        <p>Kiểm tra tự động một file BPMN theo luật trong sách: 7PMG G1–G7 (§5.4.4), nhãn sự kiện có nghĩa, không ghi Có/Không trên nhánh XOR (tr.190), lane phải nằm trong pool, mọi node đi được từ start tới end. Chạy trên <code>current_process.bpmn</code> phải bắt được 4 lỗi đã biết.</p>
+        <dl><dt>Kết quả</dt><dd>Hàm <code>lint()</code> trả danh sách vi phạm, mỗi vi phạm ghi luật và mục sách.</dd><dt>Cần trước</dt><dd>01</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">03</span><div><h3>Gateway, vòng làm lại và flow analysis</h3><div class="chips"><span class="chip ready">Làm được ngay</span><span class="chip phase">Phase 2–3</span></div></div></header>
+        <p>Cho bộ mô phỏng hiểu rẽ nhánh XOR, chạy song song AND và vòng rework. Thêm flow analysis: tính cycle time lý thuyết bằng công thức §7.1.1. Kết quả phải khớp đúng các ví dụ trong sách (Hình 7.1–7.8) và khớp với kết quả mô phỏng.</p>
+        <dl><dt>Kết quả</dt><dd>Simulator xử lý được gateway, hàm flow analysis để đối chiếu.</dd><dt>Cần trước</dt><dd>01</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">04</span><div><h3>Nguồn lực, hồ sơ đến và thời gian chờ</h3><div class="chips"><span class="chip ready">Làm được ngay</span><span class="chip phase">Phase 2</span></div></div></header>
+        <p>Mỗi lane là một nhóm người có số lượng giới hạn. Hồ sơ đến liên tục nên phải xếp hàng chờ. Log tách riêng thời gian chờ và thời gian làm. Có warm-up: bỏ các case chạy lúc hệ thống còn trống. Ticket này sửa chung lõi mô phỏng với 03, nên làm cùng nhau.</p>
+        <dl><dt>Kết quả</dt><dd>Log có ready / start / end thật, thấy được hàng chờ.</dd><dt>Cần trước</dt><dd>01</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">05</span><div><h3>Schema kết quả và trang web đầy đủ</h3><div class="chips"><span class="chip ready">Làm được ngay</span><span class="chip phase">Phase 7</span></div></div></header>
+        <p>Định nghĩa đầy đủ cấu trúc <code>results.json</code>, làm trang hoàn chỉnh theo thứ tự DSRM bằng dữ liệu giả, có nút bật/tắt từng thay đổi. Mọi chữ trên trang lấy từ file kết quả, nên muốn đổi ngôn ngữ chỉ cần đổi nội dung.</p>
+        <dl><dt>Kết quả</dt><dd>Schema đầy đủ, file giả hợp lệ, trang chạy trên GitHub Pages.</dd><dt>Cần trước</dt><dd>01</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">06</span><div><h3>Mô hình as-is đã sửa</h3><div class="chips"><span class="chip wait">Đang chờ</span><span class="chip human">Cần bạn</span><span class="chip phase">Phase 0</span></div></div></header>
+        <p>Vẽ lại quy trình hiện tại bằng tiếng Anh cho đúng sách: thêm pool, nhãn sự kiện dạng "đối tượng + phân từ quá khứ", thay Có/Không bằng điều kiện rõ, tách task kiểm thử thành 4 bước (code review, kiểm thử chức năng, bảo mật, nghiệm thu), thêm kết thúc "Proposal rejected". File gốc giữ nguyên.</p>
+        <dl><dt>Kết quả</dt><dd>Mô hình mới lint sạch, kèm change log.</dd><dt>Bạn quyết</dt><dd>"Bổ sung / điều chỉnh đề xuất" thuộc lane nào.</dd><dt>Cần trước</dt><dd>02</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">07</span><div><h3>Thuộc tính case và file tham số</h3><div class="chips"><span class="chip wait">Đang chờ</span><span class="chip phase">Phase 2</span></div></div></header>
+        <p>Mỗi case có thuộc tính: loại dự án, độ phức tạp, số tích hợp, mức bảo mật, đơn vị yêu cầu, tải của team. Xác suất rẽ nhánh có thể phụ thuộc thuộc tính, ví dụ dự án phức tạp dễ phải làm lại hơn. Thời gian task theo phân phối tam giác. Tham số nào cũng phải có lý do, và từ đó sinh ra bảng giả định.</p>
+        <dl><dt>Kết quả</dt><dd>Log có thuộc tính trên mỗi dòng, bảng giả định trong kết quả.</dd><dt>Cần trước</dt><dd>03</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">08</span><div><h3>Phân tích baseline</h3><div class="chips"><span class="chip wait">Đang chờ</span><span class="chip phase">Phase 3</span></div></div></header>
+        <p>Từ event log tính: cycle time, thời gian làm, thời gian chờ (mean, median, P90), cycle time efficiency (§7.1.2), tỉ lệ rework ở mỗi gateway, thời gian chờ trung bình theo task. Đối chiếu số mô phỏng với flow analysis.</p>
+        <dl><dt>Kết quả</dt><dd>Mục <code>baseline</code> trong kết quả: bức tranh "hiện tại chậm ở đâu".</dd><dt>Cần trước</dt><dd>03, 04</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">09</span><div><h3>Phân tích định tính</h3><div class="chips"><span class="chip wait">Đang chờ</span><span class="chip human">Cần bạn duyệt</span><span class="chip phase">Phase 1</span></div></div></header>
+        <p>Theo chương 6: xếp từng activity vào VA / BVA / NVA, phân tích lãng phí, lập issue register, và viết mục tiêu thành một con số cycle time cụ thể. Agent soạn nháp, bạn sửa và duyệt, vì việc này cần hiểu quy trình thật.</p>
+        <dl><dt>Kết quả</dt><dd>Phát biểu vấn đề và mục tiêu đo được.</dd><dt>Cần trước</dt><dd>05, 06</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">10</span><div><h3>Tham số as-is và event log tổng hợp</h3><div class="chips"><span class="chip wait">Đang chờ</span><span class="chip phase">Phase 2</span></div></div></header>
+        <p>Đặt tham số mặc định cho mô hình đã sửa: tốc độ hồ sơ đến, thời gian từng task, xác suất rẽ nhánh, số người mỗi lane. Liệt kê rõ các hiệu ứng cài sẵn để sau này nói thật là ML đang tìm lại cái gì. Sinh ít nhất 2.000 case, xuất CSV.</p>
+        <dl><dt>Kết quả</dt><dd>Event log dùng cho baseline và ML.</dd><dt>Cần trước</dt><dd>04, 06, 07</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">11</span><div><h3>ML A: dự đoán cycle time</h3><div class="chips"><span class="chip wait">Đang chờ</span><span class="chip phase">Phase 4</span></div></div></header>
+        <p>Từ thuộc tính lúc case bắt đầu, đoán case sẽ mất bao lâu. So ba mô hình: đoán bằng trung bình (mốc so sánh), hồi quy tuyến tính, gradient boosting. Chia train/test theo thời gian, không chia ngẫu nhiên. Đo MAE và R². Dùng SHAP để xếp hạng yếu tố gây chậm.</p>
+        <dl><dt>Kết quả</dt><dd>Danh sách nguyên nhân chậm, xếp theo mức ảnh hưởng.</dd><dt>Cần trước</dt><dd>07</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">12</span><div><h3>ML B: dự đoán rework</h3><div class="chips"><span class="chip wait">Đang chờ</span><span class="chip phase">Phase 4</span></div></div></header>
+        <p>Ở mỗi gateway làm lại, đoán xem case có bị quay lại ít nhất một lần không. Mốc: luôn đoán lớp đông nhất. Mô hình: logistic regression, gradient boosting. Đo ROC-AUC và F1, xử lý mất cân bằng lớp, SHAP theo từng gateway.</p>
+        <dl><dt>Kết quả</dt><dd>Yếu tố gây làm lại ở từng gateway.</dd><dt>Cần trước</dt><dd>07</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">13</span><div><h3>Bộ chạy kịch bản và ablation</h3><div class="chips"><span class="chip wait">Đang chờ</span><span class="chip phase">Phase 6</span></div></div></header>
+        <p>Định dạng danh mục thay đổi. Mỗi kịch bản là một tập thay đổi được bật. Chạy hết 2<sup>k</sup> kịch bản, mỗi kịch bản 30 lần, dùng cùng seed giữa các kịch bản, báo mean / median / P90 kèm khoảng tin cậy 95%. Làm thử trên dữ liệu mẫu trước khi có thiết kế thật.</p>
+        <dl><dt>Kết quả</dt><dd>Máy so sánh kịch bản, có sẵn trước khi bạn thiết kế lại.</dd><dt>Cần trước</dt><dd>04, 07</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">14</span><div><h3>Chạy as-is từ đầu đến cuối</h3><div class="chips"><span class="chip wait">Đang chờ</span><span class="chip phase">Phase 3–4</span></div></div></header>
+        <p>Notebook chạy pipeline thật với một seed: lint, sinh log, baseline, hai bài ML, ghi kết quả. Trang hiện số thật cho phần as-is. Có một đoạn so nguyên nhân ML tìm được với hiệu ứng đã cài sẵn.</p>
+        <dl><dt>Kết quả</dt><dd>Bằng chứng để bạn dựa vào khi thiết kế lại.</dd><dt>Cần trước</dt><dd>05, 08, 09, 10, 11, 12</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">15</span><div><h3>Thiết kế lại (to-be)</h3><div class="chips"><span class="chip wait">Đang chờ</span><span class="chip human">Việc của bạn</span><span class="chip phase">Phase 5</span></div></div></header>
+        <p>Bạn chọn 3–5 thay đổi dựa trên nguyên nhân ML, baseline và phân tích định tính. Mỗi thay đổi gắn với một nguyên nhân, một heuristic trong Phụ lục A, và ghi trade-off theo Devil's Quadrangle (§8.1.3). Vẽ mô hình to-be lint sạch.</p>
+        <dl><dt>Kết quả</dt><dd>Danh mục thay đổi và <code>to_be.bpmn</code>.</dd><dt>Cần trước</dt><dd>13, 14</dd></dl>
+      </article>
+
+      <article class="tk">
+        <header><span class="id">16</span><div><h3>Đánh giá cuối và trang kết quả</h3><div class="chips"><span class="chip wait">Đang chờ</span><span class="chip phase">Phase 6–7</span></div></div></header>
+        <p>Mô phỏng as-is và mọi tổ hợp thay đổi. Trang hiện toàn bộ số thật: hai mô hình, baseline, ML, danh mục thay đổi, nút bật/tắt, ablation, giả định, giới hạn. Đưa lên GitHub Pages.</p>
+        <dl><dt>Kết quả</dt><dd>Câu kết luận "to-be nhanh hơn X%".</dd><dt>Cần trước</dt><dd>15</dd></dl>
+      </article>
+
+    </div>
+  </section>
+
+  <section class="lane">
+    <div class="lane-head"><h2>Nên làm gì tiếp</h2><span class="tag">Đề xuất</span></div>
+    <div class="next-grid">
+      <div class="box rec">
+        <h3>Làm 02 rồi 06 trước</h3>
+        <p>Chuỗi 02 → 06 → 09 là chỗ cần bạn tham gia: 06 có câu hỏi về lane, 09 cần bạn duyệt. Việc chờ người thường tốn nhiều ngày nhất, nên mở chuỗi này sớm. Trong lúc bạn suy nghĩ, phần mô phỏng vẫn chạy tiếp được.</p>
+        <ol class="steps">
+          <li><b>02</b> Linter</li>
+          <li><b>06</b> Mô hình as-is đã sửa (bạn trả lời câu hỏi lane)</li>
+          <li><b>03 + 04</b> làm chung một lần, vì cùng sửa lõi mô phỏng</li>
+          <li><b>07</b>, rồi <b>08</b></li>
+          <li><b>05</b> chen vào lúc rảnh, chỉ cần xong trước 09</li>
+        </ol>
+      </div>
+      <div class="box">
+        <h3>Việc bạn tự làm ngay</h3>
+        <ul class="todo">
+          <li>Mở trang của ticket 01 ở localhost, xem có hiện sơ đồ và 10,5 ngày không.</li>
+          <li>Quyết định có giữ giả định "ngày làm việc liên tục, bỏ qua cuối tuần" không. Giả định này sẽ vào bảng giả định.</li>
+          <li>Đọc lại §7.1.1 để xác nhận công thức tuần tự, vì bạn sẽ trích mục này.</li>
+          <li>Nghĩ trước: "Bổ sung / điều chỉnh đề xuất" nên nằm ở lane nào. Ticket 06 cần câu trả lời này.</li>
+          <li>Thêm <code>tony-trinh-sg</code> làm collaborator của repo, để lần sau push không bị 403.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="lane">
+    <div class="lane-head"><h2>Thuật ngữ nhanh</h2><span class="tag">Gặp trong ticket</span></div>
+    <dl class="gloss">
+      <div><dt>Event log</dt><dd>Bảng ghi lại mỗi lần một task được làm: case nào, task gì, bắt đầu và kết thúc lúc nào.</dd></div>
+      <div><dt>Cycle time</dt><dd>Tổng thời gian một case đi từ lúc bắt đầu đến lúc kết thúc, tính cả thời gian chờ.</dd></div>
+      <div><dt>Processing / waiting time</dt><dd>Thời gian có người thật sự làm, và thời gian nằm chờ trong hàng.</dd></div>
+      <div><dt>Cycle time efficiency</dt><dd>Thời gian làm chia cho cycle time. Bằng 1 nghĩa là không chờ chút nào.</dd></div>
+      <div><dt>Rework</dt><dd>Case bị đẩy quay lại một bước trước đó để làm lại.</dd></div>
+      <div><dt>Flow analysis</dt><dd>Tính cycle time bằng công thức trên sơ đồ, không cần chạy mô phỏng.</dd></div>
+      <div><dt>7PMG</dt><dd>Bảy hướng dẫn vẽ mô hình quy trình cho dễ hiểu (§5.4.4).</dd></div>
+      <div><dt>Warm-up</dt><dd>Giai đoạn đầu mô phỏng khi hàng chờ còn trống. Bỏ đi để số liệu không bị đẹp giả.</dd></div>
+      <div><dt>SHAP</dt><dd>Cách đo mỗi thuộc tính đẩy dự đoán lên hay xuống bao nhiêu, dùng để xếp hạng nguyên nhân.</dd></div>
+      <div><dt>Common random numbers</dt><dd>Dùng cùng seed cho mọi kịch bản, để chênh lệch đến từ thiết kế chứ không phải từ may rủi.</dd></div>
+      <div><dt>2<sup>k</sup> kịch bản, ablation</dt><dd>Với k thay đổi thì có 2<sup>k</sup> cách bật/tắt. Ablation là xem bỏ từng thay đổi thì kết quả mất bao nhiêu.</dd></div>
+      <div><dt>DSRM</dt><dd>Khung nghiên cứu 6 bước: vấn đề, mục tiêu, thiết kế, minh họa, đánh giá, truyền đạt.</dd></div>
+    </dl>
+  </section>
+
+  <footer>Nguồn: <code>PLAN.md</code> và các ticket trong <code>.scratch/bpmn-time-optimization/issues/</code>, repo <code>dangth1101/IS6003</code>, commit <code>7ed48d1</code>.</footer>
+</main>
+</body>
+</html>
