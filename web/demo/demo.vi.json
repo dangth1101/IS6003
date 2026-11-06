@@ -125,8 +125,8 @@
   "pool": "Ngân hàng",
   "people_added": "thêm {n}",
   "events": {
-    "Start_RequestReceived": "Có yêu cầu phát triển mới",
-    "End_ProposalRejected": "Đề xuất bị từ chối",
+    "Start_RequestReceived": "Đã nhận\nyêu cầu",
+    "End_ProposalRejected": "Đề xuất\nbị từ chối",
     "End_ProjectClosed": "Dự án kết thúc"
   },
   "gateways": {

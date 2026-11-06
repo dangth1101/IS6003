@@ -89,6 +89,19 @@ function drawFlow(layout, scenario) {
   svg.append(sv("defs", {}, arrowMarker(`arrow-${uid}`, "var(--flow)"), arrowMarker(`arrow-hot-${uid}`, "var(--orange)")));
   const laneFill = (id) => (LANES.indexOf(id) % 2 ? "var(--lane-alt)" : "var(--lane)");
   const laneAt = (y) => LANES.find((id) => y >= lanes[id].top && y < lanes[id].bottom) ?? LANES[0];
+  // A label on the flow: one text per line, left-aligned at the layout's spot, with a halo in the colour of
+  // the lane under it so a line passing close by never runs into the letters.
+  const textBlock = (text, at, attrs) => {
+    const g = sv("g", attrs);
+    lines(text).forEach((line, k) => {
+      const y = at.y + k * S * TYPE.line;
+      g.append(sv("text", {
+        x: at.x, y, "font-size": S, "font-weight": 600, fill: attrs.fill,
+        stroke: laneFill(laneAt(y - 5)), "stroke-width": 4, "stroke-linejoin": "round", "paint-order": "stroke", text: line,
+      }));
+    });
+    return g;
+  };
 
   // the pool (one organisation) with one lane per department
   for (const id of LANES) {
@@ -156,10 +169,9 @@ function drawFlow(layout, scenario) {
     }));
     if (f.label) {
       const text = fill(T.conditions[f.id], { rate: rates[f.source] != null ? pct(rates[f.source], 0) : "" });
-      labelLayer.append(sv("text", {
-        x: f.label.x, y: f.label.y, "text-anchor": f.label.anchor, "font-size": S, "font-weight": 600, "data-cond": f.id,
-        fill: hot ? "var(--orange-ink)" : "var(--ink)", stroke: laneFill(laneAt(f.label.y - 5)), "stroke-width": 4, "stroke-linejoin": "round", "paint-order": "stroke", text,
-      }));
+      // a two-line condition breaks before the rate in brackets
+      const split = f.label.lines === 2 ? text.replace(" (", "\n(") : text;
+      labelLayer.append(textBlock(split, f.label, { "data-cond": f.id, fill: hot ? "var(--orange-ink)" : "var(--ink)" }));
     }
   }
   svg.append(flowLayer);
@@ -167,7 +179,7 @@ function drawFlow(layout, scenario) {
   // events, gateways and tasks
   const goLive = layout.goLive;
   for (const n of Object.values(nodes)) {
-    const title = sv("title", { text: n.type === "task" ? oneLine(T.activities[n.id]) : n.type.endsWith("Gateway") ? T.gateways[n.type] : T.events[n.id] });
+    const title = sv("title", { text: n.type === "task" ? oneLine(T.activities[n.id]) : n.type.endsWith("Gateway") ? T.gateways[n.type] : oneLine(T.events[n.id]) });
     if (n.type === "startEvent") { svg.append(sv("g", { "data-node": n.id }, title, shape.start(n.cx, n.cy))); continue; }
     if (n.type === "endEvent") { svg.append(sv("g", { "data-node": n.id }, title, shape.end(n.cx, n.cy))); continue; }
     if (n.type.endsWith("Gateway")) { svg.append(sv("g", { "data-node": n.id, "data-gateway": n.type }, title, shape.gateway(n.cx, n.cy, n.type))); continue; }
@@ -188,6 +200,8 @@ function drawFlow(layout, scenario) {
     if (change) g.append(chipSvg(change, n.chip.x, n.chip.y));
     svg.append(g);
   }
+  // event names, beside each start and end event (Dumas et al., §5.4.3)
+  for (const n of Object.values(nodes)) if (n.label) labelLayer.append(textBlock(T.events[n.id], n.label, { "data-event-label": n.id, fill: "var(--ink)" }));
   svg.append(labelLayer);
 
   const dynamic = sv("g", {});

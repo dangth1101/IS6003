@@ -58,7 +58,17 @@ const W = {
   Task_FixDefects: 64, Task_RetestFixedDefects: 103, Task_ApproveRelease: 90, Task_RefineApplication: 96,
   Task_DeployApplication: 88, Task_StartOperation: 82, Task_MonitorOperation: 82, Task_EvaluateProject: 82,
 };
-const COND_W = { loopTest: 93, approved: 88 }; // label widths: "có lỗi (37%)" above the arc into "Sửa lỗi", "được duyệt"
+// Label widths, measured the same way: the conditions of demo.vi.json with the rates of replay.json (the
+// wider of the two scenarios), and the event names (two lines where demo.vi.json breaks them).
+const COND_W = { approved: 88, rejected: 72, changes: 113, passed: 28, defects: 95, defectsTwoLines: 49, releaseRejected: 114 };
+const EVENT_LABEL = {
+  Start_RequestReceived: { w: 64, lines: 2 },
+  End_ProposalRejected: { w: 72, lines: 2 },
+  End_ProjectClosed: { w: 112, lines: 1 },
+};
+const SIDE = SPACE.s; // a label beside the leg it belongs to; any other line keeps twice that away
+const DOT_CLEAR = 5; // a label under an arc: just more than a token's radius
+const textH = (lines) => (TYPE.ascent + (lines - 1) * TYPE.line + TYPE.descent) * TYPE.size;
 
 // The elements of each model: BPMN type and lane, as in the .bpmn files.
 const COMMON = {
@@ -85,6 +95,9 @@ const CHANGED = { as_is: {}, to_be: { Task_RetestFixedDefects: "C2", Task_Specif
 const CHECKS = ["Task_ReviewSourceCode", "Task_RunFunctionalTests", "Task_RunSecurityTests", "Task_RunAcceptanceTests"];
 
 // Horizontal placement, left to right. Each rule names the arrow or label it makes room for.
+// Conditions sit beside the first stretch of their arc, right at the gateway (Dumas et al., Fig. 3.4):
+// a leg up has its label up and to the right, a leg down down and to the right, an arc to the right
+// has it underneath.
 function placeX(model) {
   const x = {}; // centre x of every node
   const w = (id) => W[id] ?? (id.startsWith("Gateway") ? 2 * GW : 2 * EV);
@@ -92,15 +105,25 @@ function placeX(model) {
   const left = (id, at) => { x[id] = at + w(id) / 2; };
   const c = {}; // named leg positions
 
-  x.Start_RequestReceived = HEADER + 6 + EV;
-  left("Task_RegisterRequest", R("Start_RequestReceived") + ARROW);
+  // The start event sits at the top of its lane with its name in two lines under it, left of the request box.
+  const start = EVENT_LABEL.Start_RequestReceived;
+  x.Start_RequestReceived = HEADER + SIDE + start.w / 2;
+  left("Task_RegisterRequest", Math.max(R("Start_RequestReceived") + ARROW, HEADER + 2 * SIDE + start.w));
   x.Gateway_ProposalJoin = L("Task_RegisterRequest") + 14; // straight down from the request box
   left("Task_ApproveProposal", R("Gateway_ProposalJoin") + ARROW);
-  x.Gateway_ProposalSplit = R("Task_ApproveProposal") + ARROW + GW;
+  // The proposal split: "cần sửa" goes left of its leg down, just inside the development lane, so it needs
+  // room between that leg and the loop back, which goes up into the join's left corner.
+  x.Gateway_ProposalSplit = Math.max(R("Task_ApproveProposal") + ARROW + GW,
+    L("Gateway_ProposalJoin") - ARROW + 2 * SIDE + COND_W.changes + SIDE);
   x.Task_ReviseProposal = x.Gateway_ProposalSplit; // straight down: "cần sửa"
-  x.End_ProposalRejected = R("Gateway_ProposalSplit") + ARROW + EV;
-  // straight up, then right: "được duyệt" sits above that corner, right of the request box
-  left("Task_HoldKickOff", Math.max(x.Gateway_ProposalSplit + ARROW, R("Task_RegisterRequest") + COND_W.approved + 2 * SPACE.s));
+  // "bị từ chối" runs right under its label, then down into the end event at the bottom of the lane,
+  // whose name sits just inside the development lane under it.
+  x.End_ProposalRejected = R("Gateway_ProposalSplit") + 3 + COND_W.rejected + SIDE + EV;
+  const rejectedName = x.End_ProposalRejected + EVENT_LABEL.End_ProposalRejected.w / 2;
+  // "được duyệt" leaves the top: up, then right into the kick-off. The leg down from the requirements box
+  // passes right of the rejected event's name.
+  left("Task_HoldKickOff", Math.max(x.Gateway_ProposalSplit + ARROW,
+    rejectedName + 2 * SIDE + CLEAR - W.Task_HoldKickOff - BOX_GAP - W.Task_SpecifyRequirements));
   left("Task_SpecifyRequirements", R("Task_HoldKickOff") + BOX_GAP);
   c.specifyExit = R("Task_SpecifyRequirements") - CLEAR; // down into the plan join's left corner
   x.Gateway_PlanJoin = c.specifyExit + ARROW + GW;
@@ -108,38 +131,45 @@ function placeX(model) {
   c.draftUp = R("Task_DraftPlan") + ARROW + 1; // up into the plan approval's bottom
   left("Task_ApprovePlan", c.draftUp - 20);
   x.Gateway_PlanSplit = R("Task_ApprovePlan") + ARROW + GW;
-  x.Task_BuildApplication = x.Gateway_PlanSplit; // straight down: "được duyệt"
+  // The build box sits just right of the leg up from the draft; "được duyệt" comes straight down into its right part.
+  left("Task_BuildApplication", c.draftUp + CLEAR);
   x.Gateway_ReleaseJoin = L("Task_BuildApplication") + 14; // straight down from the build box
   const second = x.Gateway_ReleaseJoin + 2 * GW + ARROW; // the test join (as-is) or the AND-split (to-be)
   left("Task_ReviewSourceCode", second + GW + ARROW);
   for (let k = 1; k < 4; k++) left(CHECKS[k], R(CHECKS[k - 1]) + BOX_GAP);
   const a = R("Task_RunAcceptanceTests");
 
+  // After the tests, "có lỗi" leaves the split's top with its label up and right of it, so "đạt" runs right
+  // under that label before it goes up into the release approval.
   if (model === "as_is") {
     x.Gateway_TestJoin = second;
     x.Gateway_TestSplit = a + ARROW + GW;
-    // "có lỗi" runs up and left into the fix box, which sits above the checks; its label goes above that arc.
-    x.Task_FixDefects = x.Gateway_TestSplit - COND_W.loopTest - SPACE.s - W.Task_FixDefects / 2;
+    x.Task_FixDefects = x.Gateway_TestSplit - COND_W.defects - SIDE - W.Task_FixDefects / 2; // above the checks
+    c.passUp = x.Gateway_TestSplit + SIDE + COND_W.defects + 2 * SIDE;
   } else {
     x.Gateway_ChecksSplit = second;
     x.Gateway_ChecksJoin = a - 10; // on the line under the checks, below the acceptance box's right end
     left("Task_RetestFixedDefects", a + ARROW + 1);
     x.Gateway_RetestJoin = L("Task_RetestFixedDefects") + 12; // straight down from the retest box
     x.Task_FixDefects = x.Gateway_RetestJoin + 5 - W.Task_FixDefects / 2; // straight down into the retest box
-    x.Gateway_TestSplit = Math.max(R("Task_RetestFixedDefects") + CLEAR, R("Task_FixDefects") + COND_W.loopTest + SPACE.s);
+    // right of the retest box, at the height of the boxes; its "có lỗi" label takes two lines
+    x.Gateway_TestSplit = R("Task_RetestFixedDefects") + GW + 8;
+    c.passUp = x.Gateway_TestSplit + SIDE + COND_W.defectsTwoLines + 2 * SIDE;
   }
-  // After the tests: "đạt" leaves the split's right corner and runs up into the release approval.
-  c.passUp = x.Gateway_TestSplit + GW + ARROW;
   left("Task_ApproveRelease", c.passUp - 20);
   left("Task_RefineApplication", c.passUp + CLEAR);
   c.refineIn = R("Task_RefineApplication") - 14; // "bị từ chối" comes down into it from above
   x.Gateway_ReleaseSplit = Math.max(c.refineIn + CLEAR + GW, R("Task_ApproveRelease") + ARROW + GW, R("Task_RefineApplication") + CLEAR);
-  x.Task_DeployApplication = x.Gateway_ReleaseSplit; // straight down: "được duyệt"
+  // "được duyệt" comes straight down into the deploy box's right part. The deploy box sits as far left as
+  // "bị từ chối (8%)" allows: the label, up and right of the split, ends before the go-live frame.
+  const goLiveMin = x.Gateway_ReleaseSplit + SIDE + COND_W.releaseRejected + SIDE;
+  const deployRight = Math.max(x.Gateway_ReleaseSplit + 14, goLiveMin - 7 - W.Task_StartOperation - BOX_GAP);
+  left("Task_DeployApplication", deployRight - W.Task_DeployApplication);
   left("Task_StartOperation", R("Task_DeployApplication") + BOX_GAP);
   c.goLive = R("Task_StartOperation") + 7;
   left("Task_MonitorOperation", R("Task_StartOperation") + BOX_GAP);
   left("Task_EvaluateProject", R("Task_MonitorOperation") + BOX_GAP - 2);
-  x.End_ProjectClosed = R("Task_EvaluateProject") + ARROW + EV;
+  x.End_ProjectClosed = R("Task_EvaluateProject") + ARROW + EV; // its name sits above it, in the lane above
   c.width = Math.ceil(R("End_ProjectClosed") + 6); // clear of the go-live frame and the pool edge
   return { x, c };
 }
@@ -170,7 +200,13 @@ export function buildLayout(model, metricsName = "normal") {
   for (const [id, [type, lane]] of Object.entries(NODES[model])) {
     const cx = x[id];
     let cy = boxTop(lane) + m.boxH / 2;
-    if (model === "to_be" && ["Gateway_ChecksJoin", "Gateway_RetestJoin", "Gateway_TestSplit"].includes(id)) cy = under;
+    if (model === "to_be" && ["Gateway_ChecksJoin", "Gateway_RetestJoin"].includes(id)) cy = under;
+    // to-be test split: low enough for its two-line "có lỗi" label above it, inside the lane
+    if (model === "to_be" && id === "Gateway_TestSplit") cy = Math.max(q1, qc.top + SPACE.xs + textH(2) + 10);
+    // the outer events sit high in their lane, level with the arc into or out of the box beside them;
+    // the rejected proposal ends at the bottom of its lane, its name just under the lane line
+    if (id === "Start_RequestReceived" || id === "End_ProjectClosed") cy = boxTop(lane) + 10;
+    if (id === "End_ProposalRejected") cy = lanes[lane].bottom - 3 - EV;
     const n = { id, type, lane, cx, cy };
     if (type === "task") {
       const w = W[id], top = boxTop(lane);
@@ -190,37 +226,50 @@ export function buildLayout(model, metricsName = "normal") {
   const rightMid = (id) => [N[id].right, N[id].cy];
   const at = (px, id) => [px, N[id].cy];
 
+  // A label from the top left corner of its glyph box: x is its left edge, y the baseline of its first line,
+  // w its width (W and COND_W above), lines its number of lines.
+  const lab = (left, topY, w, lines = 1) => ({ x: left, y: topY + TYPE.ascent * TYPE.size, w, lines });
+  const upRight = (g, w, lines = 1) => lab(g.cx + SIDE, g.cy - 10 - textH(lines), w, lines); // beside a leg up
+  const downRight = (g, w) => lab(g.cx + SIDE, g.bottom + SPACE.xs, w); // beside a leg down
+  // under an arc to the right, a token's width below it so passing tokens clear the letters
+  const underRight = (g, w) => lab(g.right + 3, g.cy + DOT_CLEAR, w);
+
+  // Event names: under the start event, under the rejected proposal (in the lane below), and above the
+  // closed project (in the lane above), since the boxes beside them fill their lanes.
+  const ev = (id) => EVENT_LABEL[id];
+  N.Start_RequestReceived.label = lab(N.Start_RequestReceived.cx - ev("Start_RequestReceived").w / 2, N.Start_RequestReceived.bottom + SPACE.xs, ev("Start_RequestReceived").w, ev("Start_RequestReceived").lines);
+  N.End_ProposalRejected.label = lab(N.End_ProposalRejected.cx - ev("End_ProposalRejected").w / 2, lanes[ITM].bottom + SPACE.xs, ev("End_ProposalRejected").w, ev("End_ProposalRejected").lines);
+  N.End_ProjectClosed.label = lab(N.End_ProjectClosed.right - ev("End_ProjectClosed").w, lanes[OPS].top - SPACE.xs - textH(1), ev("End_ProjectClosed").w, ev("End_ProjectClosed").lines);
+
   // Sequence flows, by BPMN ID. `label` is where the condition of an XOR-split arc goes.
   const flows = {};
   let c1 = null;
   const flow = (id, source, target, pts, extra = {}) => { flows[id] = { id, source, target, pts, ...extra }; };
-  const lab = (px, py, anchor = "start") => ({ x: px, y: py, anchor });
-  const above = (py) => py - SPACE.s - 3 - TYPE.descent * TYPE.size; // baseline of a label just above a line at py
-  const lowInLane = (lane) => lanes[lane].bottom - TYPE.descent * TYPE.size - 2; // baseline at the bottom of a lane
-  const besideLeg = (lane) => lanes[lane].top + lanes[lane].h / 2 + 0.36 * TYPE.size; // mid-lane baseline
 
-  flow("Flow_RequestReceived", "Start_RequestReceived", "Task_RegisterRequest", [rightMid("Start_RequestReceived"), leftMid("Task_RegisterRequest")]);
+  flow("Flow_RequestReceived", "Start_RequestReceived", "Task_RegisterRequest", [rightMid("Start_RequestReceived"), [N.Task_RegisterRequest.left, N.Start_RequestReceived.cy]]);
   flow("Flow_RequestRegistered", "Task_RegisterRequest", "Gateway_ProposalJoin", [bottom("Task_RegisterRequest", x.Gateway_ProposalJoin - x.Task_RegisterRequest), top("Gateway_ProposalJoin")]);
   flow("Flow_ProposalSubmitted", "Gateway_ProposalJoin", "Task_ApproveProposal", [rightMid("Gateway_ProposalJoin"), leftMid("Task_ApproveProposal")]);
   flow("Flow_ProposalDecided", "Task_ApproveProposal", "Gateway_ProposalSplit", [rightMid("Task_ApproveProposal"), leftMid("Gateway_ProposalSplit")]);
   const ps = N.Gateway_ProposalSplit;
   flow("Flow_ProposalApproved", "Gateway_ProposalSplit", "Task_HoldKickOff", [top("Gateway_ProposalSplit"), at(ps.cx, "Task_HoldKickOff"), leftMid("Task_HoldKickOff")],
-    { label: lab(N.Task_HoldKickOff.left - SPACE.s, above(N.Task_HoldKickOff.cy), "end") });
+    { label: upRight(ps, COND_W.approved) });
   flow("Flow_ProposalChangesRequested", "Gateway_ProposalSplit", "Task_ReviseProposal", [bottom("Gateway_ProposalSplit"), top("Task_ReviseProposal")],
-    { label: lab(ps.cx + 8, besideLeg(DEV)), loop: true });
-  flow("Flow_ProposalRejected", "Gateway_ProposalSplit", "End_ProposalRejected", [rightMid("Gateway_ProposalSplit"), leftMid("End_ProposalRejected")],
-    { label: lab(ps.cx + 8, Math.min(ps.cy + EV + SPACE.s + TYPE.ascent * TYPE.size, lowInLane(ITM))) });
-  flow("Flow_ProposalRevised", "Task_ReviseProposal", "Gateway_ProposalJoin", [leftMid("Task_ReviseProposal"), at(x.Gateway_ProposalJoin, "Task_ReviseProposal"), bottom("Gateway_ProposalJoin")]);
+    { label: lab(ps.cx - SIDE - COND_W.changes, lanes[DEV].top + SPACE.xs, COND_W.changes), loop: true });
+  flow("Flow_ProposalRejected", "Gateway_ProposalSplit", "End_ProposalRejected", [rightMid("Gateway_ProposalSplit"), [x.End_ProposalRejected, ps.cy], top("End_ProposalRejected")],
+    { label: underRight(ps, COND_W.rejected) });
+  const loopUp = N.Gateway_ProposalJoin.left - ARROW; // the loop back runs up left of the join
+  flow("Flow_ProposalRevised", "Task_ReviseProposal", "Gateway_ProposalJoin",
+    [leftMid("Task_ReviseProposal"), at(loopUp, "Task_ReviseProposal"), at(loopUp, "Gateway_ProposalJoin"), leftMid("Gateway_ProposalJoin")]);
   flow("Flow_KickOffHeld", "Task_HoldKickOff", "Task_SpecifyRequirements", [rightMid("Task_HoldKickOff"), leftMid("Task_SpecifyRequirements")]);
   flow("Flow_RequirementsSpecified", "Task_SpecifyRequirements", "Gateway_PlanJoin", [[c.specifyExit, N.Task_SpecifyRequirements.bottom], at(c.specifyExit, "Gateway_PlanJoin"), leftMid("Gateway_PlanJoin")]);
   flow("Flow_PlanStarted", "Gateway_PlanJoin", "Task_DraftPlan", [rightMid("Gateway_PlanJoin"), leftMid("Task_DraftPlan")]);
   flow("Flow_PlanDrafted", "Task_DraftPlan", "Task_ApprovePlan", [rightMid("Task_DraftPlan"), at(c.draftUp, "Task_DraftPlan"), [c.draftUp, N.Task_ApprovePlan.bottom]]);
   flow("Flow_PlanDecided", "Task_ApprovePlan", "Gateway_PlanSplit", [rightMid("Task_ApprovePlan"), leftMid("Gateway_PlanSplit")]);
   const pl = N.Gateway_PlanSplit, buY = N.Task_HoldKickOff.cy;
-  flow("Flow_PlanApproved", "Gateway_PlanSplit", "Task_BuildApplication", [bottom("Gateway_PlanSplit"), top("Task_BuildApplication")],
-    { label: lab(pl.cx + 8, Math.min(pl.cy + GW + TYPE.ascent * TYPE.size, lowInLane(ITM))) });
+  flow("Flow_PlanApproved", "Gateway_PlanSplit", "Task_BuildApplication", [bottom("Gateway_PlanSplit"), top("Task_BuildApplication", pl.cx - x.Task_BuildApplication)],
+    { label: downRight(pl, COND_W.approved) });
   flow("Flow_PlanChangesRequested", "Gateway_PlanSplit", "Gateway_PlanJoin", [top("Gateway_PlanSplit"), [pl.cx, buY], [x.Gateway_PlanJoin, buY], top("Gateway_PlanJoin")],
-    { label: lab((pl.cx + x.Gateway_PlanJoin) / 2, above(buY), "middle"), loop: true });
+    { label: upRight(pl, COND_W.changes), loop: true });
   flow("Flow_ApplicationBuilt", "Task_BuildApplication", "Gateway_ReleaseJoin", [bottom("Task_BuildApplication", x.Gateway_ReleaseJoin - x.Task_BuildApplication), top("Gateway_ReleaseJoin")]);
 
   const ts = N.Gateway_TestSplit;
@@ -234,7 +283,7 @@ export function buildLayout(model, metricsName = "normal") {
     flow("Flow_SecurityTested", "Task_RunSecurityTests", "Task_RunAcceptanceTests", [rightMid("Task_RunSecurityTests"), leftMid("Task_RunAcceptanceTests")]);
     flow("Flow_AcceptanceTested", "Task_RunAcceptanceTests", "Gateway_TestSplit", [rightMid("Task_RunAcceptanceTests"), leftMid("Gateway_TestSplit")]);
     flow("Flow_DefectsFound", "Gateway_TestSplit", "Task_FixDefects", [top("Gateway_TestSplit"), at(ts.cx, "Task_FixDefects"), rightMid("Task_FixDefects")],
-      { label: lab((ts.cx + N.Task_FixDefects.right) / 2, above(N.Task_FixDefects.cy), "middle"), loop: true, hot: true });
+      { label: upRight(ts, COND_W.defects), loop: true, hot: true });
     flow("Flow_DefectsFixed", "Task_FixDefects", "Gateway_TestJoin", [[fixUnder, N.Task_FixDefects.bottom], [fixUnder, railY], [x.Gateway_TestJoin, railY], top("Gateway_TestJoin")], { hot: true });
     flow("Flow_ApplicationRefined", "Task_RefineApplication", "Gateway_ReleaseJoin",
       [[refineOut, N.Task_RefineApplication.bottom], [refineOut, channel], [x.Gateway_ReleaseJoin, channel], bottom("Gateway_ReleaseJoin")]);
@@ -254,9 +303,9 @@ export function buildLayout(model, metricsName = "normal") {
     toJoin("Flow_SecurityTested", "Task_RunSecurityTests");
     toJoin("Flow_AcceptanceTested", "Task_RunAcceptanceTests");
     flow("Flow_ChecksCompleted", "Gateway_ChecksJoin", "Gateway_RetestJoin", [rightMid("Gateway_ChecksJoin"), leftMid("Gateway_RetestJoin")]);
-    flow("Flow_TestRoundCompleted", "Gateway_RetestJoin", "Gateway_TestSplit", [rightMid("Gateway_RetestJoin"), leftMid("Gateway_TestSplit")]);
+    flow("Flow_TestRoundCompleted", "Gateway_RetestJoin", "Gateway_TestSplit", [rightMid("Gateway_RetestJoin"), [ts.cx, under], bottom("Gateway_TestSplit")]);
     flow("Flow_DefectsFound", "Gateway_TestSplit", "Task_FixDefects", [top("Gateway_TestSplit"), at(ts.cx, "Task_FixDefects"), rightMid("Task_FixDefects")],
-      { label: lab((ts.cx + N.Task_FixDefects.right) / 2, above(N.Task_FixDefects.cy), "middle"), loop: true });
+      { label: upRight(ts, COND_W.defectsTwoLines, 2), loop: true });
     flow("Flow_DefectsFixed", "Task_FixDefects", "Task_RetestFixedDefects", [bottom("Task_FixDefects", x.Gateway_RetestJoin - x.Task_FixDefects), top("Task_RetestFixedDefects", x.Gateway_RetestJoin - x.Task_RetestFixedDefects)]);
     flow("Flow_DefectsRetested", "Task_RetestFixedDefects", "Gateway_RetestJoin", [bottom("Task_RetestFixedDefects", x.Gateway_RetestJoin - x.Task_RetestFixedDefects), top("Gateway_RetestJoin")]);
     flow("Flow_ApplicationRefined", "Task_RefineApplication", "Gateway_ReleaseJoin",
@@ -264,17 +313,17 @@ export function buildLayout(model, metricsName = "normal") {
     c1 = { x: cs.left - SPACE.s, y: qc.top + SPACE.xs, w: cj.right + SPACE.m - cs.left + SPACE.s, h: under + GW + 3 - qc.top - SPACE.xs };
   }
   flow("Flow_TestsPassed", "Gateway_TestSplit", "Task_ApproveRelease", [rightMid("Gateway_TestSplit"), [c.passUp, ts.cy], [c.passUp, N.Task_ApproveRelease.bottom]],
-    { label: lab(c.passUp + 8, ts.cy - GW - SPACE.s) });
+    { label: underRight(ts, COND_W.passed) });
   flow("Flow_ReleaseDecided", "Task_ApproveRelease", "Gateway_ReleaseSplit", [rightMid("Task_ApproveRelease"), leftMid("Gateway_ReleaseSplit")]);
   const rs = N.Gateway_ReleaseSplit;
-  flow("Flow_ReleaseApproved", "Gateway_ReleaseSplit", "Task_DeployApplication", [bottom("Gateway_ReleaseSplit"), top("Task_DeployApplication")],
-    { label: lab(rs.cx + 8, besideLeg(DEV)) });
+  flow("Flow_ReleaseApproved", "Gateway_ReleaseSplit", "Task_DeployApplication", [bottom("Gateway_ReleaseSplit"), top("Task_DeployApplication", rs.cx - x.Task_DeployApplication)],
+    { label: downRight(rs, COND_W.approved) });
   flow("Flow_ReleaseRejected", "Gateway_ReleaseSplit", "Task_RefineApplication", [top("Gateway_ReleaseSplit"), [rs.cx, buY], [c.refineIn, buY], [c.refineIn, N.Task_RefineApplication.top]],
-    { label: lab(rs.cx + 8, buY + 0.36 * TYPE.size), loop: true });
+    { label: upRight(rs, COND_W.releaseRejected), loop: true });
   flow("Flow_ApplicationDeployed", "Task_DeployApplication", "Task_StartOperation", [rightMid("Task_DeployApplication"), leftMid("Task_StartOperation")]);
   flow("Flow_OperationStarted", "Task_StartOperation", "Task_MonitorOperation", [rightMid("Task_StartOperation"), leftMid("Task_MonitorOperation")]);
   flow("Flow_OperationMonitored", "Task_MonitorOperation", "Task_EvaluateProject", [rightMid("Task_MonitorOperation"), leftMid("Task_EvaluateProject")]);
-  flow("Flow_ProjectEvaluated", "Task_EvaluateProject", "End_ProjectClosed", [rightMid("Task_EvaluateProject"), leftMid("End_ProjectClosed")]);
+  flow("Flow_ProjectEvaluated", "Task_EvaluateProject", "End_ProjectClosed", [[N.Task_EvaluateProject.right, N.End_ProjectClosed.cy], leftMid("End_ProjectClosed")]);
 
   // Highlight frames (not BPMN elements): the bottleneck or C1 around the checks, and the part after go-live.
   const frames = [];

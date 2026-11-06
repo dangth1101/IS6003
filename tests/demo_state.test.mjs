@@ -260,3 +260,73 @@ test("every lane is tall enough for its name and head count, the to-be QC lane a
 test("the flow is narrow enough for 12 px text across a 1366 px screen (1360 px of panel)", () => {
   assert.ok((1360 / WIDTH) * TYPE.size >= 12, `width ${WIDTH}`);
 });
+
+// ---------- labels: conditions on their arcs next to the gateway, names on the events ----------
+
+// The glyph box of a label: x is its left edge, y the baseline of its first line.
+const labelBox = (lb) => ({
+  left: lb.x, right: lb.x + lb.w,
+  top: lb.y - TYPE.ascent * TYPE.size,
+  bottom: lb.y + (lb.lines - 1) * TYPE.line * TYPE.size + TYPE.descent * TYPE.size,
+});
+const boxGap = (a, b) => Math.hypot(Math.max(0, a.left - b.right, b.left - a.right), Math.max(0, a.top - b.bottom, b.top - a.bottom));
+const segBox = ([x0, y0], [x1, y1]) => ({ left: Math.min(x0, x1), right: Math.max(x0, x1), top: Math.min(y0, y1), bottom: Math.max(y0, y1) });
+// From a box to an element's own shape: a gateway is a diamond, an event a circle.
+const nodeGap = (box, n) => {
+  if (n.type === "task") return boxGap(box, n);
+  const px = Math.max(box.left, Math.min(n.cx, box.right)), py = Math.max(box.top, Math.min(n.cy, box.bottom));
+  if (!n.type.endsWith("Gateway")) return Math.max(0, Math.hypot(px - n.cx, py - n.cy) - n.r);
+  let best = Infinity; // nearest point of the box to the diamond's edge, sampled
+  for (let k = 0; k < 400; k++) {
+    const t = (k / 400) * 4, side = Math.floor(t), f = t - side;
+    const corners = [[n.cx, n.top], [n.right, n.cy], [n.cx, n.bottom], [n.left, n.cy], [n.cx, n.top]];
+    const [a, b] = [corners[side], corners[side + 1]];
+    const [ex, ey] = [a[0] + f * (b[0] - a[0]), a[1] + f * (b[1] - a[1])];
+    best = Math.min(best, Math.hypot(Math.max(0, box.left - ex, ex - box.right), Math.max(0, box.top - ey, ey - box.bottom)));
+  }
+  return best;
+};
+const segments = (l) => Object.values(l.flows).flatMap((f) => f.pts.slice(1).map((p, k) => ({ flow: f.id, box: segBox(f.pts[k], p) })));
+const labels = (l) => [
+  ...Object.values(l.flows).filter((f) => f.label).map((f) => ({ id: f.id, box: labelBox(f.label) })),
+  ...Object.values(l.nodes).filter((n) => n.label).map((n) => ({ id: n.id, box: labelBox(n.label) })),
+];
+
+test("every condition sits beside the first stretch of its own arc, next to the gateway it leaves", () => {
+  for (const l of layouts()) {
+    const segs = segments(l);
+    for (const f of Object.values(l.flows).filter((x) => x.label)) {
+      const box = labelBox(f.label), tag = `${l.model} ${l.metrics.name} ${f.id}`;
+      const own = boxGap(box, segBox(f.pts[0], f.pts[1]));
+      assert.ok(own <= 6, `${tag}: ${own.toFixed(1)} from its arc`);
+      for (const s of segs) {
+        if (s.flow !== f.id) assert.ok(boxGap(box, s.box) >= own + 4, `${tag}: as close to ${s.flow} as to its own arc`);
+      }
+      const gw = boxGap(box, l.nodes[f.source]);
+      assert.ok(gw <= 2.6 * TYPE.size, `${tag}: ${gw.toFixed(1)} from its gateway`);
+    }
+  }
+});
+
+test("every start and end event has its name right next to it", () => {
+  for (const l of layouts()) {
+    for (const n of Object.values(l.nodes).filter((x) => x.type.endsWith("Event"))) {
+      assert.ok(n.label, `${l.model} ${n.id} has no label`);
+      const gap = nodeGap(labelBox(n.label), n);
+      assert.ok(gap >= 1 && gap <= 1.2 * TYPE.size, `${l.model} ${l.metrics.name} ${n.id}: ${gap.toFixed(1)} from the event`);
+    }
+  }
+});
+
+test("no label touches an element, another label or an arc, and none leaves the pool", () => {
+  for (const l of layouts()) {
+    const all = labels(l), segs = segments(l);
+    for (const a of all) {
+      const tag = `${l.model} ${l.metrics.name} ${a.id}`;
+      assert.ok(a.box.left > HEADER + 1 && a.box.right < l.width - 2 && a.box.top > 0 && a.box.bottom < l.height, `${tag} outside the pool`);
+      for (const n of Object.values(l.nodes)) assert.ok(nodeGap(a.box, n) >= 1, `${tag} on ${n.id}`);
+      for (const b of all) if (b !== a) assert.ok(boxGap(a.box, b.box) >= 2, `${tag} on ${b.id}`);
+      for (const s of segs) assert.ok(boxGap(a.box, s.box) >= 2.5, `${tag} on ${s.flow}`);
+    }
+  }
+});
