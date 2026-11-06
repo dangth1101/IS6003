@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from bpmopt.analysis import case_ends
+from bpmopt.analysis import case_ends, rework_rates
 from bpmopt.bpmn import read_bpmn
 from bpmopt.parameters import load_parameters
 from bpmopt.replay import build_replay, write_replay
@@ -121,6 +121,22 @@ def test_the_as_is_queue_at_qc_builds_up_and_the_to_be_one_does_not(replay):
     assert qc_queue(as_is, START, START + 20) < 1  # about empty when the window opens
     assert qc_queue(as_is, START, END) > 4
     assert qc_queue(to_be, START, END) < qc_queue(as_is, START, END) / 4
+
+
+@pytest.mark.parametrize(("scenario_id", "changes"), SCENARIOS)
+def test_each_scenario_has_its_lane_capacities_and_baseline_rework_rates(catalog, replay, scenario_id, changes):
+    model, params = catalog.resolve(changes)
+    scenario = _scenario(replay, scenario_id)
+    assert scenario["capacities"] == params.lane_capacities
+    assert scenario["rework"] == rework_rates(simulate(model, params, n_cases=2_000, seed=SEED), model)
+
+
+def test_the_as_is_rework_rates_are_the_reports_baseline(replay):
+    results = json.loads((Path(__file__).parents[1] / "web" / "results.json").read_text())
+    assert _scenario(replay, "as_is")["rework"] == results["baseline"]["rework"]
+    to_be = {r["gateway_id"]: r["rate"] for r in _scenario(replay, "to_be")["rework"]}
+    as_is = {r["gateway_id"]: r["rate"] for r in results["baseline"]["rework"]}
+    assert to_be["Gateway_TestSplit"] < as_is["Gateway_TestSplit"]  # C3 lowers the defect rate
 
 
 def test_the_written_file_reads_back_and_stays_small(replay, tmp_path):

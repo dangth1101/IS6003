@@ -1,0 +1,115 @@
+{
+  "lang": "vi",
+  "title": "Quy trình phát triển ứng dụng",
+  "subtitle": "Mỗi chấm là một dự án đang đi qua quy trình",
+  "report_link": "Báo cáo đầy đủ (tiếng Anh)",
+  "views": {
+    "label": "Chế độ xem",
+    "as_is": "As-is",
+    "to_be": "To-be",
+    "compare": "So sánh",
+    "result": "Kết quả"
+  },
+  "lanes": {
+    "Lane_BusinessUnit": "Nghiệp vụ / PMO",
+    "Lane_ITManagement": "Quản lý IT",
+    "Lane_Development": "Phát triển",
+    "Lane_QualityControl": "QC",
+    "Lane_ITOperations": "Vận hành"
+  },
+  "people": "{n} người",
+  "activities": {
+    "Task_RegisterRequest": "Đăng ký yêu cầu",
+    "Task_ApproveProposal": "Duyệt đề xuất dự án",
+    "Task_ReviseProposal": "Sửa đề xuất dự án",
+    "Task_HoldKickOff": "Họp kick-off",
+    "Task_SpecifyRequirements": "Phân tích yêu cầu",
+    "Task_DraftPlan": "Lập kế hoạch dự án",
+    "Task_ApprovePlan": "Duyệt kế hoạch dự án",
+    "Task_BuildApplication": "Xây dựng ứng dụng",
+    "Task_ReviewSourceCode": "Review mã nguồn",
+    "Task_RunFunctionalTests": "Kiểm thử chức năng",
+    "Task_RunSecurityTests": "Kiểm thử bảo mật",
+    "Task_RunAcceptanceTests": "Kiểm thử chấp nhận",
+    "Task_FixDefects": "Sửa lỗi",
+    "Task_RetestFixedDefects": "Kiểm thử lại phần bị lỗi",
+    "Task_ApproveRelease": "Duyệt phát hành",
+    "Task_RefineApplication": "Hoàn thiện ứng dụng",
+    "Task_DeployApplication": "Triển khai ứng dụng",
+    "Task_StartOperation": "Đưa vào vận hành",
+    "Task_MonitorOperation": "Theo dõi vận hành",
+    "Task_EvaluateProject": "Đánh giá dự án"
+  },
+  "markers": {
+    "rejected": "Từ chối",
+    "go_live": "Go-live",
+    "go_live_note": "Cycle time tính đến đây"
+  },
+  "loops": {
+    "Gateway_ProposalSplit": "{rate} cần sửa",
+    "Gateway_PlanSplit": "{rate} trả về",
+    "Gateway_TestSplit": "{rate} có lỗi",
+    "Gateway_ReleaseSplit": "{rate} bị từ chối"
+  },
+  "loops_note": "Vòng làm lại, kèm tỉ lệ dự án phải quay lại ít nhất một lần",
+  "bottleneck": "Điểm nghẽn: bốn bước kiểm thử chạy nối tiếp",
+  "changes": {
+    "C1": { "name": "Parallel Testing", "detail": "Bốn hoạt động kiểm thử chạy song song" },
+    "C2": { "name": "Selective Retesting", "detail": "Chỉ kiểm thử lại phần bị lỗi" },
+    "C3": { "name": "Risk-based Requirement Analysis", "detail": "Phân tích yêu cầu sâu hơn cho dự án rủi ro cao" },
+    "C4": { "name": "Additional QC Resource", "detail": "Bổ sung một nhân sự QC, từ {from} lên {to} người" }
+  },
+  "controls": {
+    "play": "Chạy mô phỏng",
+    "pause": "Tạm dừng",
+    "resume": "Chạy tiếp",
+    "restart": "Chạy lại",
+    "speed": "Tốc độ",
+    "clock": "Tháng {month} / {total}",
+    "day": "ngày làm việc {day} / {total}",
+    "progress": "Thời gian mô phỏng"
+  },
+  "legend": {
+    "work": "Đang được làm",
+    "wait": "Đang chờ người rảnh",
+    "park": "Chờ các bước kiểm thử khác xong",
+    "live": "Đã go-live"
+  },
+  "counters": {
+    "in_progress": "Dự án đang chạy",
+    "waiting_qc": "Việc đang chờ ở QC",
+    "finished": "Dự án đã xong",
+    "mean_cycle": "Cycle time trung bình",
+    "days": "ngày",
+    "none": "chưa có"
+  },
+  "chart": {
+    "title": "Số việc đang chờ ở QC",
+    "x_unit": "tháng",
+    "tooltip": "Tháng {month}"
+  },
+  "sample_note": "Bộ đếm là của một lần chạy mẫu (seed {seed}), {months} tháng ngay sau giai đoạn khởi động. Kết quả chính thức ở mục Kết quả.",
+  "result": {
+    "title": "Kết quả chính thức",
+    "method": "Mỗi kịch bản được mô phỏng {replications} lần, mỗi lần {cases} dự án. Các kịch bản dùng chung chuỗi số ngẫu nhiên, nên khác biệt đến từ thiết kế chứ không phải do may rủi.",
+    "share": "nhanh hơn As-is với To-be đủ bốn thay đổi",
+    "share_ci": "Khoảng tin cậy 95%: {low} đến {high}",
+    "saving": "{days} ngày",
+    "saving_label": "tiết kiệm cho mỗi dự án",
+    "saving_ci": "Khoảng tin cậy 95%: {low} đến {high} ngày",
+    "goal_met": "Đạt mục tiêu: cả khoảng tin cậy đều trên mức {goal}.",
+    "goal_missed": "Chưa đạt mục tiêu {goal} với cả khoảng tin cậy.",
+    "cycle_title": "Cycle time trung bình (ngày)",
+    "share_title": "Nhanh hơn As-is",
+    "goal_line": "Mục tiêu {goal}",
+    "as_is": "As-is",
+    "full": "To-be ({changes})",
+    "best": "{changes}",
+    "best_note": "{changes} còn nhanh hơn, {share}. C3 có lợi khi đứng riêng, nhưng khi đã có C1 và C2 thì phần phân tích thêm dồn việc sang bộ phận nghiệp vụ.",
+    "range": "khoảng tin cậy 95%: {low} đến {high}",
+    "ci_note": "Thanh mảnh là khoảng tin cậy 95%.",
+    "sample_vs_official": "Bộ đếm trong phần mô phỏng là một lần chạy mẫu nên có thể khác các số ở đây.",
+    "goal_share": 0.2
+  },
+  "error": "Không tải được dữ liệu: {error}. Trang cần chạy qua một static server, ví dụ python -m http.server trong thư mục web."
+}

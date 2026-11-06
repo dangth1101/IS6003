@@ -12,6 +12,7 @@ Plan: `PLAN.md`. Spec and tickets: `.scratch/bpmn-time-optimization/`.
 - `notebooks/time_optimization.ipynb`: runs the whole study (lint, simulation, baseline, value-added, ML, drivers vs planted effects, redesign, all 16 scenarios with 30 replications, ablation) and writes `web/results.json`, plus the event log as CSV in `notebooks/output/` (not committed). Takes about 8 minutes
 - `docs/analysis/phase1-qualitative.md`: Phase 1 draft (value-added, waste, issue register, objective), awaiting the student's review
 - `web/`: the static page, `results.json` and the two BPMN models it shows (`web/models/`, copied there by the notebook)
+- `web/demo/`: the flow demo for the presentation, in Vietnamese: the as-is and to-be flows as swimlanes, an animated replay of one simulation run (`replay.json`), both side by side, and the official results from `results.json`. Text in `demo.vi.json`. Open http://localhost:8000/demo/ with the server below
 - `web/fixtures/`: a fake results file with every section filled, and its models, for building the page and for the tests. The real page never reads it
 
 ## Setup

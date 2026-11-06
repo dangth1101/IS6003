@@ -429,7 +429,7 @@
         "metric_mae", "metric_r2", "metric_roc_auc", "metric_f1", "drivers", "mean_abs_shap",
         "change_catalog", "change_id", "driver", "heuristic", "expected_effect", "trade_off",
         "dq_time", "dq_cost", "dq_quality", "dq_flexibility", "effect_better", "effect_worse", "effect_neutral",
-        "toggles", "scenario_as_is", "scenario_selected", "saving", "saving_share", "scenario_missing",
+        "demo_link", "toggles", "scenario_as_is", "scenario_selected", "saving", "saving_share", "scenario_missing",
         "ablation", "ablation_alone", "ablation_full_minus",
         "assumptions", "parameter", "value", "rationale", "assumption_change", "threats"
       ]

@@ -6,6 +6,11 @@ arrived during the warm-up: they are still in flight when the window opens
 and hold resources, so the page would show the queues too short without them.
 Rows don't depend on later arrivals (resources serve requests first come, first
 served), so every row equals the one `simulate` gives for that case and seed.
+
+Each scenario also carries its lane capacities and the rework rate of each loop,
+measured like the report's baseline: one run of `rework_cases` cases after the
+warm-up, same seed. For the as-is that is exactly `baseline.rework` in
+web/results.json; the to-be has no such number there.
 """
 
 import json
@@ -15,7 +20,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from bpmopt.analysis import case_ends
+from bpmopt.analysis import case_ends, rework_rates
 from bpmopt.bpmn import ProcessModel
 from bpmopt.parameters import Parameters
 from bpmopt.scenarios import Catalog
@@ -27,12 +32,14 @@ DECIMALS = 2
 SCENARIOS = [("as_is", "As-is", False), ("to_be", "To-be", True)]  # id, name, with every change
 
 
-def build_replay(catalog: Catalog, *, seed: int, start: float, length: float) -> dict:
+def build_replay(catalog: Catalog, *, seed: int, start: float, length: float, rework_cases: int = 2_000) -> dict:
     """The replay of the as-is (no changes) and the full to-be (every change), for the window [start, start + length).
 
     Per scenario: its model's lane and task IDs (for the page layout), the cases in
     the system during the window and the task rows that overlap it. Times are in
-    working days from the start of the run, rounded to DECIMALS.
+    working days from the start of the run, rounded to DECIMALS. Also its lane
+    capacities and its rework rates over a run of `rework_cases` cases, the
+    report's baseline case count.
     """
     end = start + length
     _, as_is = catalog.resolve([])
@@ -48,6 +55,8 @@ def build_replay(catalog: Catalog, *, seed: int, start: float, length: float) ->
                 "changes": changes,
                 "lanes": list(model.lanes),
                 "tasks": [node.id for node in model.nodes_of_type("task")],
+                "capacities": dict(params.lane_capacities),
+                "rework": rework_rates(simulate(model, params, n_cases=rework_cases, seed=seed), model),
                 "cases": _cases(log, params, start, end),
                 "rows": _rows(log, start, end),
             }

@@ -148,6 +148,7 @@
       "effect_better": "better",
       "effect_worse": "worse",
       "effect_neutral": "no change",
+      "demo_link": "Watch one simulation run as an animated flow, as-is and to-be side by side (in Vietnamese)",
       "toggles": "Changes to apply",
       "scenario_as_is": "As-is",
       "scenario_selected": "With the selected changes",
