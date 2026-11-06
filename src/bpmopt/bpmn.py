@@ -69,18 +69,10 @@ class ProcessModel:
 
 
 def read_bpmn(path: str | Path) -> ProcessModel:
-    return _model(ElementTree.parse(path).getroot(), str(path))
-
-
-def parse_bpmn(xml: str) -> ProcessModel:
-    """Read a BPMN document from a string, e.g. what a modeler in the browser exports."""
-    return _model(ElementTree.fromstring(xml), "BPMN")
-
-
-def _model(root: ElementTree.Element, where: str) -> ProcessModel:
+    root = ElementTree.parse(path).getroot()
     processes = root.findall(_q("process"))
     if len(processes) != 1:
-        raise ValueError(f"{where}: expected exactly one process, found {len(processes)}")
+        raise ValueError(f"{path}: expected exactly one process, found {len(processes)}")
     process = processes[0]
     process_id = process.attrib["id"]
 
