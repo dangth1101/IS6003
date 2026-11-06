@@ -1,7 +1,7 @@
-// Flow demo: draws the as-is and to-be flows, replays the sample run from replay.json,
-// and shows the official results from ../results.json. Text comes from demo.vi.json.
-import { buildLayout, dotPosition, badgeWidth, HEADER, LANES, TYPE, SPACE, PILL_H, BADGE_H, CHIP } from "./layout.js";
-import { prepare, stateAt, qcQueueSeries, clock, along, MONTH } from "./state.js";
+// Flow demo: draws the as-is and to-be flows in BPMN notation, replays the sample run from
+// replay.json, and shows the official results from ../results.json. Text comes from demo.vi.json.
+import { buildLayout, dotPosition, parkPosition, route, HEADER, POOL_W, LANES, TYPE, SPACE, GW, EV, CHIP } from "./layout.js";
+import { prepare, stateAt, qcQueueSeries, clock, along, rest, MONTH } from "./state.js";
 import { figures } from "./figures.js";
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -16,6 +16,8 @@ let NUM;
 const fill = (s, vars = {}) => s.replace(/\{(\w+)\}/g, (_, k) => (k in vars ? vars[k] : `{${k}}`));
 const fmt = (v, d = 1) => NUM(d).format(v);
 const pct = (v, d = 1) => NUM(d, "percent").format(v);
+const lines = (s) => s.split("\n");
+const oneLine = (s) => s.replace(/\n/g, " ");
 
 function el(tag, attrs = {}, ...kids) {
   const n = document.createElement(tag);
@@ -30,39 +32,39 @@ function sv(tag, attrs = {}, ...kids) {
   return n;
 }
 
-// ---------- text fitting ----------
-
 const ctx = document.createElement("canvas").getContext("2d");
 const textWidth = (text, size, weight) => {
   ctx.font = `${weight} ${size}px "Be Vietnam Pro", system-ui, sans-serif`;
   return ctx.measureText(text).width;
 };
-// Split a label into at most two lines: as even as possible (task boxes), or with as much as fits
-// on the first line (lane names). The layout sizes each box so its label fits at the given size;
-// nothing is shrunk below the type scale.
-function wrap(text, size, weight, maxW, even = true) {
-  if (textWidth(text, size, weight) <= maxW) return { lines: [text], size };
-  const words = text.split(" ");
-  let best = [text];
-  let bestW = Infinity;
-  for (let k = 1; k < words.length; k++) {
-    const lines = [words.slice(0, k).join(" "), words.slice(k).join(" ")];
-    const widths = lines.map((l) => textWidth(l, size, weight));
-    if (!even) {
-      if (widths[0] <= maxW) best = lines;
-      continue;
-    }
-    const w = Math.max(...widths);
-    if (w < bestW) { best = lines; bestW = w; }
-  }
-  return { lines: best, size };
-}
 // First baseline of a text block whose glyph box starts at `top`.
-const baseline = (top, size) => top + TYPE.ascent * size;
+const baseline = (top) => top + TYPE.ascent * TYPE.size;
+const S = TYPE.size;
 
-// ---------- the flow drawing ----------
+// ---------- BPMN shapes (Dumas et al., ch. 3), also used for the legend ----------
 
-function roundedPath(pts, r) {
+const shape = {
+  start: (cx, cy, r = EV) => sv("circle", { cx, cy, r, fill: "var(--surface)", stroke: "var(--ink)", "stroke-width": 1.5 }),
+  end: (cx, cy, r = EV) => sv("circle", { cx, cy, r: r - 1.2, fill: "var(--surface)", stroke: "var(--ink)", "stroke-width": 3.4 }),
+  gateway(cx, cy, kind, r = GW) {
+    const k = kind === "parallelGateway" ? 0.5 * r : 0.34 * r;
+    const marker = kind === "parallelGateway"
+      ? `M${cx - k},${cy} H${cx + k} M${cx},${cy - k} V${cy + k}`
+      : `M${cx - k},${cy - k} L${cx + k},${cy + k} M${cx + k},${cy - k} L${cx - k},${cy + k}`;
+    return sv("g", {},
+      sv("path", { d: `M${cx},${cy - r} L${cx + r},${cy} L${cx},${cy + r} L${cx - r},${cy} Z`, fill: "var(--surface)", stroke: "var(--ink)", "stroke-width": 1.5, "stroke-linejoin": "round" }),
+      sv("path", { d: marker, stroke: "var(--ink)", "stroke-width": 2.4, "stroke-linecap": "round", fill: "none" }));
+  },
+  task: (x, y, w, h, extra = {}) => sv("rect", { x, y, width: w, height: h, rx: 8, fill: "var(--surface)", stroke: "var(--task)", "stroke-width": 1.3, ...extra }),
+};
+
+function arrowMarker(id, color) {
+  return sv("marker", { id, viewBox: "0 0 10 10", refX: 9.5, refY: 5, markerWidth: 6.5, markerHeight: 6.5, markerUnits: "userSpaceOnUse", orient: "auto" },
+    sv("path", { d: "M0,0.8 L10,5 L0,9.2 z", fill: color }));
+}
+
+// Orthogonal path with slightly rounded corners.
+function roundedPath(pts, r = 4) {
   let d = `M${pts[0][0]},${pts[0][1]}`;
   for (let k = 1; k < pts.length - 1; k++) {
     const [px, py] = pts[k - 1], [x, y] = pts[k], [nx, ny] = pts[k + 1];
@@ -76,177 +78,194 @@ function roundedPath(pts, r) {
   return d + ` L${last[0]},${last[1]}`;
 }
 
-function drawFlow(layout, scenario) {
-  const { width, height, lanes, boxes, edges, bands, markers, metrics: m } = layout;
-  const svg = sv("svg", { class: "flow", viewBox: `0 0 ${width} ${height + 2}`, role: "img", "aria-label": scenario.name, preserveAspectRatio: "xMidYMid meet" });
-  const uid = `${scenario.id}-${height}`;
-  svg.append(sv("defs", {},
-    sv("marker", { id: `arrow-${uid}`, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" },
-      sv("path", { d: "M0,1 L9,5 L0,9 z", fill: "var(--edge)" })),
-    sv("marker", { id: `arrow-hot-${uid}`, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" },
-      sv("path", { d: "M0,1 L9,5 L0,9 z", fill: "var(--orange)" }))));
+// ---------- the flow drawing ----------
 
-  // lanes: name, then the head count (and the C4 change in the to-be QC lane), from the lane's top
-  LANES.forEach((id, i) => {
-    const L = lanes[id];
-    svg.append(sv("rect", { x: 0, y: L.top, width, height: L.h, fill: i % 2 ? "var(--lane-alt)" : "var(--lane)", "data-lane-bg": id }));
-    svg.append(sv("line", { x1: 0, x2: width, y1: L.bottom, y2: L.bottom, stroke: "var(--line)", "stroke-width": 1 }));
-  });
-  svg.append(sv("line", { x1: HEADER, x2: HEADER, y1: 0, y2: height, stroke: "var(--line)" }));
-  const caps = scenario.capacities;
-  const asIsCaps = scenario.asIsCapacities;
-  const laneX = SPACE.l;
+const HOT = new Set(["Flow_DefectsFound", "Flow_DefectsFixed"]); // as-is: the rework loop through all four checks
+
+function drawFlow(layout, scenario) {
+  const { width, height, lanes, nodes, flows, frames, metrics: m } = layout;
+  const svg = sv("svg", { class: "flow", viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": scenario.name, preserveAspectRatio: "xMidYMid meet" });
+  const uid = `${scenario.id}-${m.name}`;
+  svg.append(sv("defs", {}, arrowMarker(`arrow-${uid}`, "var(--flow)"), arrowMarker(`arrow-hot-${uid}`, "var(--orange)")));
+  const laneFill = (id) => (LANES.indexOf(id) % 2 ? "var(--lane-alt)" : "var(--lane)");
+  const laneAt = (y) => LANES.find((id) => y >= lanes[id].top && y < lanes[id].bottom) ?? LANES[0];
+
+  // the pool (one organisation) with one lane per department
   for (const id of LANES) {
     const L = lanes[id];
-    const name = wrap(T.lanes[id], TYPE.lg, 700, HEADER - laneX - SPACE.s, false);
+    svg.append(sv("rect", { x: POOL_W, y: L.top, width: width - POOL_W, height: L.h, fill: laneFill(id), "data-lane-bg": id }));
+    if (L.top > 0) svg.append(sv("line", { x1: POOL_W, x2: width, y1: L.top, y2: L.top, stroke: "var(--line)" }));
+  }
+  svg.append(sv("rect", { x: 0, y: 0, width: POOL_W, height, fill: "var(--pool)" }));
+  svg.append(sv("text", { x: POOL_W / 2 + 0.36 * TYPE.pool, y: height / 2, transform: `rotate(-90 ${POOL_W / 2 + 0.36 * TYPE.pool} ${height / 2})`, "text-anchor": "middle", "font-size": TYPE.pool, "font-weight": 700, fill: "var(--ink)", text: T.pool, "data-pool": "" }));
+  svg.append(sv("line", { x1: POOL_W, x2: POOL_W, y1: 0, y2: height, stroke: "var(--line-strong)" }));
+  svg.append(sv("line", { x1: HEADER, x2: HEADER, y1: 0, y2: height, stroke: "var(--line)" }));
+  svg.append(sv("rect", { x: 0.5, y: 0.5, width: width - 1, height: height - 1, fill: "none", stroke: "var(--line-strong)" }));
+
+  // lane names, then the head count (and C4 in the to-be QC lane)
+  const caps = scenario.capacities, asIsCaps = scenario.asIsCapacities;
+  const laneX = POOL_W + SPACE.m;
+  for (const id of LANES) {
+    const L = lanes[id];
     const g = sv("g", { "data-lane": id });
-    const y0 = baseline(L.top + m.laneTop, TYPE.lg); // level with the tops of the boxes
-    name.lines.forEach((line, k) => g.append(sv("text", { x: laneX, y: y0 + k * TYPE.lg * TYPE.line, "font-size": TYPE.lg, "font-weight": 700, fill: "var(--ink)", text: line })));
-    const nameBottom = y0 + (name.lines.length - 1) * TYPE.lg * TYPE.line + TYPE.descent * TYPE.lg;
-    const py = baseline(nameBottom + SPACE.xs, TYPE.sm);
+    const y0 = baseline(L.top + m.laneTop + SPACE.xs);
+    const name = lines(T.lanes[id]);
+    name.forEach((line, k) => g.append(sv("text", { x: laneX, y: y0 + k * S * TYPE.line, "font-size": S, "font-weight": 700, fill: "var(--ink)", text: line })));
+    const py = y0 + name.length * S * TYPE.line;
     const changed = asIsCaps && asIsCaps[id] !== caps[id];
+    g.append(sv("text", { x: laneX, y: py, "font-size": S, "font-weight": changed ? 700 : 400, fill: changed ? "var(--orange-ink)" : "var(--muted)", text: fill(T.people, { n: caps[id] }) }));
     if (changed) {
-      g.append(sv("text", { x: laneX, y: py, "font-size": TYPE.sm, "font-weight": 600, fill: "var(--orange-ink)", text: `${asIsCaps[id]} → ${fill(T.people, { n: caps[id] })}` }));
-      g.append(chipSvg("C4", laneX, py + TYPE.descent * TYPE.sm + SPACE.s));
-    } else if (caps[id]) {
-      g.append(sv("text", { x: laneX, y: py, "font-size": TYPE.sm, fill: "var(--muted)", text: fill(T.people, { n: caps[id] }) }));
+      const cy = py + TYPE.descent * S + SPACE.s;
+      g.append(chipSvg("C4", laneX, cy));
+      g.append(sv("text", { x: laneX + CHIP.w + SPACE.s, y: cy + CHIP.h / 2 + 0.36 * S, "font-size": S, "font-weight": 600, fill: "var(--orange-ink)", text: fill(T.people_added, { n: caps[id] - asIsCaps[id] }) }));
     }
     svg.append(g);
   }
 
-  // highlight bands (bottleneck in the as-is, C1 in the to-be), labelled just below the QC lane
-  for (const band of bands) {
-    svg.append(sv("rect", { x: band.x, y: band.y, width: band.w, height: band.h, rx: 12, fill: "var(--orange-soft)", stroke: "var(--orange)", "stroke-width": 1.2, "stroke-dasharray": band.kind === "change" ? null : "5 4", "data-band": band.kind }));
-    const [lx, ly] = band.label;
-    if (band.kind === "change") {
-      const text = T.changes.C1.detail;
-      const tw = textWidth(text, TYPE.md, 600);
-      const x0 = lx - (CHIP.w + SPACE.m + tw) / 2;
-      svg.append(chipSvg("C1", x0, ly - TYPE.ascent * TYPE.md + 1));
-      svg.append(sv("text", { x: x0 + CHIP.w + SPACE.m, y: ly, "font-size": TYPE.md, "font-weight": 600, fill: "var(--orange-ink)", text }));
+  // highlight frames: the bottleneck (as-is) or C1 (to-be) around the checks, and the part after go-live
+  for (const f of frames) {
+    if (f.kind === "golive") {
+      svg.append(sv("rect", { x: f.x, y: f.y, width: f.w, height: f.h, rx: 10, fill: "var(--teal-wash)", stroke: "var(--teal)", "stroke-width": 1.2, "data-band": "golive" }));
+      const ty = baseline(f.y + m.laneTop / 2 + SPACE.xs);
+      svg.append(sv("text", { x: f.x + SPACE.m, y: ty, "font-size": S, "font-weight": 700, fill: "var(--teal)", text: T.golive.title }));
+      svg.append(sv("text", { x: f.x + SPACE.m, y: ty + S * TYPE.line, "font-size": S, fill: "var(--muted)", text: T.golive.note }));
+      continue;
+    }
+    svg.append(sv("rect", { x: f.x, y: f.y, width: f.w, height: f.h, rx: 10, fill: "var(--orange-soft)", stroke: "var(--orange)", "stroke-width": 1.2, "data-band": f.kind }));
+    const [lx, ly] = f.label;
+    if (f.kind === "change") {
+      const text = T.changes[f.change].detail;
+      const x0 = lx - (CHIP.w + SPACE.m + textWidth(text, S, 600)) / 2;
+      svg.append(chipSvg(f.change, x0, ly - TYPE.ascent * S + 1));
+      svg.append(sv("text", { x: x0 + CHIP.w + SPACE.m, y: ly, "font-size": S, "font-weight": 600, fill: "var(--orange-ink)", text }));
     } else {
-      svg.append(sv("text", { x: lx, y: ly, "text-anchor": "middle", "font-size": TYPE.md, "font-weight": 600, fill: "var(--orange-ink)", text: T.bottleneck }));
+      svg.append(sv("text", { x: lx, y: ly, "text-anchor": "middle", "font-size": S, "font-weight": 600, fill: "var(--orange-ink)", text: T.bottleneck }));
     }
   }
 
-  // go-live line, labelled at the top of the first lane
-  const gx = markers.goLive;
-  const gTop = lanes[LANES[0]].top + SPACE.s;
-  svg.append(sv("line", { x1: gx, x2: gx, y1: SPACE.s, y2: height - SPACE.s, stroke: "var(--teal)", "stroke-width": 1.5, "stroke-dasharray": "3 5" }));
-  svg.append(sv("text", { x: gx + SPACE.m, y: baseline(gTop, TYPE.lg), "font-size": TYPE.lg, "font-weight": 700, fill: "var(--teal)", text: T.markers.go_live }));
-  svg.append(sv("text", { x: gx + SPACE.m, y: baseline(gTop + (TYPE.ascent + TYPE.descent) * TYPE.lg + SPACE.xs, TYPE.sm), "font-size": TYPE.sm, fill: "var(--muted)", text: T.markers.go_live_note }));
-
-  // edges, and the rework rate of each loop as a pill on or beside its arrow
+  // sequence flows: solid arrows; the conditions of XOR-split arcs beside them
   const rates = Object.fromEntries(scenario.rework.map((r) => [r.gateway_id, r.rate]));
-  const edgeLayer = sv("g", { fill: "none" });
+  const flowLayer = sv("g", { fill: "none" });
   const labelLayer = sv("g", {});
-  for (const e of edges) {
-    if (e.silent) continue;
-    const hot = e.hot;
-    edgeLayer.append(sv("path", {
-      d: roundedPath(e.pts, e.loop ? 16 : 9),
-      stroke: hot ? "var(--orange)" : "var(--edge)", "stroke-width": hot ? 2 : 1.6,
-      "stroke-dasharray": e.loop ? "6 4" : null,
-      "marker-end": e.noArrow ? null : `url(#${hot ? "arrow-hot" : "arrow"}-${uid})`,
+  for (const f of Object.values(flows)) {
+    const hot = scenario.id === "as_is" && HOT.has(f.id);
+    flowLayer.append(sv("path", {
+      d: roundedPath(f.pts), "data-flow": f.id,
+      stroke: hot ? "var(--orange)" : "var(--flow)", "stroke-width": hot ? 2 : 1.5,
+      "marker-end": `url(#${hot ? "arrow-hot" : "arrow"}-${uid})`,
     }));
-    if (typeof e.loop === "string" && e.label && rates[e.loop] != null) {
-      const text = fill(T.loops[e.loop], { rate: pct(rates[e.loop], 0) });
-      const w = textWidth(text, TYPE.sm, 700) + 2 * SPACE.m;
-      const { x, y, anchor } = e.label;
-      const left = anchor === "end" ? x - w : x - w / 2;
-      labelLayer.append(sv("g", { "data-pill": e.loop },
-        sv("rect", { x: left, y: y - PILL_H / 2, width: w, height: PILL_H, rx: PILL_H / 2, fill: "var(--surface)", stroke: hot ? "var(--orange)" : "var(--edge)", "stroke-width": 1.2 }),
-        sv("text", { x: left + w / 2, y: y + 0.36 * TYPE.sm, "text-anchor": "middle", "font-size": TYPE.sm, "font-weight": 700, fill: hot ? "var(--orange-ink)" : "var(--ink)", text })));
+    if (f.label) {
+      const text = fill(T.conditions[f.id], { rate: rates[f.source] != null ? pct(rates[f.source], 0) : "" });
+      labelLayer.append(sv("text", {
+        x: f.label.x, y: f.label.y, "text-anchor": f.label.anchor, "font-size": S, "font-weight": 600, "data-cond": f.id,
+        fill: hot ? "var(--orange-ink)" : "var(--ink)", stroke: laneFill(laneAt(f.label.y - 5)), "stroke-width": 4, "stroke-linejoin": "round", "paint-order": "stroke", text,
+      }));
     }
   }
-  svg.append(edgeLayer);
+  svg.append(flowLayer);
 
-  // markers
-  const { start, rejected, closed, split } = markers;
-  svg.append(sv("circle", { cx: start.x, cy: start.y, r: 9, fill: "var(--surface)", stroke: "var(--ink)", "stroke-width": 2 }));
-  for (const p of [rejected, closed]) svg.append(sv("circle", { cx: p.x, cy: p.y, r: 9, fill: "var(--surface)", stroke: "var(--ink)", "stroke-width": 3.5 }));
-  svg.append(sv("text", { x: rejected.x, y: baseline(rejected.y + 9 + SPACE.xs, TYPE.sm), "text-anchor": "middle", "font-size": TYPE.sm, fill: "var(--muted)", text: T.markers.rejected }));
-  svg.append(sv("circle", { cx: split.x, cy: split.y, r: 5, fill: "var(--surface)", stroke: "var(--edge)", "stroke-width": 2 }));
-
-  // tasks: the label on top, the status strip (queue and dots) along the bottom
-  for (const box of Object.values(boxes)) {
-    const change = layout.changed[box.id];
-    const afterGoLive = box.cx > gx;
-    const g = sv("g", { "data-box-group": box.id });
-    g.append(sv("rect", {
-      x: box.left, y: box.top, width: box.w, height: m.boxH, rx: 10, "data-box": box.id,
-      fill: change === "C2" ? "var(--orange-soft)" : "var(--surface)",
-      stroke: change ? "var(--orange)" : afterGoLive ? "var(--line)" : "#a9bcc0", "stroke-width": change ? 2 : 1.3,
+  // events, gateways and tasks
+  const goLive = layout.goLive;
+  for (const n of Object.values(nodes)) {
+    const title = sv("title", { text: n.type === "task" ? oneLine(T.activities[n.id]) : n.type.endsWith("Gateway") ? T.gateways[n.type] : T.events[n.id] });
+    if (n.type === "startEvent") { svg.append(sv("g", { "data-node": n.id }, title, shape.start(n.cx, n.cy))); continue; }
+    if (n.type === "endEvent") { svg.append(sv("g", { "data-node": n.id }, title, shape.end(n.cx, n.cy))); continue; }
+    if (n.type.endsWith("Gateway")) { svg.append(sv("g", { "data-node": n.id, "data-gateway": n.type }, title, shape.gateway(n.cx, n.cy, n.type))); continue; }
+    const change = layout.changed[n.id];
+    const after = n.cx > goLive;
+    const g = sv("g", { "data-box-group": n.id, "data-node": n.id }, title);
+    g.append(shape.task(n.left, n.top, n.w, m.boxH, {
+      "data-box": n.id, fill: change === "C2" ? "var(--orange-soft)" : "var(--surface)",
+      stroke: change ? "var(--orange)" : "var(--task)", "stroke-width": change ? 2 : 1.3,
     }));
-    const label = wrap(T.activities[box.id], TYPE.md, 600, box.w - 10);
-    const lh = TYPE.md * TYPE.line;
-    const blockH = (TYPE.ascent + TYPE.descent) * TYPE.md + (label.lines.length - 1) * lh;
-    const y0 = baseline(box.top + m.labelTop + (m.labelH - blockH) / 2, TYPE.md);
-    const lg = sv("g", { "data-label": box.id });
-    label.lines.forEach((line, k) => lg.append(sv("text", {
-      x: box.cx, y: y0 + k * lh, "text-anchor": "middle", "font-size": TYPE.md, "font-weight": 600,
-      fill: afterGoLive ? "var(--muted)" : "var(--ink)", text: line,
-    })));
+    const label = lines(T.activities[n.id]);
+    const lh = S * TYPE.line;
+    const blockH = (TYPE.ascent + TYPE.descent) * S + (label.length - 1) * lh;
+    const y0 = baseline(n.top + m.labelTop + (m.labelH - blockH) / 2);
+    const lg = sv("g", { "data-label": n.id });
+    label.forEach((line, k) => lg.append(sv("text", { x: n.cx, y: y0 + k * lh, "text-anchor": "middle", "font-size": S, "font-weight": 600, fill: after ? "var(--muted)" : "var(--ink)", text: line })));
     g.append(lg);
-    if (change) g.append(chipSvg(change, box.right + SPACE.s, box.top));
+    if (change) g.append(chipSvg(change, n.chip.x, n.chip.y));
     svg.append(g);
   }
   svg.append(labelLayer);
 
   const dynamic = sv("g", {});
-  const badges = sv("g", {});
-  svg.append(dynamic, badges);
-  return { svg, dynamic, badges };
+  svg.append(dynamic);
+  return { svg, dynamic };
 }
 
 function chipSvg(text, x, y) {
   return sv("g", { "data-chip": text },
     sv("rect", { x, y, width: CHIP.w, height: CHIP.h, rx: 5, fill: "var(--orange)" }),
-    sv("text", { x: x + CHIP.w / 2, y: y + CHIP.h / 2 + 0.36 * TYPE.sm, "text-anchor": "middle", "font-size": TYPE.sm, "font-weight": 700, fill: "#fff", text }));
+    sv("text", { x: x + CHIP.w / 2, y: y + CHIP.h / 2 + 0.36 * S, "text-anchor": "middle", "font-size": S, "font-weight": 700, fill: "#fff", text }));
 }
 
 // ---------- one animated flow ----------
 
+// Each dot is a token (Dumas et al., §3.1): one project. It is created at the start event, moves
+// along the arcs and through the gateways, sits on a task while it waits or is worked on, and is
+// destroyed at an end event. At the to-be AND-split it splits into four; at the AND-join they merge.
 class FlowView {
   constructor(scenario, prep, layout) {
     this.scenario = scenario;
     this.prep = prep;
     this.layout = layout;
-    const { svg, dynamic, badges } = drawFlow(layout, scenario);
+    const { svg, dynamic } = drawFlow(layout, scenario);
     this.svg = svg;
     this.layer = dynamic;
-    this.badgeLayer = badges;
     this.dots = new Map(); // row index -> dot
-    this.badges = new Map(); // task -> badge
-    this.edgeIndex = new Map(layout.edges.filter((e) => !e.line).map((e) => [`${e.from}>${e.to}`, e.pts]));
+    this.routes = new Map();
+    this.start = Object.values(layout.nodes).find((n) => n.type === "startEvent");
+  }
+
+  route(from, to) {
+    const key = `${from}>${to}`;
+    if (!this.routes.has(key)) this.routes.set(key, route(this.layout, from, to));
+    return this.routes.get(key);
+  }
+
+  path(from, to) {
+    return this.route(from, to)?.pts ?? null;
   }
 
   update(state, now, dt) {
     const L = this.layout;
     const r = L.metrics.dot;
     const seen = new Set();
+    // parked dots of all four checks share the arc into the AND-join, oldest nearest the gateway
+    const parked = state.items.filter((x) => x.mode === "park").sort((a, b) => this.prep.rows[a.i].end - this.prep.rows[b.i].end || a.i - b.i);
+    const parkSlot = new Map(parked.map((x, k) => [x.i, k]));
     for (const item of state.items) {
-      const target = dotPosition(L, item.task, item.mode, item.slot, item.count, state.waitCounts[item.task] ?? 0);
+      const waiting = state.waitCounts[item.task] ?? 0, total = waiting + (state.workCounts[item.task] ?? 0);
+      const target = item.mode === "park" ? parkPosition(L, item.task, parkSlot.get(item.i))
+        : dotPosition(L, item.task, item.mode === "wait" ? item.slot : waiting + item.slot, total);
       seen.add(item.i);
       let dot = this.dots.get(item.i);
       if (!dot) {
         const prevDot = item.prev != null ? this.dots.get(item.prev) : null;
         const prevRow = item.prev != null ? this.prep.rows[item.prev] : null;
-        let from = prevDot ? [prevDot.x, prevDot.y] : null;
-        let path = null;
-        if (prevRow) path = this.edgeIndex.get(`${prevRow.activity}>${item.task}`);
-        else if (item.task === "Task_RegisterRequest") {
-          const s = L.markers.start;
-          from = [s.x, s.y];
-          path = [[s.x, s.y]];
-        }
-        const el = sv("circle", { r, class: "dot" });
-        const start = from ?? target ?? [0, 0];
-        dot = { el, x: start[0], y: start[1], opacity: from ? 1 : 0, travel: null, mode: null };
-        if (from && !REDUCED) dot.travel = { pts: [from, ...(path ?? []), target ?? from], t0: now };
-        this.layer.append(el);
+        let pts = null;
+        if (prevRow && prevDot) {
+          const r0 = this.route(prevRow.activity, item.task);
+          const lead = here(prevDot); // a dot still on its way finishes that path first
+          if (r0 && prevDot.mode === "park") pts = [...lead, ...r0.pts.slice(this.layout.flows[r0.flows[0]].pts.length - 1)];
+          else if (r0) pts = [...lead.slice(0, -1), ...leave(L.boxes[prevRow.activity], lead.at(-1), r0.pts)];
+        } else if (!prevRow && item.task === "Task_RegisterRequest") pts = this.path(this.start.id, item.task);
+        if (pts && target) pts = enter(L.boxes[item.task], pts, target);
+        const node = sv("circle", { r, class: "dot" });
+        const start = pts?.[0] ?? target ?? [0, 0];
+        dot = { el: node, x: start[0], y: start[1], opacity: pts ? 1 : 0, travel: null, mode: null, task: item.task, last: item.last };
+        if (pts && !REDUCED) dot.travel = { pts, t0: now };
+        this.layer.append(node);
         this.dots.set(item.i, dot);
         if (prevDot) prevDot.claimed = true;
+      }
+      // a check that finished first runs down its arc to wait just before the AND-join
+      if (item.mode === "park" && dot.mode && dot.mode !== "park" && target && !REDUCED) {
+        const f = this.joinFlow(item.task);
+        const lead = here(dot);
+        dot.travel = { pts: [...lead.slice(0, -1), ...leave(L.boxes[item.task], lead.at(-1), [...f.pts.slice(0, -1), target])], t0: now };
       }
       dot.target = target;
       dot.gone = null;
@@ -262,70 +281,83 @@ class FlowView {
     for (const [i, dot] of this.dots) {
       if (seen.has(i)) continue;
       if (dot.claimed || REDUCED) { dot.el.remove(); this.dots.delete(i); continue; }
-      dot.gone ??= now;
+      if (dot.gone == null) {
+        dot.gone = now;
+        // the last task of a project: the token runs on to its end event; a parked check merges into the join
+        const lead = here(dot);
+        let pts = null;
+        if (dot.mode === "park") {
+          const f = this.joinFlow(dot.task), j = L.nodes[f.target];
+          pts = [...lead, f.pts.at(-1), [j.cx, j.cy]];
+        } else if (dot.last) {
+          const exit = this.path(dot.task, null);
+          if (exit) pts = [...lead.slice(0, -1), ...leave(L.boxes[dot.task], lead.at(-1), exit)];
+        }
+        if (pts) { dot.travel = { pts, t0: now }; dot.gone = now + TRAVEL_MS; }
+      }
     }
     for (const [i, dot] of this.dots) {
-      if (dot.gone != null) {
-        const f = (now - dot.gone) / FADE_MS;
-        if (f >= 1) { dot.el.remove(); this.dots.delete(i); continue; }
-        dot.opacity = 1 - f;
-      } else if (dot.travel) {
+      if (dot.travel) {
         const f = (now - dot.travel.t0) / TRAVEL_MS;
-        if (f >= 1) dot.travel = null;
+        if (f >= 1) { [dot.x, dot.y] = dot.travel.pts.at(-1); dot.travel = null; }
         else {
           const e = f < 0.5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2;
+          dot.travel.e = e;
           [dot.x, dot.y] = along(dot.travel.pts, e);
         }
         dot.opacity = Math.min(1, dot.opacity + dt / 150);
       }
-      if (!dot.travel && dot.gone == null) {
-        if (dot.target) {
-          const k = REDUCED ? 1 : 1 - Math.exp(-dt / 90);
-          dot.x += (dot.target[0] - dot.x) * k;
-          dot.y += (dot.target[1] - dot.y) * k;
-          dot.opacity = Math.min(1, dot.opacity + dt / 150);
-        } else dot.opacity = 0; // beyond the tray: the badge counts it
+      if (dot.gone != null && now >= dot.gone) {
+        const f = (now - dot.gone) / FADE_MS;
+        if (f >= 1) { dot.el.remove(); this.dots.delete(i); continue; }
+        dot.opacity = 1 - f;
+      } else if (!dot.travel && dot.gone == null && dot.target) {
+        const k = REDUCED ? 1 : 1 - Math.exp(-dt / 90);
+        dot.x += (dot.target[0] - dot.x) * k;
+        dot.y += (dot.target[1] - dot.y) * k;
+        dot.opacity = Math.min(1, dot.opacity + dt / 150);
       }
       dot.el.setAttribute("cx", dot.x.toFixed(1));
       dot.el.setAttribute("cy", dot.y.toFixed(1));
       dot.el.setAttribute("opacity", dot.opacity.toFixed(2));
     }
-    this.updateBadges(state.waitCounts);
   }
 
-  updateBadges(counts) {
-    const L = this.layout;
-    for (const [task, n] of Object.entries(counts)) {
-      const box = L.boxes[task];
-      if (!box) continue;
-      let b = this.badges.get(task);
-      if (!b) {
-        const qc = box.lane === "Lane_QualityControl";
-        const rect = sv("rect", { height: BADGE_H, rx: BADGE_H / 2, fill: qc ? "var(--orange)" : "var(--surface)", stroke: "var(--orange)", "stroke-width": 1.2 });
-        const text = sv("text", { "text-anchor": "middle", "font-size": TYPE.sm, "font-weight": 700, fill: qc ? "#fff" : "var(--orange-ink)" });
-        const g = sv("g", { "data-badge": task }, rect, text);
-        this.badgeLayer.append(g);
-        b = { g, rect, text, n: -1 };
-        this.badges.set(task, b);
-      }
-      if (b.n !== n) {
-        b.n = n;
-        // the left end of the task's status strip, in front of its waiting dots
-        const w = badgeWidth(n);
-        const x = box.strip.x0, cy = box.strip.rows[0];
-        b.rect.setAttribute("x", x); b.rect.setAttribute("y", cy - BADGE_H / 2); b.rect.setAttribute("width", w);
-        b.text.setAttribute("x", x + w / 2); b.text.setAttribute("y", cy + 0.36 * TYPE.sm);
-        b.text.textContent = n;
-      }
-      b.g.style.display = "";
-    }
-    for (const [task, b] of this.badges) if (!(task in counts)) { b.g.style.display = "none"; b.n = -1; }
+  joinFlow(task) {
+    return Object.values(this.layout.flows).find((fl) => fl.source === task && this.layout.nodes[fl.target]?.type === "parallelGateway");
   }
 
   reset() {
     for (const dot of this.dots.values()) dot.el.remove();
     this.dots.clear();
   }
+}
+
+// The rest of a dot's current path, from where it is now (just its position if it is not moving).
+function here(dot) {
+  return dot.travel ? rest(dot.travel.pts, dot.travel.e ?? 0) : [[dot.x, dot.y]];
+}
+
+// Into a task: from the end of `pts` (on the box edge) to the dot's place `s` in the strip, and out
+// of it again. The dot goes round the outside of the box, so it never crosses the task's label.
+const OUT = 5;
+function edge(box, p) {
+  if (Math.abs(p[1] - box.bottom) < 0.5) return "bottom";
+  if (Math.abs(p[1] - box.top) < 0.5) return "top";
+  return p[0] < box.cx ? "left" : "right";
+}
+function enter(box, pts, s) {
+  if (!box) return [...pts, s];
+  const p = pts.at(-1), side = edge(box, p);
+  const ox = (side === "top" ? p[0] < box.cx : side === "left") ? box.left - OUT : box.right + OUT;
+  if (side === "bottom") return [...pts, [p[0], box.bottom + OUT], [s[0], box.bottom + OUT], s];
+  if (side === "top") return [...pts.slice(0, -1), [p[0], box.top - 2], [ox, box.top - 2], [ox, s[1]], s];
+  return [...pts, [ox, p[1]], [ox, s[1]], s];
+}
+function leave(box, s, pts) {
+  if (!box) return [s, ...pts];
+  const way = enter(box, [pts[0]], s); // the same way round, backwards
+  return [...way.reverse(), ...pts.slice(1)];
 }
 
 const DOT_STYLE = {
@@ -403,11 +435,19 @@ function queueChart(series, now) {
 function legendLine(color) {
   return sv("svg", { width: 16, height: 8, "aria-hidden": "true" }, sv("line", { x1: 1, x2: 15, y1: 4, y2: 4, stroke: color, "stroke-width": 2.5, "stroke-linecap": "round" }));
 }
-function legendLoop() {
-  return sv("svg", { width: 22, height: 8, "aria-hidden": "true" }, sv("line", { x1: 1, x2: 21, y1: 4, y2: 4, stroke: "var(--edge)", "stroke-width": 2, "stroke-dasharray": "5 3" }));
-}
 function legendDot(style) {
   return sv("svg", { width: 14, height: 14, "aria-hidden": "true" }, sv("circle", { cx: 7, cy: 7, r: 5, fill: style.fill, stroke: style.stroke === "#fff" ? "none" : style.stroke, "stroke-width": style.width }));
+}
+// Small samples of the BPMN shapes the flow uses, drawn with the same code as the flow.
+function legendShape(kind) {
+  const box = (w, ...kids) => sv("svg", { width: w, height: 22, viewBox: `0 0 ${w} 22`, "aria-hidden": "true" }, ...kids);
+  if (kind === "start") return box(22, shape.start(11, 11, 8));
+  if (kind === "end") return box(22, shape.end(11, 11, 8));
+  if (kind === "task") return box(30, shape.task(1, 3, 28, 16, { rx: 5 }));
+  if (kind === "xor") return box(24, shape.gateway(12, 11, "exclusiveGateway", 10));
+  if (kind === "and") return box(24, shape.gateway(12, 11, "parallelGateway", 10));
+  return box(30, sv("defs", {}, arrowMarker("legend-arrow", "var(--flow)")),
+    sv("path", { d: "M1,11 H28", stroke: "var(--flow)", "stroke-width": 1.5, "marker-end": "url(#legend-arrow)" }));
 }
 
 // ---------- result view ----------
@@ -578,11 +618,13 @@ async function main() {
   }
 
   function legend() {
-    const items = [["work", T.legend.work], ["wait", T.legend.wait], ["live", T.legend.live]];
-    if (sim.view !== "as_is") items.splice(2, 0, ["park", T.legend.park]);
-    return el("div", {},
-      el("ul", { class: "legend" }, items.map(([k, label]) => el("li", {}, legendDot(DOT_STYLE[k]), label)),
-        el("li", {}, legendLoop(), T.loops_note)),
+    const withAnd = sim.view !== "as_is";
+    const tokens = [["work", T.legend.work], ["wait", T.legend.wait], ...(withAnd ? [["park", T.legend.park]] : []), ["live", T.legend.live]];
+    const notation = ["start", "end", "task", "xor", ...(withAnd ? ["and"] : []), "flow"];
+    return el("div", { class: "legend-block" },
+      el("ul", { class: "legend", "data-legend": "tokens" }, tokens.map(([k, label]) => el("li", {}, legendDot(DOT_STYLE[k]), label))),
+      el("ul", { class: "legend", "data-legend": "notation" }, notation.map((k) => el("li", {}, legendShape(k), T.legend[k]))),
+      el("p", { class: "note", "data-note": "tokens", text: `${T.legend.token} ${T.legend.share}` }),
       el("p", { class: "note", "data-note": "sample", text: fill(T.sample_note, { seed: replay.seed, months: clock(win, win.end).totalMonths }) }));
   }
 
@@ -630,7 +672,7 @@ async function main() {
   const speedHost = document.getElementById("speed");
   document.getElementById("speed-label").textContent = T.controls.speed;
   const speedButtons = SPEEDS.map((s) => {
-    const b = el("button", { type: "button", "aria-pressed": String(s === sim.speed), text: `${NUM(s % 1 ? 1 : 0).format(s)}×` });
+    const b = el("button", { type: "button", "aria-pressed": String(s === sim.speed), text: fill(T.controls.speed_value, { v: NUM(s % 1 ? 1 : 0).format(s) }) });
     b.addEventListener("click", () => { sim.speed = s; speedButtons.forEach((x, k) => x.setAttribute("aria-pressed", String(SPEEDS[k] === s))); });
     speedHost.append(b);
     return b;
@@ -693,7 +735,7 @@ async function main() {
   setView(sim.view);
   requestAnimationFrame(frame);
   // For the browser checks: read the clock and the counters the page shows.
-  window.demo = { sim, win, figures: () => figures(results), state: (id) => stateAt(preps[id], sim.t), setView, togglePlay };
+  window.demo = { sim, win, figures: () => figures(results), state: (id) => stateAt(preps[id], sim.t), setView, togglePlay, views: () => views };
 }
 
 main().catch((err) => {

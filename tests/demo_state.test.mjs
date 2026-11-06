@@ -3,8 +3,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { prepare, stateAt, counters, qcQueueSeries, clock, along, MONTH } from "../web/demo/state.js";
-import { buildLayout, dotPosition, badgeWidth, TYPE, SPACE, HEADER, BADGE_H, WIDTH } from "../web/demo/layout.js";
+import { prepare, stateAt, counters, qcQueueSeries, clock, along, rest, MONTH } from "../web/demo/state.js";
+import { buildLayout, dotPosition, parkPosition, route, TYPE, SPACE, HEADER, WIDTH, CHIP } from "../web/demo/layout.js";
 
 const WINDOW = { start: 10, end: 40 };
 const QC = "Lane_QualityControl";
@@ -91,17 +91,15 @@ test("along walks a polyline by length", () => {
   assert.deepEqual(along(pts, 1), [10, 10]);
 });
 
-const replay = JSON.parse(fs.readFileSync(new URL("../web/demo/replay.json", import.meta.url)));
-
-test("on the real replay, every row's task has a place in its layout", () => {
-  for (const s of replay.scenarios) {
-    for (const metrics of ["normal", "compact"]) {
-      const layout = buildLayout(s.id, metrics);
-      assert.deepEqual(Object.keys(layout.boxes).sort(), [...s.tasks].sort());
-      for (const r of s.rows.slice(0, 200)) assert.ok(dotPosition(layout, r.activity, "work", 0, 1));
-    }
-  }
+test("rest keeps what is left of a polyline, so a dot finishes its path before the next one", () => {
+  const pts = [[0, 0], [10, 0], [10, 10]];
+  assert.deepEqual(rest(pts, 0.25), [[5, 0], [10, 0], [10, 10]]);
+  assert.deepEqual(rest(pts, 0.75), [[10, 5], [10, 10]]);
+  assert.deepEqual(rest(pts, 1), [[10, 10]]);
+  assert.deepEqual(rest(pts, 0), [[0, 0], [10, 0], [10, 10]]);
 });
+
+const replay = JSON.parse(fs.readFileSync(new URL("../web/demo/replay.json", import.meta.url)));
 
 test("on the real replay, the counters at the end match the case list", () => {
   for (const s of replay.scenarios) {
@@ -123,62 +121,142 @@ test("on the real replay, the as-is QC queue is longer than the to-be one", () =
   assert.ok(avg(asIs) > 4 * avg(toBe));
 });
 
-// ---------- layout geometry ----------
 
-const layouts = () => ["as_is", "to_be"].flatMap((model) => ["normal", "compact"].map((m) => buildLayout(model, m)));
+// ---------- tokens move along the arcs, through gateways ----------
 
-test("boxes in one lane leave room for an arrow between them, and stay inside their lane", () => {
-  for (const l of layouts()) {
-    const byLane = {};
-    for (const b of Object.values(l.boxes)) (byLane[b.lane] ??= []).push(b);
-    for (const list of Object.values(byLane)) {
-      list.sort((a, b) => a.left - b.left);
-      for (let k = 1; k < list.length; k++) assert.ok(list[k].left - list[k - 1].right >= SPACE.xl - 0.01, `${list[k - 1].id} / ${list[k].id}`);
-    }
-    for (const b of Object.values(l.boxes)) {
-      assert.ok(b.left > HEADER && b.right < WIDTH, b.id);
-      const lane = l.lanes[b.lane];
-      assert.ok(b.top >= lane.top && b.bottom <= lane.bottom, b.id);
+const flowsOf = (model, from, to) => route(buildLayout(model), from, to)?.flows;
+
+test("a token goes from one task to the next through the gateways between them, along their arcs", () => {
+  assert.deepEqual(flowsOf("as_is", "Start_RequestReceived", "Task_RegisterRequest"), ["Flow_RequestReceived"]);
+  assert.deepEqual(flowsOf("as_is", "Task_FixDefects", "Task_ReviewSourceCode"), ["Flow_DefectsFixed", "Flow_TestsStarted"]);
+  assert.deepEqual(flowsOf("as_is", "Task_RefineApplication", "Task_ReviewSourceCode"), ["Flow_ApplicationRefined", "Flow_ReleaseCandidateReady", "Flow_TestsStarted"]);
+  // to-be: the AND-split sends the build's token to every check, the AND-join and the retest join lead on.
+  assert.deepEqual(flowsOf("to_be", "Task_BuildApplication", "Task_RunSecurityTests"), ["Flow_ApplicationBuilt", "Flow_ReleaseCandidateReady", "Flow_SecurityTestsStarted"]);
+  assert.deepEqual(flowsOf("to_be", "Task_ReviewSourceCode", "Task_ApproveRelease"), ["Flow_CodeReviewed", "Flow_ChecksCompleted", "Flow_TestRoundCompleted", "Flow_TestsPassed"]);
+  assert.deepEqual(flowsOf("to_be", "Task_RetestFixedDefects", "Task_FixDefects"), ["Flow_DefectsRetested", "Flow_TestRoundCompleted", "Flow_DefectsFound"]);
+});
+
+test("a token never passes through a task on its way, and ends in an end event", () => {
+  assert.equal(flowsOf("as_is", "Task_RegisterRequest", "Task_HoldKickOff"), undefined);
+  const rejected = route(buildLayout("as_is"), "Task_ApproveProposal", null);
+  assert.deepEqual([rejected.flows, rejected.target], [["Flow_ProposalDecided", "Flow_ProposalRejected"], "End_ProposalRejected"]);
+  assert.equal(route(buildLayout("to_be"), "Task_EvaluateProject", null).target, "End_ProjectClosed");
+  assert.equal(route(buildLayout("to_be"), "Task_BuildApplication", null), null);
+});
+
+test("on the real replay, every step of every project has a path along the arcs", () => {
+  for (const s of replay.scenarios) {
+    const p = prepare(s, replay.window);
+    for (const metrics of ["normal", "compact"]) {
+      const layout = buildLayout(s.id, metrics);
+      assert.deepEqual(Object.keys(layout.boxes).sort(), [...s.tasks].sort());
+      const pairs = new Set(p.rows.filter((r) => r.prev != null).map((r) => `${p.rows[r.prev].activity}>${r.activity}`));
+      for (const pair of pairs) {
+        const [from, to] = pair.split(">");
+        const r = route(layout, from, to);
+        assert.ok(r, `${s.id} ${pair}`);
+        assert.deepEqual(r.pts[0], layout.flows[r.flows[0]].pts[0]);
+        assert.deepEqual(r.pts.at(-1), layout.flows[r.flows.at(-1)].pts.at(-1));
+      }
     }
   }
 });
 
-test("dots and the queue count stay in the box's strip, below its label", () => {
+// ---------- the drawing ----------
+
+const layouts = () => ["as_is", "to_be"].flatMap((model) => ["normal", "compact"].map((m) => buildLayout(model, m)));
+const onBoundary = (n, [x, y]) => {
+  if (n.type === "task") {
+    const onX = Math.abs(x - n.left) < 0.5 || Math.abs(x - n.right) < 0.5, onY = Math.abs(y - n.top) < 0.5 || Math.abs(y - n.bottom) < 0.5;
+    return (onX && y >= n.top - 0.5 && y <= n.bottom + 0.5) || (onY && x >= n.left - 0.5 && x <= n.right + 0.5);
+  }
+  if (n.type.endsWith("Gateway")) return Math.abs(Math.abs(x - n.cx) + Math.abs(y - n.cy) - n.r) < 0.5 && (Math.abs(x - n.cx) < 0.5 || Math.abs(y - n.cy) < 0.5);
+  return Math.abs(Math.hypot(x - n.cx, y - n.cy) - n.r) < 0.5;
+};
+
+test("every arc is a solid orthogonal line from the edge of its source to the edge of its target", () => {
+  for (const l of layouts()) {
+    for (const f of Object.values(l.flows)) {
+      assert.ok(onBoundary(l.nodes[f.source], f.pts[0]), `${l.model} ${f.id} start`);
+      assert.ok(onBoundary(l.nodes[f.target], f.pts.at(-1)), `${l.model} ${f.id} end`);
+      for (let k = 1; k < f.pts.length; k++) {
+        const [a, b] = [f.pts[k - 1], f.pts[k]];
+        assert.ok(Math.abs(a[0] - b[0]) < 0.01 || Math.abs(a[1] - b[1]) < 0.01, `${l.model} ${f.id} segment ${k}`);
+      }
+      const last = Math.hypot(f.pts.at(-1)[0] - f.pts.at(-2)[0], f.pts.at(-1)[1] - f.pts.at(-2)[1]);
+      assert.ok(last >= 8, `${l.model} ${l.metrics.name} ${f.id}: the arrow head needs ${last} >= 8`);
+    }
+  }
+});
+
+test("no arc runs through an element it does not connect", () => {
+  const crosses = (a, b, n, pad = 1) => {
+    const [x0, x1] = [Math.min(a[0], b[0]), Math.max(a[0], b[0])], [y0, y1] = [Math.min(a[1], b[1]), Math.max(a[1], b[1])];
+    return x1 > n.left + pad && x0 < n.right - pad && y1 > n.top + pad && y0 < n.bottom - pad;
+  };
+  for (const l of layouts()) {
+    for (const f of Object.values(l.flows)) {
+      for (const n of Object.values(l.nodes)) {
+        if (n.id === f.source || n.id === f.target) continue;
+        for (let k = 1; k < f.pts.length; k++) assert.ok(!crosses(f.pts[k - 1], f.pts[k], n), `${l.model} ${l.metrics.name} ${f.id} crosses ${n.id}`);
+      }
+    }
+  }
+});
+
+test("every element sits inside its lane, right of the lane names, and no two overlap", () => {
+  for (const l of layouts()) {
+    const list = Object.values(l.nodes);
+    for (const n of list) {
+      const lane = l.lanes[n.lane];
+      assert.ok(n.left > HEADER && n.right < WIDTH, n.id);
+      assert.ok(n.top >= lane.top && n.bottom <= lane.bottom, `${l.model} ${l.metrics.name} ${n.id}`);
+    }
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const [a, b] = [list[i], list[j]];
+      const overlap = Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0;
+      assert.ok(!overlap, `${l.model} ${a.id} / ${b.id}`);
+    }
+  }
+});
+
+test("dots stay in the box's strip below its label, waiting ones first, wrapping onto the next row", () => {
   for (const l of layouts()) {
     const m = l.metrics;
     for (const b of Object.values(l.boxes)) {
       const labelBottom = b.top + m.labelTop + m.labelH;
-      const inside = ([x, y]) => x - m.dot >= b.left && x + m.dot <= b.right && y - m.dot >= labelBottom && y + m.dot <= b.bottom;
-      for (let waiting = 0; waiting <= 12; waiting += 3) {
-        for (let count = 1; count <= 16; count++) {
-          for (let slot = 0; slot < count; slot++) assert.ok(inside(dotPosition(l, b.id, "work", slot, count, waiting)), `${l.model} ${m.name} ${b.id} work ${slot}/${count}`);
-        }
-        for (let slot = 0; slot < waiting; slot++) {
-          const p = dotPosition(l, b.id, "wait", slot, waiting);
-          if (p) assert.ok(inside(p), `${b.id} wait ${slot}`);
-        }
+      for (let total = 1; total <= 24; total++) {
+        const pts = Array.from({ length: total }, (_, k) => dotPosition(l, b.id, k, total));
+        for (const [x, y] of pts) assert.ok(x - m.dot >= b.left && x + m.dot <= b.right && y - m.dot >= labelBottom && y + m.dot <= b.bottom, `${l.model} ${b.id} ${total}`);
+        if (b.chip) for (const [x] of pts) assert.ok(x + m.dot <= b.chip.x - 1 || x - m.dot >= b.chip.x + CHIP.w + 1, `${b.id} dot on its chip`);
+        // the first dot is bottom left; a full row wraps upwards
+        assert.ok(pts.every(([x, y]) => y <= pts[0][1] && (y < pts[0][1] || x >= pts[0][0])));
       }
-      // the count badge sits at the left end of the bottom row
-      assert.ok(b.strip.x0 + badgeWidth(10) <= b.right && b.strip.rows[0] - BADGE_H / 2 >= labelBottom, b.id);
+      const few = [0, 1, 2].map((k) => dotPosition(l, b.id, k, 3));
+      assert.ok(few[0][0] < few[1][0] && few[1][0] < few[2][0] && few[0][1] === few[2][1], b.id);
     }
   }
 });
 
-test("worked-on dots never sit on the queue", () => {
+test("a check that finished first waits on its arc just before the AND-join", () => {
+  for (const m of ["normal", "compact"]) {
+    const l = buildLayout("to_be", m);
+    const join = l.nodes.Gateway_ChecksJoin;
+    const spots = [0, 1, 2, 3, 4, 5].map((k) => parkPosition(l, "Task_RunSecurityTests", k));
+    for (const [x, y] of spots) assert.ok(y === join.cy && x < join.left && x > l.nodes.Task_ReviewSourceCode.cx, `${x}`);
+    assert.ok(spots.every((p, k) => k === 0 || spots[k - 1][0] - p[0] >= 2 * l.metrics.dot));
+  }
+  assert.equal(parkPosition(buildLayout("as_is"), "Task_RunSecurityTests", 0), null);
+});
+
+test("every lane is tall enough for its name and head count, the to-be QC lane also for the C4 chip", () => {
+  const block = (lines) => TYPE.size * (TYPE.ascent + (lines - 1) * TYPE.line + TYPE.descent);
   for (const l of layouts()) {
-    for (const b of Object.values(l.boxes)) {
-      const waiting = 5;
-      const queue = Array.from({ length: waiting }, (_, s) => dotPosition(l, b.id, "wait", s, waiting)).filter(Boolean);
-      const queueRight = Math.max(b.strip.x0 + badgeWidth(waiting), ...queue.map(([x]) => x + l.metrics.dot));
-      for (let slot = 0; slot < 6; slot++) {
-        const [x, y] = dotPosition(l, b.id, "work", slot, 6, waiting);
-        assert.ok(y !== b.strip.rows[0] || x - l.metrics.dot >= queueRight - 0.01, `${b.id} ${slot}`);
-      }
-    }
+    for (const lane of Object.values(l.lanes)) assert.ok(l.metrics.laneTop + block(3) + SPACE.xs <= lane.h, lane.id);
+    if (l.model === "to_be") assert.ok(l.metrics.laneTop + block(3) + SPACE.s + CHIP.h <= l.lanes.Lane_QualityControl.h);
   }
 });
 
-test("every lane is tall enough for a two-line name and its head count", () => {
-  const block = TYPE.lg * (TYPE.ascent + TYPE.line + TYPE.descent) + SPACE.xs + TYPE.sm * (TYPE.ascent + TYPE.descent);
-  for (const l of layouts()) for (const lane of Object.values(l.lanes)) assert.ok(l.metrics.laneTop + block <= lane.h, lane.id);
+test("the flow is narrow enough for 12 px text across a 1366 px screen (1360 px of panel)", () => {
+  assert.ok((1360 / WIDTH) * TYPE.size >= 12, `width ${WIDTH}`);
 });

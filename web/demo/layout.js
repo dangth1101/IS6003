@@ -1,282 +1,354 @@
-// Fixed layout of the two flows, keyed by the element IDs of models/as_is.bpmn and models/to_be.bpmn.
-// Coordinates are SVG user units. Lane order and task lanes follow the BPMN files; a test
-// (tests/test_demo.py) checks that every task of both models has a place here.
+// Fixed layout of the two flows in BPMN notation (Dumas et al., ch. 3), keyed by the element and
+// flow IDs of models/as_is.bpmn and models/to_be.bpmn. tests/test_demo.py checks that the nodes
+// (type and lane) and the sequence flows here are exactly the model's, so the page can't drift.
 //
-// Every size below comes from one type scale and one spacing scale. At 1366 px the flow is drawn
-// at about 0.8 px per unit, so TYPE.sm renders at about 12 px; at 1920 px at about 1.15.
+// Coordinates are SVG user units. At 1366 px in compare mode the flow is drawn at about 0.78 px per
+// unit, so the one text size (TYPE.size) renders at about 12 px. Every gap below is spent with that
+// budget in mind: a test fails if the flow gets too wide for 12 px text.
 
 export const TYPE = {
-  sm: 15, // people counts, loop rates, queue counts, change chips, notes
-  md: 15.5, // task labels, band labels
-  lg: 17, // lane names, go-live
+  size: 15.5, // every text on the flow: labels, lane names, conditions, counts, chips
+  pool: 17, // the pool name in its band
   line: 1.2, // line height of two-line labels
   ascent: 0.97, // Be Vietnam Pro: top of the glyph box above the baseline, in em
   descent: 0.25,
 };
 export const SPACE = { xs: 2, s: 4, m: 8, l: 12, xl: 20 };
 
-export const HEADER = 108; // lane name column: the widest lane word ("Nghiệp vụ") at TYPE.lg plus padding
-export const PILL_H = 20;
-export const BADGE_H = 16;
+export const POOL_W = 20; // the pool's name band (vertical text)
+export const HEADER = 108; // pool band plus the lane name column
+export const GW = 11; // half the width of a gateway diamond
+export const EV = 9; // radius of an event circle
 export const CHIP = { w: 30, h: 19 };
-const BOX_PAD_X = 6;
-const LABEL_H = (TYPE.ascent + TYPE.line + TYPE.descent) * TYPE.md; // two lines of a task label
+const ARROW = 12; // shortest arrow segment
+const CLEAR = 12; // a vertical leg passing a box edge
+const BOX_GAP = 12; // two boxes next to each other in one lane
+const LABEL_H = (TYPE.ascent + TYPE.line + TYPE.descent) * TYPE.size; // two lines of a task label
 
 export const LANES = ["Lane_BusinessUnit", "Lane_ITManagement", "Lane_Development", "Lane_QualityControl", "Lane_ITOperations"];
-
-// normal: one flow on screen; compact: two flows stacked in compare mode. They differ only in
-// vertical room: the lane padding and how many rows of dots a task box holds.
-const MODES = {
-  normal: { padTop: 6, padBottom: 4, rows: 2, dot: 4.2, laneTop: 16, laneBottom: 10, waitMax: 4 },
-  compact: { padTop: 3, padBottom: 2, rows: 1, dot: 4, laneTop: 3, laneBottom: 2, waitMax: 2 },
-};
-const RAIL_GAP = SPACE.m; // to-be QC lane: from the shared line above the checks to their tops
-const JOIN_GAP = SPACE.s; // and from their bottoms to the join line
-
-export const METRICS = Object.fromEntries(Object.entries(MODES).map(([name, m]) => {
-  const dotRow = 2 * m.dot + SPACE.xs;
-  const boxH = Math.round(m.padTop + LABEL_H + SPACE.xs + BADGE_H + (m.rows - 1) * dotRow + m.padBottom);
-  const lane = m.laneTop + boxH + m.laneBottom;
-  // room under the join line for the hollow dots parked on it, inside the C1 frame
-  const qcLane = m.laneTop + RAIL_GAP + boxH + JOIN_GAP + m.dot + SPACE.s + m.laneBottom;
-  return [name, { ...m, name, boxH, dotRow, laneH: [lane, lane, lane, qcLane, lane], labelTop: m.padTop, labelH: LABEL_H }];
-}));
-
 const BU = "Lane_BusinessUnit", ITM = "Lane_ITManagement", DEV = "Lane_Development", QC = "Lane_QualityControl", OPS = "Lane_ITOperations";
 
-// Box widths: the wider line of each two-line label at TYPE.md, measured in the page font, plus padding.
+// normal: one flow on screen; compact: two flows stacked in compare mode. They differ only in
+// vertical room. A task box holds its label and, under it, `rows` rows of dots.
+const MODES = {
+  normal: { padTop: 6, padBottom: 4, rows: 3, dot: 4.2, laneTop: 14, laneBottom: 10 },
+  compact: { padTop: 3, padBottom: 2, rows: 2, dot: 4, laneTop: 3, laneBottom: 2 },
+};
+const RAIL = 10; // QC lane: from the rail above the checks to their tops
+const UNDER = 8; // to-be QC lane: from the checks' bottoms to the line of the join gateways
+const CHANNEL = 7; // QC lane: the loop back from "Hoàn thiện ứng dụng" runs this far under the lowest element
+
+export const METRICS = Object.fromEntries(Object.entries(MODES).map(([name, m]) => {
+  const dotStep = 2 * m.dot + 1;
+  const boxH = Math.round(m.padTop + LABEL_H + SPACE.xs + 2 * m.dot + (m.rows - 1) * dotStep + m.padBottom);
+  const lane = m.laneTop + boxH + m.laneBottom;
+  const qc = {
+    as_is: m.laneTop + RAIL + boxH + CHANNEL + 1 + m.laneBottom,
+    to_be: m.laneTop + RAIL + boxH + UNDER + 2 * GW + CHANNEL + 3 + m.laneBottom,
+  };
+  return [name, { ...m, name, boxH, dotStep, lane, qc, labelTop: m.padTop, labelH: LABEL_H }];
+}));
+
+// Box widths: the wider line of each label (two lines, split as in demo.vi.json) at TYPE.size,
+// weight 600, measured in the page font, plus 6 units of padding on each side.
 const W = {
-  Task_RegisterRequest: 76, Task_ApproveProposal: 94, Task_ReviseProposal: 94, Task_HoldKickOff: 76,
-  Task_SpecifyRequirements: 86, Task_DraftPlan: 108, Task_ApprovePlan: 108, Task_BuildApplication: 86,
-  Task_ReviewSourceCode: 96, Task_RunFunctionalTests: 94, Task_RunSecurityTests: 80, Task_RunAcceptanceTests: 94,
-  Task_FixDefects: 76, Task_RetestFixedDefects: 104, Task_ApproveRelease: 90, Task_RefineApplication: 96,
+  Task_RegisterRequest: 76, Task_ApproveProposal: 71, Task_ReviseProposal: 71, Task_HoldKickOff: 76,
+  Task_SpecifyRequirements: 85, Task_DraftPlan: 83, Task_ApprovePlan: 83, Task_BuildApplication: 85,
+  Task_ReviewSourceCode: 88, Task_RunFunctionalTests: 93, Task_RunSecurityTests: 80, Task_RunAcceptanceTests: 93,
+  Task_FixDefects: 64, Task_RetestFixedDefects: 103, Task_ApproveRelease: 90, Task_RefineApplication: 96,
   Task_DeployApplication: 88, Task_StartOperation: 82, Task_MonitorOperation: 82, Task_EvaluateProject: 82,
 };
-const LANE_OF = {
-  Task_RegisterRequest: BU, Task_ApproveProposal: ITM, Task_ReviseProposal: OPS, Task_HoldKickOff: BU,
-  Task_SpecifyRequirements: BU, Task_DraftPlan: DEV, Task_ApprovePlan: ITM, Task_BuildApplication: DEV,
-  Task_ReviewSourceCode: QC, Task_RunFunctionalTests: QC, Task_RunSecurityTests: QC, Task_RunAcceptanceTests: QC,
-  Task_FixDefects: DEV, Task_RetestFixedDefects: QC, Task_ApproveRelease: ITM, Task_RefineApplication: DEV,
-  Task_DeployApplication: OPS, Task_StartOperation: OPS, Task_MonitorOperation: OPS, Task_EvaluateProject: OPS,
+const COND_W = { loopTest: 93, approved: 88 }; // label widths: "có lỗi (37%)" above the arc into "Sửa lỗi", "được duyệt"
+
+// The elements of each model: BPMN type and lane, as in the .bpmn files.
+const COMMON = {
+  Start_RequestReceived: ["startEvent", BU], Task_RegisterRequest: ["task", BU], Gateway_ProposalJoin: ["exclusiveGateway", ITM],
+  Task_ApproveProposal: ["task", ITM], Gateway_ProposalSplit: ["exclusiveGateway", ITM], Task_ReviseProposal: ["task", OPS],
+  End_ProposalRejected: ["endEvent", ITM], Task_HoldKickOff: ["task", BU], Task_SpecifyRequirements: ["task", BU],
+  Gateway_PlanJoin: ["exclusiveGateway", DEV], Task_DraftPlan: ["task", DEV], Task_ApprovePlan: ["task", ITM],
+  Gateway_PlanSplit: ["exclusiveGateway", ITM], Task_BuildApplication: ["task", DEV], Gateway_ReleaseJoin: ["exclusiveGateway", QC],
+  Task_ReviewSourceCode: ["task", QC], Task_RunFunctionalTests: ["task", QC], Task_RunSecurityTests: ["task", QC],
+  Task_RunAcceptanceTests: ["task", QC], Gateway_TestSplit: ["exclusiveGateway", QC], Task_FixDefects: ["task", DEV],
+  Task_ApproveRelease: ["task", ITM], Gateway_ReleaseSplit: ["exclusiveGateway", ITM], Task_RefineApplication: ["task", DEV],
+  Task_DeployApplication: ["task", OPS], Task_StartOperation: ["task", OPS], Task_MonitorOperation: ["task", OPS],
+  Task_EvaluateProject: ["task", OPS], End_ProjectClosed: ["endEvent", OPS],
 };
+const NODES = {
+  as_is: { ...COMMON, Gateway_TestJoin: ["exclusiveGateway", QC] },
+  to_be: {
+    ...COMMON, Gateway_ChecksSplit: ["parallelGateway", QC], Gateway_ChecksJoin: ["parallelGateway", QC],
+    Gateway_RetestJoin: ["exclusiveGateway", QC], Task_RetestFixedDefects: ["task", QC],
+  },
+};
+// Chips on changed tasks, in the bottom right corner of the box.
+const CHANGED = { as_is: {}, to_be: { Task_RetestFixedDefects: "C2", Task_SpecifyRequirements: "C3" } };
+const CHECKS = ["Task_ReviewSourceCode", "Task_RunFunctionalTests", "Task_RunSecurityTests", "Task_RunAcceptanceTests"];
 
 // Horizontal placement, left to right. Each rule names the arrow or label it makes room for.
-const GAP = SPACE.xl; // two boxes in one lane: room for an arrow
-const CLEAR = SPACE.l; // an arrow passing a box corner
-const DOWN_DX = 30; // an arrow into the next lane down enters this far right of the box centre
-const UP_DX = 14; // an arrow into the next lane up
-const PILL_RESERVE = { Gateway_PlanSplit: 94, Gateway_ReleaseSplit: 114 }; // the two loop rates set beside a box
-const REJECT_HALF = 28; // half the width of the "rejected" label under its end event
+function placeX(model) {
+  const x = {}; // centre x of every node
+  const w = (id) => W[id] ?? (id.startsWith("Gateway") ? 2 * GW : 2 * EV);
+  const L = (id) => x[id] - w(id) / 2, R = (id) => x[id] + w(id) / 2;
+  const left = (id, at) => { x[id] = at + w(id) / 2; };
+  const c = {}; // named leg positions
 
-function placeX() {
-  const cx = {};
-  const left = (id, x) => { cx[id] = x + W[id] / 2; };
-  const L = (id) => cx[id] - W[id] / 2, R = (id) => cx[id] + W[id] / 2;
-  const x = {};
-  x.start = HEADER + SPACE.xl;
-  left("Task_RegisterRequest", x.start + 9 + GAP);
-  cx.Task_ApproveProposal = R("Task_RegisterRequest") + CLEAR - DOWN_DX;
-  cx.Task_ReviseProposal = cx.Task_ApproveProposal; // the rework loop runs straight down and back
-  x.reviseLoop = L("Task_ApproveProposal") - GAP;
-  left("Task_HoldKickOff", Math.max(R("Task_RegisterRequest") + GAP, R("Task_ApproveProposal") + CLEAR - UP_DX - W.Task_HoldKickOff / 2));
-  x.rejected = cx.Task_HoldKickOff + UP_DX + 26;
-  // Specify leaves from its bottom-left corner, clear of the "rejected" label.
-  left("Task_SpecifyRequirements", Math.max(R("Task_HoldKickOff") + GAP, x.rejected + REJECT_HALF + SPACE.m - 10));
-  x.specifyExit = L("Task_SpecifyRequirements") + 10;
-  left("Task_DraftPlan", x.specifyExit + GAP - 2);
-  // The plan loop runs down from Approve plan's bottom-left into Draft plan; its rate sits left of
-  // Approve plan, between the arrow from Specify and the box.
-  left("Task_ApprovePlan", x.specifyExit + SPACE.m + PILL_RESERVE.Gateway_PlanSplit + SPACE.s);
-  left("Task_BuildApplication", Math.max(cx.Task_ApprovePlan + UP_DX + CLEAR, R("Task_ApprovePlan") + CLEAR - DOWN_DX - W.Task_BuildApplication / 2));
-  x.buildExit = cx.Task_BuildApplication - 2;
-  left("Task_ReviewSourceCode", x.buildExit + GAP - 4);
-  left("Task_RunFunctionalTests", R("Task_ReviewSourceCode") + GAP);
-  left("Task_RunSecurityTests", R("Task_RunFunctionalTests") + GAP);
-  left("Task_RunAcceptanceTests", R("Task_RunSecurityTests") + GAP);
-  x.split = R("Task_RunAcceptanceTests") + 18;
-  // to-be: the fix and retest column after the checks
-  const retestCx = x.split + GAP + W.Task_RetestFixedDefects / 2;
-  const fixRight = retestCx + W.Task_FixDefects / 2;
-  // Approve release's loop rate sits left of the box, right of the arrow coming up from the split.
-  const releaseLeft = Math.max(fixRight + GAP + (W.Task_RefineApplication - W.Task_ApproveRelease) / 2, x.split + SPACE.m + PILL_RESERVE.Gateway_ReleaseSplit + SPACE.s);
-  cx.Task_ApproveRelease = releaseLeft + W.Task_ApproveRelease / 2;
-  cx.Task_RefineApplication = cx.Task_ApproveRelease;
-  cx.Task_DeployApplication = Math.max(R("Task_ApproveRelease"), R("Task_RefineApplication")) + CLEAR - DOWN_DX;
-  left("Task_StartOperation", R("Task_DeployApplication") + GAP);
-  x.goLive = R("Task_StartOperation") + 10;
-  left("Task_MonitorOperation", x.goLive + 10);
-  left("Task_EvaluateProject", R("Task_MonitorOperation") + GAP);
-  x.closed = R("Task_EvaluateProject") + GAP + 2;
-  x.width = Math.ceil(x.closed + 9 + SPACE.l);
-  const as_is = { ...cx, Task_FixDefects: cx.Task_RunSecurityTests };
-  const to_be = { ...cx, Task_FixDefects: retestCx, Task_RetestFixedDefects: retestCx };
-  return { as_is, to_be, x };
+  x.Start_RequestReceived = HEADER + 6 + EV;
+  left("Task_RegisterRequest", R("Start_RequestReceived") + ARROW);
+  x.Gateway_ProposalJoin = L("Task_RegisterRequest") + 14; // straight down from the request box
+  left("Task_ApproveProposal", R("Gateway_ProposalJoin") + ARROW);
+  x.Gateway_ProposalSplit = R("Task_ApproveProposal") + ARROW + GW;
+  x.Task_ReviseProposal = x.Gateway_ProposalSplit; // straight down: "cần sửa"
+  x.End_ProposalRejected = R("Gateway_ProposalSplit") + ARROW + EV;
+  // straight up, then right: "được duyệt" sits above that corner, right of the request box
+  left("Task_HoldKickOff", Math.max(x.Gateway_ProposalSplit + ARROW, R("Task_RegisterRequest") + COND_W.approved + 2 * SPACE.s));
+  left("Task_SpecifyRequirements", R("Task_HoldKickOff") + BOX_GAP);
+  c.specifyExit = R("Task_SpecifyRequirements") - CLEAR; // down into the plan join's left corner
+  x.Gateway_PlanJoin = c.specifyExit + ARROW + GW;
+  left("Task_DraftPlan", R("Gateway_PlanJoin") + ARROW);
+  c.draftUp = R("Task_DraftPlan") + ARROW + 1; // up into the plan approval's bottom
+  left("Task_ApprovePlan", c.draftUp - 20);
+  x.Gateway_PlanSplit = R("Task_ApprovePlan") + ARROW + GW;
+  x.Task_BuildApplication = x.Gateway_PlanSplit; // straight down: "được duyệt"
+  x.Gateway_ReleaseJoin = L("Task_BuildApplication") + 14; // straight down from the build box
+  const second = x.Gateway_ReleaseJoin + 2 * GW + ARROW; // the test join (as-is) or the AND-split (to-be)
+  left("Task_ReviewSourceCode", second + GW + ARROW);
+  for (let k = 1; k < 4; k++) left(CHECKS[k], R(CHECKS[k - 1]) + BOX_GAP);
+  const a = R("Task_RunAcceptanceTests");
+
+  if (model === "as_is") {
+    x.Gateway_TestJoin = second;
+    x.Gateway_TestSplit = a + ARROW + GW;
+    // "có lỗi" runs up and left into the fix box, which sits above the checks; its label goes above that arc.
+    x.Task_FixDefects = x.Gateway_TestSplit - COND_W.loopTest - SPACE.s - W.Task_FixDefects / 2;
+  } else {
+    x.Gateway_ChecksSplit = second;
+    x.Gateway_ChecksJoin = a - 10; // on the line under the checks, below the acceptance box's right end
+    left("Task_RetestFixedDefects", a + ARROW + 1);
+    x.Gateway_RetestJoin = L("Task_RetestFixedDefects") + 12; // straight down from the retest box
+    x.Task_FixDefects = x.Gateway_RetestJoin + 5 - W.Task_FixDefects / 2; // straight down into the retest box
+    x.Gateway_TestSplit = Math.max(R("Task_RetestFixedDefects") + CLEAR, R("Task_FixDefects") + COND_W.loopTest + SPACE.s);
+  }
+  // After the tests: "đạt" leaves the split's right corner and runs up into the release approval.
+  c.passUp = x.Gateway_TestSplit + GW + ARROW;
+  left("Task_ApproveRelease", c.passUp - 20);
+  left("Task_RefineApplication", c.passUp + CLEAR);
+  c.refineIn = R("Task_RefineApplication") - 14; // "bị từ chối" comes down into it from above
+  x.Gateway_ReleaseSplit = Math.max(c.refineIn + CLEAR + GW, R("Task_ApproveRelease") + ARROW + GW, R("Task_RefineApplication") + CLEAR);
+  x.Task_DeployApplication = x.Gateway_ReleaseSplit; // straight down: "được duyệt"
+  left("Task_StartOperation", R("Task_DeployApplication") + BOX_GAP);
+  c.goLive = R("Task_StartOperation") + 7;
+  left("Task_MonitorOperation", R("Task_StartOperation") + BOX_GAP);
+  left("Task_EvaluateProject", R("Task_MonitorOperation") + BOX_GAP - 2);
+  x.End_ProjectClosed = R("Task_EvaluateProject") + ARROW + EV;
+  c.width = Math.ceil(R("End_ProjectClosed") + 6); // clear of the go-live frame and the pool edge
+  return { x, c };
 }
 
-const PLACE = placeX();
-export const WIDTH = PLACE.x.width;
-const CHECKS = ["Task_ReviewSourceCode", "Task_RunFunctionalTests", "Task_RunSecurityTests", "Task_RunAcceptanceTests"];
+const PLACE = { as_is: placeX("as_is"), to_be: placeX("to_be") };
+// Both flows share one width, so in compare mode they are drawn at the same scale.
+export const WIDTH = Math.max(PLACE.as_is.c.width, PLACE.to_be.c.width);
 
 export function buildLayout(model, metricsName = "normal") {
   const m = METRICS[metricsName];
-  const X = PLACE.x;
+  const { x, c } = PLACE[model];
   const lanes = {};
   let y = 0;
-  LANES.forEach((id, i) => {
-    lanes[id] = { id, top: y, h: m.laneH[i], bottom: y + m.laneH[i] };
-    y += m.laneH[i];
-  });
+  for (const id of LANES) {
+    const h = id === QC ? m.qc[model] : m.lane;
+    lanes[id] = { id, top: y, h, bottom: y + h };
+    y += h;
+  }
   const height = y;
   const qc = lanes[QC];
-  const railY = qc.top + m.laneTop; // to-be: shared line above the parallel checks
-  const boxTop = (lane) => (lane === QC ? railY + RAIL_GAP : lanes[lane].top + m.laneTop);
+  const boxTop = (lane) => lanes[lane].top + m.laneTop + (lane === QC ? RAIL : 0);
+  const railY = boxTop(QC) - RAIL + 1; // the line above the checks
+  const q1 = boxTop(QC) + m.boxH / 2; // centre line of the QC boxes
+  const under = boxTop(QC) + m.boxH + UNDER + GW; // to-be: line of the join gateways under the checks
+  const channel = (model === "to_be" ? under + GW + 2 : boxTop(QC) + m.boxH) + CHANNEL; // the refine loop
 
-  const boxes = {};
-  for (const [id, cx] of Object.entries(PLACE[model])) {
-    const lane = LANE_OF[id], w = W[id];
-    const top = boxTop(lane), bottom = top + m.boxH;
-    boxes[id] = { id, lane, cx, w, top, bottom, left: cx - w / 2, right: cx + w / 2, cy: (top + bottom) / 2, strip: strip(m, cx, w, bottom) };
-  }
-  const b = boxes;
-  const joinY = b.Task_ReviewSourceCode.bottom + JOIN_GAP; // to-be: shared line below the checks
-  const split = { x: X.split, y: b.Task_ReviewSourceCode.cy };
-  const start = { x: X.start, y: b.Task_RegisterRequest.cy };
-  const rejected = { x: X.rejected, y: b.Task_ApproveProposal.cy };
-  const closed = { x: X.closed, y: b.Task_EvaluateProject.cy };
-
-  // Edges carry their points; the page draws them with rounded corners and moves dots along them.
-  // A loop's `label` is where its rate goes: on the arrow (anchor middle) or beside a box (anchor end).
-  const edges = [];
-  const add = (from, to, pts, extra = {}) => edges.push({ from, to, pts, ...extra });
-  const top = (id, dx = DOWN_DX) => [b[id].cx + dx, b[id].top];
-  const bottomAt = (id, dx) => [b[id].cx + dx, b[id].bottom];
-  const leftMid = (id) => [b[id].left, b[id].cy];
-  const rightMid = (id) => [b[id].right, b[id].cy];
-  // Next lane down: leave the right side, enter from the top. Next lane up: leave the right side, enter from below.
-  const down = (from, to) => add(from, to, [rightMid(from), [b[to].cx + DOWN_DX, b[from].cy], top(to)]);
-  const up = (from, to) => add(from, to, [rightMid(from), [b[to].cx + UP_DX, b[from].cy], bottomAt(to, UP_DX)]);
-  const same = (from, to) => add(from, to, [rightMid(from), leftMid(to)]);
-  // A loop between two stacked boxes: down from the upper box's bottom-left corner, its rate to the left.
-  const stackedLoop = (from, to, gateway) => {
-    const x = b[from].left + SPACE.l;
-    add(from, to, [[x, b[from].bottom], [x, b[to].top]],
-      { loop: gateway, label: { x: b[from].left - SPACE.s, y: b[from].bottom - PILL_H / 2 - 1, anchor: "end" } });
-  };
-
-  add("start", "Task_RegisterRequest", [[start.x + 9, start.y], leftMid("Task_RegisterRequest")], { arrow: true });
-  down("Task_RegisterRequest", "Task_ApproveProposal");
-  up("Task_ApproveProposal", "Task_HoldKickOff");
-  add("Task_ApproveProposal", "rejected", [rightMid("Task_ApproveProposal"), [rejected.x - 10, rejected.y]]);
-  add("Task_ApproveProposal", "Task_ReviseProposal", [bottomAt("Task_ApproveProposal", DOWN_DX), top("Task_ReviseProposal")],
-    { loop: "Gateway_ProposalSplit", label: { x: b.Task_ApproveProposal.cx + DOWN_DX, y: (lanes[DEV].top + lanes[DEV].bottom) / 2, anchor: "middle" } });
-  add("Task_ReviseProposal", "Task_ApproveProposal",
-    [leftMid("Task_ReviseProposal"), [X.reviseLoop, b.Task_ReviseProposal.cy], [X.reviseLoop, b.Task_ApproveProposal.cy], leftMid("Task_ApproveProposal")], { loop: true });
-  same("Task_HoldKickOff", "Task_SpecifyRequirements");
-  add("Task_SpecifyRequirements", "Task_DraftPlan",
-    [[X.specifyExit, b.Task_SpecifyRequirements.bottom], [X.specifyExit, b.Task_DraftPlan.cy], leftMid("Task_DraftPlan")]);
-  up("Task_DraftPlan", "Task_ApprovePlan");
-  stackedLoop("Task_ApprovePlan", "Task_DraftPlan", "Gateway_PlanSplit");
-  down("Task_ApprovePlan", "Task_BuildApplication");
-  stackedLoop("Task_ApproveRelease", "Task_RefineApplication", "Gateway_ReleaseSplit");
-  down("Task_ApproveRelease", "Task_DeployApplication");
-  same("Task_DeployApplication", "Task_StartOperation");
-  same("Task_StartOperation", "Task_MonitorOperation");
-  same("Task_MonitorOperation", "Task_EvaluateProject");
-  add("Task_EvaluateProject", "closed", [rightMid("Task_EvaluateProject"), [closed.x - 10, closed.y]]);
-
-  const toRelease = [[split.x, split.y], [split.x, b.Task_ApproveRelease.cy], leftMid("Task_ApproveRelease")];
-  const bands = [];
-  const band = { x: b.Task_ReviewSourceCode.left - 10, w: b.Task_RunAcceptanceTests.right - b.Task_ReviewSourceCode.left + 20,
-    label: [(b.Task_ReviewSourceCode.left + b.Task_RunAcceptanceTests.right) / 2, qc.bottom + SPACE.s + TYPE.ascent * TYPE.md] };
-  const intoReview = (x) => [[x, qc.top], [X.buildExit, qc.top], [X.buildExit, b.Task_ReviewSourceCode.cy], leftMid("Task_ReviewSourceCode")];
-  if (model === "as_is") {
-    add("Task_BuildApplication", "Task_ReviewSourceCode", [[X.buildExit, b.Task_BuildApplication.bottom], [X.buildExit, b.Task_ReviewSourceCode.cy], leftMid("Task_ReviewSourceCode")]);
-    for (let i = 0; i < 3; i++) same(CHECKS[i], CHECKS[i + 1]);
-    add("Task_RunAcceptanceTests", "Task_ApproveRelease", [rightMid("Task_RunAcceptanceTests"), ...toRelease]);
-    const fixRight = rightMid("Task_FixDefects");
-    add("Task_RunAcceptanceTests", "Task_FixDefects",
-      [rightMid("Task_RunAcceptanceTests"), [split.x, split.y], [split.x, b.Task_FixDefects.cy], fixRight],
-      { loop: "Gateway_TestSplit", label: { x: (split.x + fixRight[0]) / 2, y: b.Task_FixDefects.cy, anchor: "middle" }, hot: true });
-    const fixOut = b.Task_FixDefects.cx - 30, refineOut = b.Task_RefineApplication.cx - 30;
-    add("Task_FixDefects", "Task_ReviewSourceCode", [[fixOut, b.Task_FixDefects.bottom], ...intoReview(fixOut)], { loop: true, hot: true });
-    add("Task_RefineApplication", "Task_ReviewSourceCode", [[refineOut, b.Task_RefineApplication.bottom], ...intoReview(refineOut)], { loop: true });
-    bands.push({ kind: "bottleneck", ...band, y: qc.top + SPACE.xs, h: qc.h - 2 * SPACE.xs });
-  } else {
-    const refineOut = [b.Task_RefineApplication.cx - 30, b.Task_RefineApplication.bottom];
-    for (const c of CHECKS) {
-      add("Task_BuildApplication", c, [[X.buildExit, b.Task_BuildApplication.bottom], [X.buildExit, railY], [b[c].cx + DOWN_DX, railY], top(c)]);
-      add("Task_RefineApplication", c, [refineOut, [refineOut[0], railY], [b[c].cx + DOWN_DX, railY], top(c)], { loop: true, silent: true });
-      const toJoin = [bottomAt(c, 0), [b[c].cx, joinY], [split.x, joinY], [split.x, split.y]];
-      add(c, "join", toJoin, { line: true, noArrow: true });
-      add(c, "Task_ApproveRelease", [...toJoin, ...toRelease.slice(1)], { silent: true });
-      add(c, "Task_FixDefects", [...toJoin, [split.x, b.Task_FixDefects.cy], leftMid("Task_FixDefects")], { silent: true });
+  const nodes = {};
+  for (const [id, [type, lane]] of Object.entries(NODES[model])) {
+    const cx = x[id];
+    let cy = boxTop(lane) + m.boxH / 2;
+    if (model === "to_be" && ["Gateway_ChecksJoin", "Gateway_RetestJoin", "Gateway_TestSplit"].includes(id)) cy = under;
+    const n = { id, type, lane, cx, cy };
+    if (type === "task") {
+      const w = W[id], top = boxTop(lane);
+      Object.assign(n, { w, top, bottom: top + m.boxH, left: cx - w / 2, right: cx + w / 2 });
+      n.strip = strip(m, n, !!CHANGED[model][id]);
+      if (CHANGED[model][id]) n.chip = { x: n.right - CHIP.w - 3, y: n.bottom - CHIP.h - 3 };
+    } else {
+      const r = type.endsWith("Gateway") ? GW : EV;
+      Object.assign(n, { r, top: cy - r, bottom: cy + r, left: cx - r, right: cx + r });
     }
-    add("Task_RefineApplication", "rail", [refineOut, [refineOut[0], railY], [b.Task_ReviewSourceCode.cx + DOWN_DX, railY]], { loop: true, line: true, noArrow: true });
-    add("join", "Task_FixDefects", [[split.x, split.y], [split.x, b.Task_FixDefects.cy], leftMid("Task_FixDefects")],
-      { loop: "Gateway_TestSplit", label: { x: split.x - SPACE.m, y: b.Task_FixDefects.cy, anchor: "end" }, line: true });
-    add("join", "Task_ApproveRelease", toRelease, { line: true });
-    add("Task_FixDefects", "Task_RetestFixedDefects", [bottomAt("Task_FixDefects", DOWN_DX), top("Task_RetestFixedDefects")], { loop: true });
-    const fromRetest = [leftMid("Task_RetestFixedDefects"), [split.x, split.y]];
-    add("Task_RetestFixedDefects", "join", fromRetest, { loop: true, line: true });
-    add("Task_RetestFixedDefects", "Task_ApproveRelease", [...fromRetest, ...toRelease.slice(1)], { silent: true });
-    add("Task_RetestFixedDefects", "Task_FixDefects", [...fromRetest, [split.x, b.Task_FixDefects.cy], leftMid("Task_FixDefects")], { silent: true });
-    bands.push({ kind: "change", change: "C1", ...band, y: qc.top + 1, h: qc.h - 2 });
+    nodes[id] = n;
   }
+  const N = nodes;
+  const top = (id, dx = 0) => [N[id].cx + dx, N[id].top];
+  const bottom = (id, dx = 0) => [N[id].cx + dx, N[id].bottom];
+  const leftMid = (id) => [N[id].left, N[id].cy];
+  const rightMid = (id) => [N[id].right, N[id].cy];
+  const at = (px, id) => [px, N[id].cy];
+
+  // Sequence flows, by BPMN ID. `label` is where the condition of an XOR-split arc goes.
+  const flows = {};
+  let c1 = null;
+  const flow = (id, source, target, pts, extra = {}) => { flows[id] = { id, source, target, pts, ...extra }; };
+  const lab = (px, py, anchor = "start") => ({ x: px, y: py, anchor });
+  const above = (py) => py - SPACE.s - 3 - TYPE.descent * TYPE.size; // baseline of a label just above a line at py
+  const lowInLane = (lane) => lanes[lane].bottom - TYPE.descent * TYPE.size - 2; // baseline at the bottom of a lane
+  const besideLeg = (lane) => lanes[lane].top + lanes[lane].h / 2 + 0.36 * TYPE.size; // mid-lane baseline
+
+  flow("Flow_RequestReceived", "Start_RequestReceived", "Task_RegisterRequest", [rightMid("Start_RequestReceived"), leftMid("Task_RegisterRequest")]);
+  flow("Flow_RequestRegistered", "Task_RegisterRequest", "Gateway_ProposalJoin", [bottom("Task_RegisterRequest", x.Gateway_ProposalJoin - x.Task_RegisterRequest), top("Gateway_ProposalJoin")]);
+  flow("Flow_ProposalSubmitted", "Gateway_ProposalJoin", "Task_ApproveProposal", [rightMid("Gateway_ProposalJoin"), leftMid("Task_ApproveProposal")]);
+  flow("Flow_ProposalDecided", "Task_ApproveProposal", "Gateway_ProposalSplit", [rightMid("Task_ApproveProposal"), leftMid("Gateway_ProposalSplit")]);
+  const ps = N.Gateway_ProposalSplit;
+  flow("Flow_ProposalApproved", "Gateway_ProposalSplit", "Task_HoldKickOff", [top("Gateway_ProposalSplit"), at(ps.cx, "Task_HoldKickOff"), leftMid("Task_HoldKickOff")],
+    { label: lab(N.Task_HoldKickOff.left - SPACE.s, above(N.Task_HoldKickOff.cy), "end") });
+  flow("Flow_ProposalChangesRequested", "Gateway_ProposalSplit", "Task_ReviseProposal", [bottom("Gateway_ProposalSplit"), top("Task_ReviseProposal")],
+    { label: lab(ps.cx + 8, besideLeg(DEV)), loop: true });
+  flow("Flow_ProposalRejected", "Gateway_ProposalSplit", "End_ProposalRejected", [rightMid("Gateway_ProposalSplit"), leftMid("End_ProposalRejected")],
+    { label: lab(ps.cx + 8, Math.min(ps.cy + EV + SPACE.s + TYPE.ascent * TYPE.size, lowInLane(ITM))) });
+  flow("Flow_ProposalRevised", "Task_ReviseProposal", "Gateway_ProposalJoin", [leftMid("Task_ReviseProposal"), at(x.Gateway_ProposalJoin, "Task_ReviseProposal"), bottom("Gateway_ProposalJoin")]);
+  flow("Flow_KickOffHeld", "Task_HoldKickOff", "Task_SpecifyRequirements", [rightMid("Task_HoldKickOff"), leftMid("Task_SpecifyRequirements")]);
+  flow("Flow_RequirementsSpecified", "Task_SpecifyRequirements", "Gateway_PlanJoin", [[c.specifyExit, N.Task_SpecifyRequirements.bottom], at(c.specifyExit, "Gateway_PlanJoin"), leftMid("Gateway_PlanJoin")]);
+  flow("Flow_PlanStarted", "Gateway_PlanJoin", "Task_DraftPlan", [rightMid("Gateway_PlanJoin"), leftMid("Task_DraftPlan")]);
+  flow("Flow_PlanDrafted", "Task_DraftPlan", "Task_ApprovePlan", [rightMid("Task_DraftPlan"), at(c.draftUp, "Task_DraftPlan"), [c.draftUp, N.Task_ApprovePlan.bottom]]);
+  flow("Flow_PlanDecided", "Task_ApprovePlan", "Gateway_PlanSplit", [rightMid("Task_ApprovePlan"), leftMid("Gateway_PlanSplit")]);
+  const pl = N.Gateway_PlanSplit, buY = N.Task_HoldKickOff.cy;
+  flow("Flow_PlanApproved", "Gateway_PlanSplit", "Task_BuildApplication", [bottom("Gateway_PlanSplit"), top("Task_BuildApplication")],
+    { label: lab(pl.cx + 8, Math.min(pl.cy + GW + TYPE.ascent * TYPE.size, lowInLane(ITM))) });
+  flow("Flow_PlanChangesRequested", "Gateway_PlanSplit", "Gateway_PlanJoin", [top("Gateway_PlanSplit"), [pl.cx, buY], [x.Gateway_PlanJoin, buY], top("Gateway_PlanJoin")],
+    { label: lab((pl.cx + x.Gateway_PlanJoin) / 2, above(buY), "middle"), loop: true });
+  flow("Flow_ApplicationBuilt", "Task_BuildApplication", "Gateway_ReleaseJoin", [bottom("Task_BuildApplication", x.Gateway_ReleaseJoin - x.Task_BuildApplication), top("Gateway_ReleaseJoin")]);
+
+  const ts = N.Gateway_TestSplit;
+  const fixUnder = N.Task_FixDefects.left + 12;
+  const refineOut = N.Task_RefineApplication.right - 14;
+  if (model === "as_is") {
+    flow("Flow_ReleaseCandidateReady", "Gateway_ReleaseJoin", "Gateway_TestJoin", [rightMid("Gateway_ReleaseJoin"), leftMid("Gateway_TestJoin")]);
+    flow("Flow_TestsStarted", "Gateway_TestJoin", "Task_ReviewSourceCode", [rightMid("Gateway_TestJoin"), leftMid("Task_ReviewSourceCode")]);
+    flow("Flow_CodeReviewed", "Task_ReviewSourceCode", "Task_RunFunctionalTests", [rightMid("Task_ReviewSourceCode"), leftMid("Task_RunFunctionalTests")]);
+    flow("Flow_FunctionsTested", "Task_RunFunctionalTests", "Task_RunSecurityTests", [rightMid("Task_RunFunctionalTests"), leftMid("Task_RunSecurityTests")]);
+    flow("Flow_SecurityTested", "Task_RunSecurityTests", "Task_RunAcceptanceTests", [rightMid("Task_RunSecurityTests"), leftMid("Task_RunAcceptanceTests")]);
+    flow("Flow_AcceptanceTested", "Task_RunAcceptanceTests", "Gateway_TestSplit", [rightMid("Task_RunAcceptanceTests"), leftMid("Gateway_TestSplit")]);
+    flow("Flow_DefectsFound", "Gateway_TestSplit", "Task_FixDefects", [top("Gateway_TestSplit"), at(ts.cx, "Task_FixDefects"), rightMid("Task_FixDefects")],
+      { label: lab((ts.cx + N.Task_FixDefects.right) / 2, above(N.Task_FixDefects.cy), "middle"), loop: true, hot: true });
+    flow("Flow_DefectsFixed", "Task_FixDefects", "Gateway_TestJoin", [[fixUnder, N.Task_FixDefects.bottom], [fixUnder, railY], [x.Gateway_TestJoin, railY], top("Gateway_TestJoin")], { hot: true });
+    flow("Flow_ApplicationRefined", "Task_RefineApplication", "Gateway_ReleaseJoin",
+      [[refineOut, N.Task_RefineApplication.bottom], [refineOut, channel], [x.Gateway_ReleaseJoin, channel], bottom("Gateway_ReleaseJoin")]);
+  } else {
+    const cs = N.Gateway_ChecksSplit, cj = N.Gateway_ChecksJoin;
+    flow("Flow_ReleaseCandidateReady", "Gateway_ReleaseJoin", "Gateway_ChecksSplit", [rightMid("Gateway_ReleaseJoin"), leftMid("Gateway_ChecksSplit")]);
+    // AND-split: one arc straight into the first check, the others over the rail above the checks.
+    flow("Flow_CodeReviewStarted", "Gateway_ChecksSplit", "Task_ReviewSourceCode", [rightMid("Gateway_ChecksSplit"), leftMid("Task_ReviewSourceCode")]);
+    const viaRail = (id, task) => flow(id, "Gateway_ChecksSplit", task, [top("Gateway_ChecksSplit"), [cs.cx, railY], [N[task].cx, railY], top(task)]);
+    viaRail("Flow_FunctionalTestsStarted", "Task_RunFunctionalTests");
+    viaRail("Flow_SecurityTestsStarted", "Task_RunSecurityTests");
+    viaRail("Flow_AcceptanceTestsStarted", "Task_RunAcceptanceTests");
+    // AND-join: every check down to the line under them, then right into the join.
+    const toJoin = (id, task) => flow(id, task, "Gateway_ChecksJoin", [bottom(task), [N[task].cx, under], leftMid("Gateway_ChecksJoin")]);
+    toJoin("Flow_CodeReviewed", "Task_ReviewSourceCode");
+    toJoin("Flow_FunctionsTested", "Task_RunFunctionalTests");
+    toJoin("Flow_SecurityTested", "Task_RunSecurityTests");
+    toJoin("Flow_AcceptanceTested", "Task_RunAcceptanceTests");
+    flow("Flow_ChecksCompleted", "Gateway_ChecksJoin", "Gateway_RetestJoin", [rightMid("Gateway_ChecksJoin"), leftMid("Gateway_RetestJoin")]);
+    flow("Flow_TestRoundCompleted", "Gateway_RetestJoin", "Gateway_TestSplit", [rightMid("Gateway_RetestJoin"), leftMid("Gateway_TestSplit")]);
+    flow("Flow_DefectsFound", "Gateway_TestSplit", "Task_FixDefects", [top("Gateway_TestSplit"), at(ts.cx, "Task_FixDefects"), rightMid("Task_FixDefects")],
+      { label: lab((ts.cx + N.Task_FixDefects.right) / 2, above(N.Task_FixDefects.cy), "middle"), loop: true });
+    flow("Flow_DefectsFixed", "Task_FixDefects", "Task_RetestFixedDefects", [bottom("Task_FixDefects", x.Gateway_RetestJoin - x.Task_FixDefects), top("Task_RetestFixedDefects", x.Gateway_RetestJoin - x.Task_RetestFixedDefects)]);
+    flow("Flow_DefectsRetested", "Task_RetestFixedDefects", "Gateway_RetestJoin", [bottom("Task_RetestFixedDefects", x.Gateway_RetestJoin - x.Task_RetestFixedDefects), top("Gateway_RetestJoin")]);
+    flow("Flow_ApplicationRefined", "Task_RefineApplication", "Gateway_ReleaseJoin",
+      [[refineOut, N.Task_RefineApplication.bottom], [refineOut, channel], [x.Gateway_ReleaseJoin, channel], bottom("Gateway_ReleaseJoin")]);
+    c1 = { x: cs.left - SPACE.s, y: qc.top + SPACE.xs, w: cj.right + SPACE.m - cs.left + SPACE.s, h: under + GW + 3 - qc.top - SPACE.xs };
+  }
+  flow("Flow_TestsPassed", "Gateway_TestSplit", "Task_ApproveRelease", [rightMid("Gateway_TestSplit"), [c.passUp, ts.cy], [c.passUp, N.Task_ApproveRelease.bottom]],
+    { label: lab(c.passUp + 8, ts.cy - GW - SPACE.s) });
+  flow("Flow_ReleaseDecided", "Task_ApproveRelease", "Gateway_ReleaseSplit", [rightMid("Task_ApproveRelease"), leftMid("Gateway_ReleaseSplit")]);
+  const rs = N.Gateway_ReleaseSplit;
+  flow("Flow_ReleaseApproved", "Gateway_ReleaseSplit", "Task_DeployApplication", [bottom("Gateway_ReleaseSplit"), top("Task_DeployApplication")],
+    { label: lab(rs.cx + 8, besideLeg(DEV)) });
+  flow("Flow_ReleaseRejected", "Gateway_ReleaseSplit", "Task_RefineApplication", [top("Gateway_ReleaseSplit"), [rs.cx, buY], [c.refineIn, buY], [c.refineIn, N.Task_RefineApplication.top]],
+    { label: lab(rs.cx + 8, buY + 0.36 * TYPE.size), loop: true });
+  flow("Flow_ApplicationDeployed", "Task_DeployApplication", "Task_StartOperation", [rightMid("Task_DeployApplication"), leftMid("Task_StartOperation")]);
+  flow("Flow_OperationStarted", "Task_StartOperation", "Task_MonitorOperation", [rightMid("Task_StartOperation"), leftMid("Task_MonitorOperation")]);
+  flow("Flow_OperationMonitored", "Task_MonitorOperation", "Task_EvaluateProject", [rightMid("Task_MonitorOperation"), leftMid("Task_EvaluateProject")]);
+  flow("Flow_ProjectEvaluated", "Task_EvaluateProject", "End_ProjectClosed", [rightMid("Task_EvaluateProject"), leftMid("End_ProjectClosed")]);
+
+  // Highlight frames (not BPMN elements): the bottleneck or C1 around the checks, and the part after go-live.
+  const frames = [];
+  const checksL = N.Task_ReviewSourceCode.left - SPACE.m, checksR = N.Task_RunAcceptanceTests.right + SPACE.m;
+  const ops = lanes[OPS];
+  const frameLabel = [(checksL + checksR) / 2, ops.top + m.laneTop / 2 + SPACE.s + TYPE.ascent * TYPE.size];
+  if (model === "as_is") frames.push({ kind: "bottleneck", x: checksL, y: boxTop(QC) - SPACE.s, w: checksR - checksL, h: m.boxH + SPACE.s + 3, label: frameLabel });
+  else frames.push({ ...c1, kind: "change", change: "C1", label: [c1.x + c1.w / 2, frameLabel[1]] });
+  frames.push({ kind: "golive", x: c.goLive, y: SPACE.xs, w: WIDTH - c.goLive - SPACE.xs, h: height - 2 * SPACE.xs });
 
   return {
-    model, metrics: m, width: WIDTH, height, lanes, boxes, edges, bands,
-    markers: { start, rejected, closed, split, goLive: X.goLive },
-    rails: model === "to_be" ? { railY, joinY, checks: CHECKS } : null,
-    changed: model === "to_be" ? { Task_RetestFixedDefects: "C2", Task_SpecifyRequirements: "C3" } : {},
+    model, metrics: m, width: WIDTH, height, lanes, nodes, flows, frames,
+    boxes: Object.fromEntries(Object.values(nodes).filter((n) => n.type === "task").map((n) => [n.id, n])),
+    changed: CHANGED[model],
+    goLive: c.goLive,
   };
 }
 
-// The status strip along the bottom of a task box: the queue count and waiting dots on the left,
-// the dots being worked on to the right of them. Rows are listed bottom-up.
-function strip(m, cx, w, bottom) {
-  const y0 = bottom - m.padBottom - BADGE_H / 2;
-  return { x0: cx - w / 2 + BOX_PAD_X, x1: cx + w / 2 - BOX_PAD_X, rows: Array.from({ length: m.rows }, (_, k) => y0 - k * m.dotRow) };
+// The status strip under a task's label: rows of dots, bottom row first, waiting dots first.
+// A box with a change chip keeps its dots left of the chip.
+function strip(m, box, chip = false) {
+  const y0 = box.bottom - m.padBottom - m.dot;
+  return { x0: box.left + 6 + m.dot, x1: box.right - 6 - m.dot - (chip ? CHIP.w + SPACE.s : 0), rows: Array.from({ length: m.rows }, (_, k) => y0 - k * m.dotStep) };
 }
 
-export const badgeWidth = (n) => (n >= 10 ? 28 : 20);
-const queueWidth = (m, waiting) => badgeWidth(waiting) + SPACE.xs + Math.min(waiting, m.waitMax) * m.dot * 2.3 + SPACE.xs;
-
-// Where a dot sits: in its task's strip while worked on or waiting (past the visible queue only
-// the count shows it), and (to-be checks) on the join line while the other checks of its round finish.
-// `waiting` is how many wait at the task: the queue takes the bottom row, so the worked-on dots go
-// to the row above it (normal) or to the right of it (compact, one row).
-export function dotPosition(layout, task, mode, slot, count, waiting = 0) {
+// Where dot number `index` of `total` sits in a task's strip. The waiting dots come first, then the
+// ones being worked on; rows fill from the bottom, and past the last row the dots squeeze together.
+export function dotPosition(layout, task, index, total) {
   const box = layout.boxes[task];
-  const m = layout.metrics;
   if (!box) return null;
-  const r = m.dot, step = r * 2.3, s = box.strip;
-  if (mode === "wait") {
-    if (slot >= m.waitMax) return null;
-    return [s.x0 + badgeWidth(count) + SPACE.xs + r + slot * step, s.rows[0]];
-  }
-  if (mode === "work") {
-    let rows = s.rows.map((y) => ({ y, x0: s.x0 }));
-    if (waiting > 0) {
-      const beside = { y: s.rows[0], x0: Math.min(s.x0 + queueWidth(m, waiting), s.x1 - 2 * r) };
-      const room = s.x1 - (s.x0 + queueWidth(m, waiting)) >= 2 * r;
-      // the rows above the queue first, then what is left of its own row
-      rows = rows.length > 1 && !room ? rows.slice(1) : [...rows.slice(1), beside];
+  const m = layout.metrics, s = box.strip;
+  const span = s.x1 - s.x0;
+  const step = 2.3 * m.dot;
+  const fit = Math.floor(span / step) + 1;
+  const perRow = Math.max(fit, Math.ceil(total / s.rows.length));
+  const row = Math.min(s.rows.length - 1, Math.floor(index / perRow));
+  const col = index - row * perRow;
+  const st = perRow > fit ? span / (perRow - 1) : step;
+  return [s.x0 + col * st, s.rows[row]];
+}
+
+// A parked dot: a check of the to-be that finished first waits on its arc just before the AND-join.
+export function parkPosition(layout, task, slot) {
+  const f = Object.values(layout.flows).find((fl) => fl.source === task && layout.nodes[fl.target]?.type === "parallelGateway");
+  if (!f) return null;
+  const [ex, ey] = f.pts.at(-1);
+  return [ex - GW / 2 - layout.metrics.dot - 2 - slot * 2.3 * layout.metrics.dot, ey];
+}
+
+// The path a token follows from one node to a task (or, with `to` null, to an end event), through
+// gateways only: the BPMN token flow of Dumas et al., Fig. 3.2. Null if there is no such path.
+export function route(layout, from, to) {
+  const isGateway = (id) => layout.nodes[id]?.type.endsWith("Gateway");
+  const out = {};
+  for (const f of Object.values(layout.flows)) (out[f.source] ??= []).push(f);
+  const queue = [[from, []]];
+  const seen = new Set([from]);
+  while (queue.length) {
+    const [node, path] = queue.shift();
+    for (const f of out[node] ?? []) {
+      const next = [...path, f];
+      const done = to == null ? layout.nodes[f.target]?.type === "endEvent" : f.target === to;
+      if (done) return { flows: next.map((x) => x.id), target: f.target, pts: join(next.map((x) => x.pts)) };
+      if (isGateway(f.target) && !seen.has(f.target)) { seen.add(f.target); queue.push([f.target, next]); }
     }
-    // Fill rows in order; past the last row, squeeze the dots of the last row together.
-    let first = 0;
-    for (let k = 0; k < rows.length; k++) {
-      const { y, x0 } = rows[k];
-      const cap = Math.max(1, Math.floor((s.x1 - x0 - 2 * r) / step) + 1);
-      const last = k === rows.length - 1;
-      const inRow = last ? count - first : Math.min(cap, count - first);
-      if (slot < first + inRow) {
-        const st = inRow > 1 ? Math.min(step, (s.x1 - x0 - 2 * r) / (inRow - 1)) : 0;
-        return [(x0 + s.x1) / 2 - ((inRow - 1) * st) / 2 + (slot - first) * st, y];
-      }
-      first += inRow;
-    }
   }
-  // park
-  if (layout.rails && layout.rails.checks.includes(task)) return [box.cx - 28 - slot * step, layout.rails.joinY];
-  return [box.right + 6, Math.max(box.top + r, box.bottom - r - 3 - slot * step)];
+  return null;
+}
+
+function join(paths) {
+  const pts = [];
+  for (const p of paths) for (const q of p) {
+    const last = pts.at(-1);
+    if (!last || Math.hypot(last[0] - q[0], last[1] - q[1]) > 0.01) pts.push(q);
+  }
+  return pts;
 }

@@ -22,6 +22,11 @@
       --faint: #8ea3a8;
       --line: #cbd7da;
       --edge: #93a8ad;
+      --flow: #4f6870; /* sequence flows */
+      --task: #8fa6ab; /* task outlines */
+      --line-strong: #a9bcc0; /* pool outline */
+      --pool: #e3eaec; /* the pool's name band */
+      --teal-wash: rgba(42, 127, 142, 0.07);
       --teal: #2a7f8e;
       --teal-soft: #9dbfc5;
       --orange: #d9622b;
@@ -95,7 +100,7 @@
 
     body.compare .top p { display: none; }
     body.compare .top { padding-top: var(--s2); padding-bottom: var(--s1); }
-    .compare .panel { margin-bottom: var(--s2); }
+    .compare .panel { margin-bottom: var(--s1); }
     .compare .panel-head { padding: 2px var(--s4); }
     .compare .panel-head h2 { font-size: var(--t-lg); }
     .compare .counters dd { font-size: var(--t-lg); }
@@ -103,6 +108,7 @@
     .below { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--s2) var(--s5); padding: var(--s2) var(--s4) var(--s3); border-top: 1px solid var(--line); }
     .compare .below { border-top: 0; }
     .compare .note { max-width: none; }
+    .legend-block { display: grid; gap: var(--s1); }
     .legend { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s4); margin: 0; padding: 0; list-style: none; font-size: var(--t-sm); color: var(--muted); }
     .legend li { display: flex; align-items: center; gap: var(--s2); }
     .legend svg { flex: none; }
@@ -162,9 +168,12 @@
 
     .error { margin: var(--s5) var(--s4); padding: 14px var(--s4); border-radius: 10px; background: var(--orange-soft); color: var(--orange-ink); }
 
+    /* Up to 1500 px wide (a 1366 projector) the flows take the full width, so their text stays at 12 px or more. */
+    @media (max-width: 1500px) { main { padding-left: 2px; padding-right: 2px; } }
     @media (max-width: 760px) {
-      /* about 0.75 px per flow unit, so the flow scrolls sideways */
-      svg.flow { min-width: 1240px; }
+      /* about 0.78 px per flow unit (text at 12 px), so the flow scrolls sideways */
+      svg.flow { min-width: 1360px; }
+      main { padding-left: var(--gutter); padding-right: var(--gutter); }
       .scroll-hint { display: block; margin: 0; padding: var(--s1) var(--s4) var(--s2); font-size: var(--t-sm); color: var(--muted); border-top: 1px solid var(--line); }
       .result-grid { grid-template-columns: 1fr; }
       .top { padding-top: var(--s2); }

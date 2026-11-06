@@ -53,10 +53,10 @@ def test_the_content_has_no_names_for_tasks_that_no_model_has(content):
 
 @pytest.mark.parametrize("model_id", MODELS)
 def test_every_loop_has_a_label_and_a_rework_rate_in_the_replay(content, replay, model_id):
-    loops = set(loop_back_flows(read_bpmn(MODELS[model_id])))
+    loops = loop_back_flows(read_bpmn(MODELS[model_id]))
     scenario = next(s for s in replay["scenarios"] if s["id"] == model_id)
-    assert loops <= set(content["loops"])
-    assert loops == {r["gateway_id"] for r in scenario["rework"]}
+    assert all("{rate}" in content["conditions"][flow] for flow in loops.values())
+    assert set(loops) == {r["gateway_id"] for r in scenario["rework"]}
 
 
 def test_the_content_describes_every_change_of_the_full_design(content, replay, results):
@@ -82,8 +82,22 @@ def test_the_content_types_no_result_numbers(content):
     assert content["result"]["goal_share"] == 0.2  # the objective from the report's problem section
 
 
-def test_the_content_reads_without_em_dashes(content):
-    assert not any("—" in s for s in _strings(content))
+STAND_INS = re.compile(r"[→←×—–•·…]|-{3,}|[\U0001F300-\U0001FAFF☀-➿]")
+
+
+def test_the_content_reads_like_a_person_wrote_it(content):
+    # No arrows, multiplication signs, dashes, bullets or emoji standing in for words.
+    for s in _strings(content):
+        assert not STAND_INS.search(s), s
+
+
+def test_the_page_code_types_no_stand_in_symbols_either():
+    for name in ["app.js", "layout.js", "index.html"]:
+        code = (DEMO / name).read_text(encoding="utf-8")
+        strings = re.findall(r"`[^`]*`|\"[^\"\n]*\"|'[^'\n]*'", code)
+        visible = re.sub(r"<[^>]+>", " ", re.sub(r"<style>.*?</style>|<script.*?</script>", "", code, flags=re.S)) if name.endswith(".html") else ""
+        for s in [*strings, visible]:
+            assert not STAND_INS.search(s), (name, s)
 
 
 @needs_node
@@ -117,19 +131,48 @@ def test_the_result_panel_numbers_are_the_official_ones_from_results_json(result
     assert round(shown["best"]["share"]["value"] * 100, 1) == 27.8
 
 
-@needs_node
-@pytest.mark.parametrize("model_id", MODELS)
-def test_the_layout_puts_every_task_in_its_bpmn_lane(model_id):
+def _drawing(model_id, metrics):
+    """What the page draws for one model: its nodes (type, lane) and its sequence flows, from layout.js."""
     script = (
         "import { buildLayout, LANES } from './web/demo/layout.js';"
-        f"const l = buildLayout('{model_id}');"
-        "console.log(JSON.stringify({ lanes: LANES, boxes: Object.fromEntries(Object.values(l.boxes).map((b) => [b.id, b.lane])) }));"
+        f"const l = buildLayout('{model_id}', '{metrics}');"
+        "console.log(JSON.stringify({ lanes: LANES,"
+        " nodes: Object.fromEntries(Object.values(l.nodes).map((n) => [n.id, [n.type, n.lane]])),"
+        " flows: Object.fromEntries(Object.values(l.flows).map((f) => [f.id, [f.source, f.target, f.pts.length, !!f.label]])) }));"
     )
     out = subprocess.run([NODE, "--input-type=module", "-e", script], cwd=ROOT, capture_output=True, text=True, check=True)
-    layout = json.loads(out.stdout)
+    return json.loads(out.stdout)
+
+
+@needs_node
+@pytest.mark.parametrize("metrics", ["normal", "compact"])
+@pytest.mark.parametrize("model_id", MODELS)
+def test_the_drawing_has_exactly_the_elements_and_flows_of_the_bpmn_model(model_id, metrics):
+    # Every event, task and gateway of the model, with its BPMN type and lane, and nothing else;
+    # every sequence flow between the same two elements. The demo can't drift from the model.
+    drawn = _drawing(model_id, metrics)
     model = read_bpmn(MODELS[model_id])
-    assert layout["lanes"] == list(model.lanes)
-    assert layout["boxes"] == {n.id: n.lane for n in model.nodes_of_type("task")}
+    assert drawn["lanes"] == list(model.lanes)
+    assert drawn["nodes"] == {n.id: [n.element_type, n.lane] for n in model.nodes.values()}
+    assert {f: v[:2] for f, v in drawn["flows"].items()} == {f.id: [f.source, f.target] for f in model.flows.values()}
+    assert all(v[2] >= 2 for v in drawn["flows"].values())
+
+
+@needs_node
+@pytest.mark.parametrize("model_id", MODELS)
+def test_every_arc_out_of_an_xor_split_carries_its_condition_and_loops_carry_the_rework_share(content, model_id):
+    # Book p.190: label the conditions on the arcs of an XOR-split, not yes/no on the gateway.
+    drawn = _drawing(model_id, "normal")
+    model = read_bpmn(MODELS[model_id])
+    loops = set(loop_back_flows(model).values())
+    for split in model.xor_splits():
+        for flow in model.outgoing(split.id):
+            text = content["conditions"][flow.id]
+            assert drawn["flows"][flow.id][3], flow.id
+            assert ("{rate}" in text) == (flow.id in loops), flow.id
+            assert text.strip().lower() not in {"yes", "no", "có", "không"}
+    labelled = {f for f, v in drawn["flows"].items() if v[3]}
+    assert labelled == {f.id for s in model.xor_splits() for f in model.outgoing(s.id)}
 
 
 @needs_node

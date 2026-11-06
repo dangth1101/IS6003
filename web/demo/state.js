@@ -59,11 +59,12 @@ export function stateAt(prep, t) {
   for (const [mode, map, key] of [["work", work, "start"], ["wait", wait, "ready"], ["park", park, "end"]]) {
     for (const [task, list] of map) {
       list.sort((a, b) => a[key] - b[key] || a.i - b.i);
-      list.forEach((r, slot) => items.push({ i: r.i, case: r.case, task, mode, slot, count: list.length, prev: r.prev, live: live(r) }));
+      list.forEach((r, slot) => items.push({ i: r.i, case: r.case, task, mode, slot, count: list.length, prev: r.prev, last: r.last, live: live(r) }));
     }
   }
   const waitCounts = Object.fromEntries([...wait].map(([task, list]) => [task, list.length]));
-  return { t, items, waitCounts, counters: counters(prep, t, waitingQc) };
+  const workCounts = Object.fromEntries([...work].map(([task, list]) => [task, list.length]));
+  return { t, items, waitCounts, workCounts, counters: counters(prep, t, waitingQc) };
 }
 
 export function counters(prep, t, waitingQc = null) {
@@ -123,4 +124,17 @@ export function along(pts, f) {
     target -= seg[k];
   }
   return pts[pts.length - 1];
+}
+
+// What is left of a polyline after a fraction of its length: the point there, then the rest.
+// A dot that must change course mid-way finishes the path it is on first.
+export function rest(pts, f) {
+  const here = along(pts, f);
+  if (pts.length === 1 || f >= 1) return [here];
+  let target = Math.max(0, f) * pts.slice(1).reduce((s, p, k) => s + Math.hypot(p[0] - pts[k][0], p[1] - pts[k][1]), 0);
+  for (let k = 1; k < pts.length; k++) {
+    target -= Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+    if (target < 0) return [here, ...pts.slice(k)];
+  }
+  return [here];
 }
