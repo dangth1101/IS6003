@@ -4,10 +4,11 @@
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Slide 10 shows the demo, caption and notes match it
 - [ ] No studio wording left in the deck
 - [ ] Deck validates and renders cleanly in PowerPoint
 
 ## Comments
+- 2026-11-06: claimed.
