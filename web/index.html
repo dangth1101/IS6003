@@ -203,7 +203,6 @@
       return [
         el("h1", {}, TEXT.title),
         el("p", { class: "muted" }, TEXT.subtitle),
-        el("p", { class: "small" }, el("a", { href: "studio/" }, t("studio_link"))),
         meta.fake ? el("p", { class: "notice" }, t("fake_notice")) : null,
         el("p", { class: "muted small" }, t("run_summary", {
           seed: meta.seed, replications: meta.replications, cases: meta.case_count,
@@ -512,10 +511,6 @@
         })));
       out.push(result);
       render();
-      const { meta } = results;
-      out.push(el("p", { class: "small" },
-        t("studio_try", { cases: fmt(meta.case_count, 0), replications: meta.replications, seed: meta.seed }), " ",
-        el("a", { href: "studio/" }, t("studio_link"))));
 
       // Ablation, as the notebook computed it from the full factorial: each change alone, and the full design without it.
       out.push(el("h3", {}, t("ablation")));

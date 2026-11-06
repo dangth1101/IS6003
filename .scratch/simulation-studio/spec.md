@@ -1,6 +1,8 @@
 # Spec: Simulation studio, an interactive what-if tool for BPMN models
 
-**Status:** ready-for-agent
+**Status:** replaced
+
+> 2026-11-06: the student replaced the studio with the flow demo (`.scratch/flow-demo/`). The studio code was removed in flow-demo ticket 01; this spec and its tickets stay as history.
 
 ## Problem Statement
 
