@@ -35,6 +35,7 @@ python3 -m venv .venv
 .venv/bin/pytest                                              # tests
 cd notebooks && ../.venv/bin/jupyter execute time_optimization.ipynb   # regenerate web/results.json
 cd web && ../.venv/bin/python -m http.server 8000             # page at http://localhost:8000
+uv run python scripts/build_demo_data.py                      # regenerate web/demo/replay.json, the run the flow demo animates
 ```
 
 `export_results` lints every model it copies, so the page shows the rule check for each. A rework gateway whose training or test cases all went the same way isn't fitted; its ML task carries `skipped` with the reason instead of scores, and the run goes on.
