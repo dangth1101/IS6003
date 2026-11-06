@@ -51,7 +51,8 @@
     "Gateway_TestSplit": "{rate} có lỗi",
     "Gateway_ReleaseSplit": "{rate} bị từ chối"
   },
-  "loops_note": "Vòng làm lại, kèm tỉ lệ dự án phải quay lại ít nhất một lần",
+  "scroll_hint": "Vuốt ngang để xem cả quy trình",
+  "loops_note":"Vòng làm lại, kèm tỉ lệ dự án phải quay lại ít nhất một lần",
   "bottleneck": "Điểm nghẽn: bốn bước kiểm thử chạy nối tiếp",
   "changes": {
     "C1": { "name": "Parallel Testing", "detail": "Bốn hoạt động kiểm thử chạy song song" },

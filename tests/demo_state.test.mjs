@@ -4,7 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { prepare, stateAt, counters, qcQueueSeries, clock, along, MONTH } from "../web/demo/state.js";
-import { buildLayout, dotPosition } from "../web/demo/layout.js";
+import { buildLayout, dotPosition, badgeWidth, TYPE, SPACE, HEADER, BADGE_H, WIDTH } from "../web/demo/layout.js";
 
 const WINDOW = { start: 10, end: 40 };
 const QC = "Lane_QualityControl";
@@ -121,4 +121,64 @@ test("on the real replay, the as-is QC queue is longer than the to-be one", () =
   };
   const [asIs, toBe] = replay.scenarios;
   assert.ok(avg(asIs) > 4 * avg(toBe));
+});
+
+// ---------- layout geometry ----------
+
+const layouts = () => ["as_is", "to_be"].flatMap((model) => ["normal", "compact"].map((m) => buildLayout(model, m)));
+
+test("boxes in one lane leave room for an arrow between them, and stay inside their lane", () => {
+  for (const l of layouts()) {
+    const byLane = {};
+    for (const b of Object.values(l.boxes)) (byLane[b.lane] ??= []).push(b);
+    for (const list of Object.values(byLane)) {
+      list.sort((a, b) => a.left - b.left);
+      for (let k = 1; k < list.length; k++) assert.ok(list[k].left - list[k - 1].right >= SPACE.xl - 0.01, `${list[k - 1].id} / ${list[k].id}`);
+    }
+    for (const b of Object.values(l.boxes)) {
+      assert.ok(b.left > HEADER && b.right < WIDTH, b.id);
+      const lane = l.lanes[b.lane];
+      assert.ok(b.top >= lane.top && b.bottom <= lane.bottom, b.id);
+    }
+  }
+});
+
+test("dots and the queue count stay in the box's strip, below its label", () => {
+  for (const l of layouts()) {
+    const m = l.metrics;
+    for (const b of Object.values(l.boxes)) {
+      const labelBottom = b.top + m.labelTop + m.labelH;
+      const inside = ([x, y]) => x - m.dot >= b.left && x + m.dot <= b.right && y - m.dot >= labelBottom && y + m.dot <= b.bottom;
+      for (let waiting = 0; waiting <= 12; waiting += 3) {
+        for (let count = 1; count <= 16; count++) {
+          for (let slot = 0; slot < count; slot++) assert.ok(inside(dotPosition(l, b.id, "work", slot, count, waiting)), `${l.model} ${m.name} ${b.id} work ${slot}/${count}`);
+        }
+        for (let slot = 0; slot < waiting; slot++) {
+          const p = dotPosition(l, b.id, "wait", slot, waiting);
+          if (p) assert.ok(inside(p), `${b.id} wait ${slot}`);
+        }
+      }
+      // the count badge sits at the left end of the bottom row
+      assert.ok(b.strip.x0 + badgeWidth(10) <= b.right && b.strip.rows[0] - BADGE_H / 2 >= labelBottom, b.id);
+    }
+  }
+});
+
+test("worked-on dots never sit on the queue", () => {
+  for (const l of layouts()) {
+    for (const b of Object.values(l.boxes)) {
+      const waiting = 5;
+      const queue = Array.from({ length: waiting }, (_, s) => dotPosition(l, b.id, "wait", s, waiting)).filter(Boolean);
+      const queueRight = Math.max(b.strip.x0 + badgeWidth(waiting), ...queue.map(([x]) => x + l.metrics.dot));
+      for (let slot = 0; slot < 6; slot++) {
+        const [x, y] = dotPosition(l, b.id, "work", slot, 6, waiting);
+        assert.ok(y !== b.strip.rows[0] || x - l.metrics.dot >= queueRight - 0.01, `${b.id} ${slot}`);
+      }
+    }
+  }
+});
+
+test("every lane is tall enough for a two-line name and its head count", () => {
+  const block = TYPE.lg * (TYPE.ascent + TYPE.line + TYPE.descent) + SPACE.xs + TYPE.sm * (TYPE.ascent + TYPE.descent);
+  for (const l of layouts()) for (const lane of Object.values(l.lanes)) assert.ok(l.metrics.laneTop + block <= lane.h, lane.id);
 });
