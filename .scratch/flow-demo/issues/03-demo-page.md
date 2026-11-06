@@ -4,7 +4,7 @@
 
 **Blocked by:** 01, 02
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] Flow is readable on a projector: Vietnamese labels, five lanes, loops with rework rates
 - [ ] Switch shows As-is and To-be; C1 and C2 are highlighted in the flow, C3 and C4 shown as badges
@@ -14,3 +14,4 @@
 - [ ] Headless Chrome: no console errors, works at 1366 px and 390 px with no horizontal scroll
 
 ## Comments
+- 2026-11-06: claimed. Implementer started.
