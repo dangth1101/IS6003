@@ -32,12 +32,6 @@ export function casePoints(results) {
   return results.clusters.cases.points;
 }
 
-/** Activity groups: activity ID -> group, and the number of groups. */
-export function activityGroups(results) {
-  const a = results.clusters.activities;
-  return { k: a.k, of: Object.fromEntries(a.points.map((p) => [p.activity_id, p.group])) };
-}
-
 /** What step 3 leads with, read off the groups: the clean path, the slowest group, the QC loop and the attributes of the slow groups. */
 export function findings(results) {
   const rows = caseGroups(results);

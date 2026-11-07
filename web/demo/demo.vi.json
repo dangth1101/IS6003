@@ -134,10 +134,6 @@
     "note": "Mô hình As-is đã được sửa theo các quy tắc vẽ BPMN của sách Fundamentals of BPM: mỗi quyết định đi qua một cổng XOR, điều kiện ghi trên từng nhánh."
   },
   "embed": {
-    "node_title": "Mỗi bước là một nút: node2vec",
-    "node_method": "Từ event log, dựng một đồ thị các bước: hai bước được nối khi bước này đi ngay sau bước kia trong một dự án, càng nhiều dự án đi như vậy thì cạnh càng nặng. node2vec thả các lần đi ngẫu nhiên trên đồ thị này (p = {p}, q = {q}) và học cho mỗi bước một vector {dimensions} chiều. Hai bước hay gặp nhau trên các lần đi sẽ có vector gần nhau.",
-    "node_map": "Vector của các bước, chiếu xuống hai chiều",
-    "node_map_note": "Mỗi chấm là một bước. Chấm không có tên là cổng XOR hoặc sự kiện bắt đầu, kết thúc; rê chuột lên để xem.",
     "gateway_after": "Cổng XOR sau bước {task}",
     "graph_title": "Đồ thị các bước và các đường đi thật",
     "graph_method": "Đường đi của một dự án là một chuỗi nút: các bước nó đã làm, và ở mỗi cổng XOR là nhánh nó đã đi. graph2vec cắt đồ thị này thành nhiều mảnh nhỏ, mỗi mảnh là một nút cùng các nút kề nó ({iterations} vòng Weisfeiler-Lehman), rồi học cho cả đồ thị một vector {dimensions} chiều. Hai dự án có nhiều mảnh giống nhau thì vector gần nhau.",
@@ -160,6 +156,42 @@
     "path_days": "{days} ngày",
     "chosen_path": "Đường đã chọn, đúng chuỗi nút mà graph2vec đọc: {name}"
   },
+  "social": {
+    "title": "Mạng lưới bộ phận: ai là trung tâm",
+    "intro": "Đây là mạng xã hội theo cách của process mining: mỗi nút là một bộ phận, mỗi cạnh có hướng là công việc được giao từ bộ phận này sang bộ phận kia, tức là bước kế tiếp của dự án do bộ phận kia làm. Cạnh càng dày thì càng nhiều lần giao việc. Chọn một chỉ số để xem bộ phận nào là trung tâm theo chỉ số đó: nút càng to thì chỉ số càng cao.",
+    "edge_title": "{from} giao việc cho {to}: {n} lần",
+    "node_title": "{lane}: {measure} {value}",
+    "finding": "{lane} là cầu nối lớn nhất: nằm trên {share} số đường ngắn nhất giữa các cặp bộ phận khác, dù chỉ có {people} người. Cả ba bước duyệt đều nằm ở đây.",
+    "measure_label": "Chỉ số trung tâm",
+    "lane": "Bộ phận",
+    "table_title": "Mọi chỉ số của từng bộ phận",
+    "measures": {
+      "betweenness": {
+        "name": "Betweenness",
+        "explain": "Tỉ lệ đường ngắn nhất giữa hai bộ phận khác phải đi qua bộ phận này. Cao nghĩa là cầu nối: việc giữa các bộ phận khác phải qua tay nó. Hai bộ phận giao việc cho nhau càng nhiều thì đường giữa chúng càng ngắn."
+      },
+      "degree": {
+        "name": "Degree",
+        "explain": "Tỉ lệ các bộ phận khác mà bộ phận này giao việc hoặc nhận việc trực tiếp. Bằng một nghĩa là nó làm việc trực tiếp với mọi bộ phận."
+      },
+      "closeness": {
+        "name": "Closeness",
+        "explain": "Bộ phận này cần ít lần chuyển tay đến đâu để việc của nó tới được mọi bộ phận khác. Bằng một nghĩa là nó giao thẳng được cho mọi bộ phận."
+      },
+      "pagerank": {
+        "name": "PageRank",
+        "explain": "Công việc dồn về đâu. Một lần nhận việc từ bộ phận đang nhận nhiều việc được tính nặng hơn. Tổng của mọi bộ phận bằng một."
+      },
+      "in_handovers": {
+        "name": "Nhận việc",
+        "explain": "Số lần bộ phận này nhận việc từ một bộ phận khác trong cả lần chạy mô phỏng."
+      },
+      "out_handovers": {
+        "name": "Giao việc",
+        "explain": "Số lần bộ phận này giao việc sang một bộ phận khác trong cả lần chạy mô phỏng."
+      }
+    }
+  },
   "kmeans": {
     "findings_title": "Kết quả phân cụm",
     "f_clean": "{share} dự án đi thẳng, không phải làm lại, mất trung bình {days} ngày.",
@@ -168,10 +200,9 @@
     "f_qc": "{share} dự án rơi vào các nhóm phải sửa lỗi sau kiểm thử, chậm hơn nhóm đi thẳng từ {low} đến {high} ngày. Đây là vòng làm lại mà C1 và C2 của To-be nhắm vào.",
     "f_features": "Trong các nhóm chậm hơn mức trung bình, thuộc tính hay gặp là {features}. Nhóm được tìm mà không nhìn vào thuộc tính, nên đây là bằng chứng thứ hai cho các yếu tố gây chậm.",
     "title": "Vì sao chia thành bấy nhiêu nhóm",
-    "what_k": "k là số nhóm mà K-means phải chia. graph2vec và node2vec chỉ tạo ra vector, còn chia mấy nhóm là do ta chọn. Với dự án, k nhỏ thì nhóm thô: hai nhóm chỉ tách được dự án có làm lại và dự án không làm lại. k lớn hơn thì tách ra từng kiểu làm lại. Ở đây chọn k = {k}.",
+    "what_k": "k là số nhóm mà K-means phải chia. graph2vec chỉ tạo ra vector, còn chia mấy nhóm là do ta chọn. k nhỏ thì nhóm thô: hai nhóm chỉ tách được dự án có làm lại và dự án không làm lại. k lớn hơn thì tách ra từng kiểu làm lại. Ở đây chọn k = {k}.",
     "method": "Ta thử k từ {k_min} đến {k_max} và đo silhouette cho mỗi k: càng gần một thì các nhóm càng tách bạch. Chọn k có silhouette cao nhất.",
-    "sil_cases": "Dự án (graph2vec)",
-    "sil_activities": "Các bước (node2vec)",
+    "sil_cases": "Silhouette theo số nhóm",
     "k_axis": "Số nhóm k",
     "chosen": "Chọn k = {k}",
     "cap_note": "Với dự án, silhouette vẫn tăng đến k = {k}: mỗi kiểu đường đi là một biến thể riêng, nên thêm nhóm luôn khớp hơn một chút. Ta dừng ở {k} nhóm để còn đọc được."
@@ -218,11 +249,7 @@
     "cycle_title": "Cycle time trung bình của nhóm",
     "map_title": "Bản đồ các dự án",
     "map_note": "Mỗi chấm là một dự án, đặt theo vector của nó. Hai chấm gần nhau là hai dự án đi đường giống nhau. Bấm vào một nhóm để tô các dự án của nhóm đó.",
-    "activities_title": "Các bước hay đi liền nhau",
-    "activities_method": "node2vec xếp các bước theo việc chúng hay đi liền nhau, không theo loại phần tử: mỗi giai đoạn có cả công việc, cổng XOR và sự kiện. Kết quả là {k} giai đoạn của quy trình.",
-    "phase": "Giai đoạn {n}",
-    "note": "Nhóm được tìm từ đường đi của dự án. Thuộc tính chỉ được đem ra so sau khi đã có nhóm, nên nếu thuộc tính khớp với nhóm thì đó là bằng chứng thứ hai cho các yếu tố gây chậm.",
-    "phase_span": "Giai đoạn {n}: từ {first} đến {last}"
+    "note": "Nhóm được tìm từ đường đi của dự án. Thuộc tính chỉ được đem ra so sau khi đã có nhóm, nên nếu thuộc tính khớp với nhóm thì đó là bằng chứng thứ hai cho các yếu tố gây chậm."
   },
   "error": "Không tải được dữ liệu: {error}. Trang cần chạy qua một static server, ví dụ python -m http.server trong thư mục web.",
   "pool": "Ngân hàng",

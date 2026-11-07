@@ -143,10 +143,10 @@ def test_the_groups_step_names_every_loop_and_every_attribute(content):
 @needs_node
 def test_the_groups_step_shows_the_groups_from_results_json(results):
     script = (
-        "import { caseGroups, overallDays, activityGroups } from './web/demo/groups.js';"
+        "import { caseGroups, overallDays } from './web/demo/groups.js';"
         "import fs from 'node:fs';"
         "const r = JSON.parse(fs.readFileSync('web/results.json'));"
-        "console.log(JSON.stringify({ rows: caseGroups(r), overall: overallDays(r), phases: activityGroups(r) }));"
+        "console.log(JSON.stringify({ rows: caseGroups(r), overall: overallDays(r) }));"
     )
     out = subprocess.run([NODE, "--input-type=module", "-e", script], cwd=ROOT, capture_output=True, text=True, check=True)
     shown = json.loads(out.stdout)
@@ -159,7 +159,6 @@ def test_the_groups_step_shows_the_groups_from_results_json(results):
         assert row["cases"] == g["case_count"]
         assert row["loops"] == [loop["gateway_id"] for loop in g["loops"] if loop["mean"] >= 0.5]
     assert shown["overall"] == results["baseline"]["cycle_time"]["mean"]
-    assert shown["phases"]["k"] == results["clusters"]["activities"]["k"]
 
 
 @needs_node

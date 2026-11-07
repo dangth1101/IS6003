@@ -1,10 +1,10 @@
-// Flow demo, one page in six steps: the as-is model in BPMN, its graphs and their vectors
-// (node2vec, graph2vec), the k-means groups, the replay of the sample run from replay.json for
+// Flow demo, one page in six steps: the as-is model in BPMN, its graphs (paths, the handover
+// network between departments with betweenness, graph2vec vectors), the k-means groups, the replay of the sample run from replay.json for
 // as-is and to-be, and the official results. Groups and results come from ../results.json. Text comes from demo.vi.json.
 import { buildLayout, dotPosition, parkPosition, route, HEADER, POOL_W, LANES, TYPE, SPACE, GW, EV, CHIP } from "./layout.js";
 import { prepare, stateAt, qcQueueSeries, clock, along, rest, MONTH } from "./state.js";
 import { figures } from "./figures.js";
-import { caseGroups, overallDays, casePoints, activityGroups, findings } from "./groups.js";
+import { caseGroups, overallDays, casePoints, findings } from "./groups.js";
 
 const SVG = "http://www.w3.org/2000/svg";
 const DAYS_PER_SECOND = 6.25; // 1x: the 375-day window in 60 s, a month in about 3.3 s
@@ -636,7 +636,7 @@ function pathName(labels) {
   return text[0].toLocaleUpperCase(T.lang) + text.slice(1);
 }
 
-/** The directly-follows graph node2vec ran on, nodes where the model has them; highlight(labels) lights up one path. */
+/** The directly-follows graph of the log, nodes where the model has them; highlight(labels) lights up one path. */
 function followsGraph(edges, points) {
   const layout = buildLayout("as_is", "normal");
   const pad = 30;
@@ -743,20 +743,10 @@ function pathsPanel(results) {
   return panel;
 }
 
-/** Step 2: the log as a graph with its paths, then each step and each project turned into a vector. */
-function embedView(results) {
+/** Step 2: the log as a graph with its paths, the handover network between departments, then each project turned into a vector. */
+function embedView(results, asIs) {
   const E = T.embed;
-  const acts = results.clusters.activities, cases = results.clusters.cases;
-  const actMap = vectorMap(acts.points.map((p) => ({
-    x: p.x, y: p.y, title: nodeName(p.activity_id), label: T.activities[p.activity_id] ? oneLine(T.activities[p.activity_id]) : null,
-    cls: T.activities[p.activity_id] ? "task-dot" : "other-dot",
-  })), { width: 900, height: 420, labels: true });
-  actMap.svg.setAttribute("aria-label", E.node_map);
-  const nodes = el("section", { class: "panel still", "aria-labelledby": "node-title" },
-    el("h2", { id: "node-title", text: E.node_title }),
-    el("p", { class: "method", text: fill(E.node_method, { p: fmt(acts.method.p, 0), q: fmt(acts.method.q, 1), dimensions: acts.method.dimensions }) }),
-    el("h3", { text: E.node_map }), actMap.svg, el("p", { class: "fine", text: E.node_map_note }));
-
+  const cases = results.clusters.cases;
   const caseMap = vectorMap(cases.points.map((p) => ({ x: p.x, y: p.y })));
   caseMap.svg.setAttribute("aria-label", fill(E.case_map, { cases: NUM(0).format(cases.points.length) }));
   const graphs = el("section", { class: "panel still", "aria-labelledby": "graph-title" },
@@ -764,7 +754,111 @@ function embedView(results) {
     el("p", { class: "method", text: fill(E.graph_method, { iterations: cases.method.wl_iterations, dimensions: cases.method.dimensions }) }),
     el("h3", { text: fill(E.case_map, { cases: NUM(0).format(cases.points.length) }) }),
     el("div", { class: "map-narrow" }, caseMap.svg), el("p", { class: "fine", text: E.case_map_note }));
-  return [pathsPanel(results), nodes, graphs];
+  return [pathsPanel(results), ...(results.social ? [socialPanel(results, asIs)] : []), graphs];
+}
+
+/** Step 2, panel B: the handover network between departments, sized by the centrality measure picked above it. */
+function socialPanel(results, asIs) {
+  const S = T.social;
+  const social = results.social;
+  const rows = social.centrality;
+  const byLane = Object.fromEntries(rows.map((r) => [r.lane_id, r]));
+  const MEASURES = ["betweenness", "degree", "closeness", "pagerank", "in_handovers", "out_handovers"];
+  const counts = new Set(["in_handovers", "out_handovers"]);
+  const show = (m, v) => (counts.has(m) ? NUM(0).format(v) : fmt(v, 2));
+  const lanes = LANES.filter((id) => id in byLane); // process order around the circle
+  const W = 680, H = 490, cx = W / 2, cy = 255, ring = 165; // room above the top node for its name at the largest size
+  const pos = Object.fromEntries(lanes.map((id, i) => {
+    const a = -Math.PI / 2 + (2 * Math.PI * i) / lanes.length;
+    return [id, { x: cx + ring * Math.cos(a), y: cy + ring * Math.sin(a) }];
+  }));
+  const name = (id) => oneLine(T.lanes[id]);
+  const svg = sv("svg", { class: "social", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": S.title },
+    sv("defs", {}, arrowMarker("sna-arrow", "var(--edge)")));
+  const R = 54; // the largest node; the others scale by area
+  const max = Math.max(...social.handovers.map((e) => e.count));
+  const pairs = new Set(social.handovers.map((e) => `${e.source}|${e.target}`));
+  const edgeLayer = sv("g", {}), nodeLayer = sv("g", {});
+  svg.append(edgeLayer, nodeLayer);
+
+  const nodes = Object.fromEntries(lanes.map((id) => {
+    const circle = sv("circle", { cx: pos[id].x, cy: pos[id].y, stroke: "var(--ink)", "stroke-width": 2 });
+    const value = sv("text", { x: pos[id].x, y: pos[id].y + 5, "text-anchor": "middle", "font-size": 15, "font-weight": 700 });
+    const label = sv("text", { "text-anchor": "middle", "font-size": 15, "font-weight": 700, fill: "var(--ink)", stroke: "var(--lane)", "stroke-width": 4, "paint-order": "stroke", text: name(id) });
+    const title = sv("title", {});
+    nodeLayer.append(sv("g", {}, title, circle, value, label));
+    return [id, { circle, value, label, title }];
+  }));
+
+  const barsHost = el("div", { class: "sna-bars" });
+  const explain = el("p", { class: "sna-explain" });
+  const buttons = MEASURES.map((m) => {
+    const b = el("button", { type: "button", class: "sna-measure", "aria-pressed": "false", text: S.measures[m].name });
+    b.addEventListener("click", () => draw(m));
+    return b;
+  });
+
+  function draw(m) {
+    buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(MEASURES[i] === m)));
+    const top = Math.max(...rows.map((r) => r[m]));
+    const radius = (id) => 12 + (R - 12) * Math.sqrt(top ? byLane[id][m] / top : 0);
+    for (const id of lanes) {
+      const v = byLane[id][m], p = pos[id], r = radius(id), lead = v === top && v > 0;
+      const n = nodes[id];
+      n.circle.setAttribute("r", r.toFixed(1));
+      n.circle.setAttribute("fill", lead ? "var(--teal)" : v > 0 ? "var(--teal-soft)" : "var(--surface)");
+      n.value.textContent = show(m, v);
+      n.value.setAttribute("fill", lead ? "#fff" : "var(--ink)");
+      n.value.setAttribute("font-size", r < 26 ? 12 : 15);
+      // a small node shows its value beside it, not inside
+      n.value.setAttribute("x", r < 26 ? p.x + r + 6 : p.x);
+      n.value.setAttribute("text-anchor", r < 26 ? "start" : "middle");
+      const below = p.y >= cy - 1;
+      n.label.setAttribute("x", p.x);
+      n.label.setAttribute("y", below ? p.y + r + 20 : p.y - r - 10);
+      n.title.textContent = fill(S.node_title, { lane: name(id), measure: S.measures[m].name, value: show(m, v) });
+    }
+    // edges end at the node's edge, so they follow the sizes
+    edgeLayer.replaceChildren(...social.handovers.map((e) => {
+      const a = pos[e.source], b = pos[e.target];
+      const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy);
+      const bend = (pairs.has(`${e.target}|${e.source}`) ? 0.16 : 0.06) * len;
+      const mx = (a.x + b.x) / 2 - (dy / len) * bend, my = (a.y + b.y) / 2 + (dx / len) * bend;
+      const toward = (p, r) => { const d = Math.hypot(mx - p.x, my - p.y); return [p.x + ((mx - p.x) / d) * r, p.y + ((my - p.y) / d) * r]; };
+      const [x1, y1] = toward(a, radius(e.source) + 2), [x2, y2] = toward(b, radius(e.target) + 5);
+      return sv("path", {
+        d: `M${x1},${y1} Q${mx},${my} ${x2},${y2}`, fill: "none", stroke: "var(--edge)", "stroke-width": (1 + 7 * Math.sqrt(e.count / max)).toFixed(2),
+        opacity: 0.75, "marker-end": "url(#sna-arrow)",
+      }, sv("title", { text: fill(S.edge_title, { from: name(e.source), to: name(e.target), n: NUM(0).format(e.count) }) }));
+    }));
+    const sorted = [...rows].sort((a, b) => b[m] - a[m]);
+    barsHost.replaceChildren(...sorted.map((r) => el("div", { class: "sna-bar-row" },
+      el("span", { class: "sna-name", text: name(r.lane_id) }),
+      el("span", { class: "sna-track" }, el("span", { class: "sna-bar", style: `width: ${top ? (r[m] / top) * 100 : 0}%` })),
+      el("span", { class: "sna-value", text: show(m, r[m]) }))));
+    explain.textContent = S.measures[m].explain;
+  }
+
+  // every measure side by side, the highest of each column in bold
+  const table = el("table", { class: "sna-table" },
+    el("thead", {}, el("tr", {}, el("th", { text: S.lane }), MEASURES.map((m) => el("th", { class: "num", text: S.measures[m].name })))),
+    el("tbody", {}, rows.map((r) => el("tr", {}, el("td", { text: name(r.lane_id) }),
+      MEASURES.map((m) => el("td", { class: r[m] === Math.max(...rows.map((x) => x[m])) ? "num lead" : "num", text: show(m, r[m]) }))))));
+
+  const best = rows[0];
+  const panel = el("section", { class: "panel still", "aria-labelledby": "sna-title" },
+    el("h2", { id: "sna-title", text: S.title }),
+    el("p", { class: "method", text: S.intro }),
+    el("div", { class: "sna-measures", role: "group", "aria-label": S.measure_label }, buttons),
+    el("div", { class: "sna-grid" },
+      el("div", { class: "sna-map" }, svg),
+      el("div", {},
+        explain, barsHost,
+        best.betweenness > 0 ? el("p", { class: "sna-finding", text: fill(S.finding, { lane: name(best.lane_id), share: pct(best.betweenness, 0), people: asIs.capacities[best.lane_id] }) }) : null)),
+    el("h3", { text: S.table_title }),
+    el("div", { class: "sna-table-scroll" }, table));
+  draw("betweenness");
+  return panel;
 }
 
 /** Silhouette per k, the chosen k in teal. */
@@ -787,10 +881,10 @@ function silhouetteChart(rows, chosen, title) {
   return svg;
 }
 
-/** Step 3: what k-means found. The findings first, then the project groups, the phases on the flow, and last how k was picked. */
+/** Step 3: what k-means found on the graph2vec vectors. The findings first, then the project groups, and last how k was picked. */
 function kmeansView(results, asIs) {
   const K = T.kmeans, G = T.groups;
-  const cases = results.clusters.cases, acts = results.clusters.activities;
+  const cases = results.clusters.cases;
   const [kMin, kMax] = cases.method.k_range;
   const list = new Intl.ListFormat(T.lang, { type: "conjunction" });
   const order = Object.keys(G.loop_parts); // loops in process order, the order of loop_parts in the content file
@@ -812,8 +906,7 @@ function kmeansView(results, asIs) {
     el("p", { class: "method", text: fill(K.what_k, { k: cases.k }) }),
     el("p", { class: "method", text: fill(K.method, { k_min: kMin, k_max: kMax }) }),
     el("div", { class: "sil-grid" },
-      el("div", {}, el("h3", { text: K.sil_cases }), silhouetteChart(cases.silhouette, cases.k, K.sil_cases), el("p", { class: "fine", text: fill(K.chosen, { k: cases.k }) })),
-      el("div", {}, el("h3", { text: K.sil_activities }), silhouetteChart(acts.silhouette, acts.k, K.sil_activities), el("p", { class: "fine", text: fill(K.chosen, { k: acts.k }) }))),
+      el("div", {}, el("h3", { text: K.sil_cases }), silhouetteChart(cases.silhouette, cases.k, K.sil_cases), el("p", { class: "fine", text: fill(K.chosen, { k: cases.k }) }))),
     cases.k === kMax ? el("p", { class: "fine", text: fill(K.cap_note, { k: kMax }) }) : null);
 
   // project groups: the list, slowest first, and the map with the picked group in teal
@@ -867,30 +960,7 @@ function kmeansView(results, asIs) {
     el("p", { class: "fine", text: G.note }));
   pick(rows[0].id);
 
-  // phases: the as-is flow, each task tinted by its node2vec group (numbered in process order)
-  const phases = activityGroups(results);
-  // each phase is named by its first and last task along the flow
-  const layout = buildLayout("as_is", "normal");
-  const span = (g) => {
-    const tasks = acts.groups[g].activity_ids.filter((id) => T.activities[id] && layout.nodes[id]).sort((a, b) => layout.nodes[a].cx - layout.nodes[b].cx);
-    return tasks.length ? fill(G.phase_span, { n: g + 1, first: oneLine(T.activities[tasks[0]]), last: oneLine(T.activities[tasks.at(-1)]) }) : fill(G.phase, { n: g + 1 });
-  };
-  const tint = (svg) => {
-    for (const box of svg.querySelectorAll("[data-box]")) {
-      const g = phases.of[box.dataset.box];
-      if (g != null && g < 3) { box.setAttribute("fill", `var(--phase-${g}-fill)`); box.setAttribute("stroke", `var(--phase-${g})`); box.setAttribute("stroke-width", 2); }
-    }
-  };
-  const legend = el("ul", { class: "legend" }, Array.from({ length: Math.min(phases.k, 3) }, (_, g) => el("li", {},
-    sv("svg", { width: 30, height: 20, "aria-hidden": "true" },
-      sv("rect", { x: 1, y: 1, width: 28, height: 18, rx: 5, fill: `var(--phase-${g}-fill)`, stroke: `var(--phase-${g})`, "stroke-width": 2 })),
-    span(g))));
-  const flow = el("section", { class: "panel", "aria-labelledby": "phases-title" },
-    el("div", { class: "panel-head" }, el("h2", { id: "phases-title", text: G.activities_title })),
-    ...stillFlow(asIs, tint),
-    el("div", { class: "below" }, el("div", { class: "legend-block" }, legend,
-      el("p", { class: "note", text: fill(G.activities_method, { k: phases.k }) }))));
-  return [found, projects, flow, choose];
+  return [found, projects, choose];
 }
 
 // ---------- result view ----------
@@ -1114,7 +1184,7 @@ async function main() {
     if (!st.startsWith("sim_")) {
       sim.playing = false;
       bar.hidden = true;
-      const still = { bpmn: () => bpmnView(scen.as_is, asIsXml), embed: () => embedView(results), kmeans: () => kmeansView(results, scen.as_is), result: () => [resultView(results)] };
+      const still = { bpmn: () => bpmnView(scen.as_is, asIsXml), embed: () => embedView(results, scen.as_is), kmeans: () => kmeansView(results, scen.as_is), result: () => [resultView(results)] };
       stage.append(...still[st]());
       return;
     }

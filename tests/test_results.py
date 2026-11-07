@@ -223,7 +223,7 @@ def test_the_page_prose_types_in_no_result():
 
 def test_fake_results_fill_every_section_of_the_spec(fake):
     # Spec, "Results contract", plus `text` for the page wording and the ablation and headline derived from the scenarios.
-    spec_sections = {"meta", "assumptions", "models", "value_added", "baseline", "ml", "clusters", "changes", "scenarios", "threats"}
+    spec_sections = {"meta", "assumptions", "models", "value_added", "baseline", "ml", "clusters", "social", "changes", "scenarios", "threats"}
 
     assert set(fake) == spec_sections | {"text", "ablation", "headline"}
     assert set(fake["models"]) == {"as_is", "to_be"}

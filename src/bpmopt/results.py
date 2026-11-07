@@ -26,7 +26,7 @@ from bpmopt.lint import lint
 from bpmopt.parameters import Parameters, assumptions
 from bpmopt.scenarios import Catalog, ablation, find_scenario, headline, saving_share
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 def build_results(
@@ -39,6 +39,7 @@ def build_results(
     value_added: dict | None = None,
     ml: dict | None = None,
     clusters: dict | None = None,
+    social: dict | None = None,
     catalog: Catalog | None = None,
     scenarios: list[dict] | None = None,
     lang: str = "en",
@@ -51,7 +52,7 @@ def build_results(
     cut-off (cycle_time_end), if they set one.
 
     The optional sections go in as given: value_added (load_value_added), ml
-    (ml_section), clusters (clusters_section), the change catalog and the scenarios run_scenarios returned
+    (ml_section), clusters (clusters_section), social (social_section), the change catalog and the scenarios run_scenarios returned
     for it. With scenarios, the ablation and the headline are derived from them
     and `replications` defaults to the runs per scenario (else 1). The catalog's
     overrides join the assumptions table after the as-is rows, each marked with
@@ -87,6 +88,8 @@ def build_results(
         results["ml"] = ml
     if clusters is not None:
         results["clusters"] = clusters
+    if social is not None:
+        results["social"] = social
     if catalog is not None:
         results["changes"] = catalog.entries()
     if scenarios is not None:
@@ -206,6 +209,16 @@ def _cross_field_errors(results: dict) -> Iterator[str]:
 
     yield from _summary_errors(results, scenarios)
     yield from _cluster_errors(results)
+    if "social" in results:
+        lanes = {e[k] for e in results["social"]["handovers"] for k in ("source", "target")}
+        scored = {row["lane_id"] for row in results["social"]["centrality"]}
+        if scored != lanes:
+            yield f"social.centrality: lanes {sorted(scored ^ lanes)} are in only one of handovers and centrality"
+        for row in results["social"]["centrality"]:
+            got = sum(e["count"] for e in results["social"]["handovers"] if e["target"] == row["lane_id"])
+            gave = sum(e["count"] for e in results["social"]["handovers"] if e["source"] == row["lane_id"])
+            if (row["in_handovers"], row["out_handovers"]) != (got, gave):
+                yield f"social.centrality ({row['lane_id']}): in and out handovers must add up the handovers, expected {got} and {gave}"
 
 
 def _cluster_errors(results: dict) -> Iterator[str]:

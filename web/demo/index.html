@@ -177,13 +177,7 @@
     .chart-block svg { display: block; width: 100%; height: auto; }
     .result .fine { color: var(--muted); font-size: var(--t-sm); margin: 6px 0 0; max-width: 80ch; }
 
-    /* groups view: case groups (graph2vec) and the flow tinted by node2vec phase.
-       Phase colours are categorical slots 7, 4, 6 (violet, yellow, green), validated all-pairs; fills are 30% tints. */
-    :root {
-      --phase-0: #6250d6; --phase-0-fill: #d0caf3;
-      --phase-1: #eda100; --phase-1-fill: #fae3b3;
-      --phase-2: #008300; --phase-2-fill: #b3dab3;
-    }
+    /* steps 2 and 3: the graphs, the department network and the project groups */
     .panel.still { padding: var(--s4) var(--s5) var(--s4); }
     .panel.still h2 { margin: 0 0 var(--s1); font-size: var(--t-xl); }
     .panel.still h3 { margin: var(--s3) 0 6px; font-size: var(--t-lg); }
@@ -213,6 +207,27 @@
     .path-name { grid-column: 2; grid-row: 1; font-weight: 600; }
     .path-days { grid-column: 3; grid-row: 1; font-weight: 700; text-align: right; white-space: nowrap; }
     .path-count { grid-column: 2 / 4; grid-row: 2; font-size: var(--t-sm); color: var(--muted); }
+    .sna-grid { display: grid; grid-template-columns: minmax(380px, 1.2fr) minmax(300px, 1fr); gap: var(--s3) var(--s5); align-items: start; margin-top: var(--s2); }
+    .sna-map { background: var(--lane); border: 1px solid var(--line); border-radius: 10px; }
+    svg.social { display: block; width: 100%; height: auto; }
+    /* one grid for all rows, so every track starts at the same x and has the same length */
+    .sna-bars { display: grid; grid-template-columns: max-content 1fr 3.6em; gap: 6px var(--s2); align-items: center; margin: 0 0 var(--s3); }
+    .sna-bar-row { display: contents; }
+    .sna-name { font-weight: 600; }
+    .sna-track { height: 16px; background: var(--lane-alt); border-radius: 4px; overflow: hidden; }
+    .sna-bar { display: block; height: 100%; background: var(--teal); border-radius: 0 4px 4px 0; }
+    .sna-value { font-weight: 700; text-align: right; }
+    .sna-measures { display: flex; flex-wrap: wrap; gap: 6px; margin: var(--s2) 0 0; }
+    .sna-measure { border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-weight: 600; border-radius: 999px; padding: 5px var(--s3); cursor: pointer; }
+    .sna-measure[aria-pressed="true"] { background: var(--teal); border-color: var(--teal); color: #fff; }
+    .sna-explain { margin: 0 0 var(--s3); color: var(--muted); }
+    .sna-table-scroll { overflow-x: auto; }
+    .sna-table { border-collapse: collapse; width: 100%; max-width: 980px; font-size: var(--t-sm); }
+    .sna-table th, .sna-table td { text-align: left; padding: 6px var(--s3) 6px 0; border-bottom: 1px solid var(--line); }
+    .sna-table th { color: var(--muted); font-weight: 600; }
+    .sna-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .sna-table td.lead { font-weight: 700; color: var(--teal); }
+    .sna-finding { margin: 0 0 var(--s2); padding: 6px 0 6px var(--s3); border-left: 4px solid var(--teal); font-size: var(--t-lg); }
     .findings { display: grid; gap: var(--s2); max-width: 100ch; }
     .findings p { margin: 0; padding: 6px 0 6px var(--s3); border-left: 4px solid var(--teal); font-size: var(--t-lg); }
     .panel-head .compare-toggle { margin-right: auto; }
@@ -246,7 +261,7 @@
       svg.flow { min-width: 1360px; }
       main { padding-left: var(--gutter); padding-right: var(--gutter); }
       .scroll-hint { display: block; margin: 0; padding: var(--s1) var(--s4) var(--s2); font-size: var(--t-sm); color: var(--muted); border-top: 1px solid var(--line); }
-      .result-grid, .groups-grid { grid-template-columns: 1fr; }
+      .result-grid, .groups-grid, .sna-grid { grid-template-columns: 1fr; }
       .groups { padding: var(--s3) var(--s3) var(--s4); }
       .top { padding-top: var(--s2); }
       .top h1 { font-size: var(--t-lg); }

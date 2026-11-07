@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/dangth1101/IS6003/results.schema.json",
   "title": "IS6003 results file",
-  "description": "Contract between the notebook (writer) and the static page (reader). Version 5: every section from the spec, with per-replication means in the scenarios, the ablation and the headline, plus the case and activity groups from graph embeddings (clusters). Sections other than meta, text, models and baseline are optional until the step that fills them is done; inside a section, the shape is fixed. All times are in working days. All human-readable text is in `text`, in the catalog entries (`changes`, `assumptions`, `threats`, `value_added` reasons, lint messages) or in the BPMN labels.",
+  "description": "Contract between the notebook (writer) and the static page (reader). Version 6: every section from the spec, with per-replication means in the scenarios, the ablation and the headline, plus the case and activity groups from graph embeddings (clusters) and the handover network between departments (social). Sections other than meta, text, models and baseline are optional until the step that fills them is done; inside a section, the shape is fixed. All times are in working days. All human-readable text is in `text`, in the catalog entries (`changes`, `assumptions`, `threats`, `value_added` reasons, lint messages) or in the BPMN labels.",
   "type": "object",
   "required": ["meta", "text", "models", "baseline"],
   "additionalProperties": false,
@@ -12,7 +12,7 @@
       "required": ["schema_version", "seed", "replications", "case_count", "warm_up", "parameter_version", "generated_at"],
       "additionalProperties": false,
       "properties": {
-        "schema_version": { "const": 5 },
+        "schema_version": { "const": 6 },
         "seed": { "type": "integer" },
         "replications": { "type": "integer", "minimum": 1, "description": "Replications per scenario. 1 for a single baseline run." },
         "case_count": { "type": "integer", "minimum": 1, "description": "Cases per run, after the warm-up is dropped." },
@@ -304,6 +304,52 @@
                 "additionalProperties": false,
                 "properties": { "activity_id": { "type": "string" }, "x": { "type": "number" }, "y": { "type": "number" }, "group": { "type": "integer", "minimum": 0 } }
               }
+            }
+          }
+        }
+      }
+    },
+    "social": {
+      "type": "object",
+      "description": "Handover of work between lanes and each lane's centrality in that network (bpmopt.social).",
+      "required": ["method", "handovers", "centrality"],
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "type": "object",
+          "required": ["network", "distance", "normalized"],
+          "additionalProperties": false,
+          "properties": {
+            "network": { "type": "string" },
+            "distance": { "type": "string", "description": "Edge length used for shortest paths." },
+            "normalized": { "const": true }
+          }
+        },
+        "handovers": {
+          "type": "array",
+          "description": "How often a task of the target lane directly follows a task of the source lane in a case, most first.",
+          "items": {
+            "type": "object",
+            "required": ["source", "target", "count"],
+            "additionalProperties": false,
+            "properties": { "source": { "type": "string" }, "target": { "type": "string" }, "count": { "type": "integer", "minimum": 1 } }
+          }
+        },
+        "centrality": {
+          "type": "array",
+          "description": "Every lane of the network, highest betweenness first. degree: share of the other lanes it works with directly. in and out handovers: how often it gets and hands on work. closeness: (n - 1) / hops to each other lane. betweenness: normalised, edge length 1 / handovers. pagerank: weighted by handovers, damping 0.85.",
+          "items": {
+            "type": "object",
+            "required": ["lane_id", "degree", "in_handovers", "out_handovers", "closeness", "betweenness", "pagerank"],
+            "additionalProperties": false,
+            "properties": {
+              "lane_id": { "type": "string" },
+              "degree": { "$ref": "#/$defs/share" },
+              "in_handovers": { "type": "integer", "minimum": 0 },
+              "out_handovers": { "type": "integer", "minimum": 0 },
+              "closeness": { "$ref": "#/$defs/share" },
+              "betweenness": { "$ref": "#/$defs/share" },
+              "pagerank": { "$ref": "#/$defs/share" }
             }
           }
         }

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "schema_version": 5,
+    "schema_version": 6,
     "seed": 42,
     "replications": 30,
     "case_count": 400,
@@ -3729,6 +3729,87 @@
         }
       ]
     }
+  },
+  "social": {
+    "method": {
+      "network": "handover of work between lanes",
+      "distance": "1 / handovers",
+      "normalized": true
+    },
+    "handovers": [
+      {
+        "source": "lane_ops",
+        "target": "lane_qa",
+        "count": 400
+      },
+      {
+        "source": "lane_qa",
+        "target": "lane_dev",
+        "count": 350
+      },
+      {
+        "source": "lane_dev",
+        "target": "lane_ld",
+        "count": 300
+      },
+      {
+        "source": "lane_ld",
+        "target": "lane_bu",
+        "count": 250
+      },
+      {
+        "source": "lane_bu",
+        "target": "lane_ops",
+        "count": 200
+      }
+    ],
+    "centrality": [
+      {
+        "lane_id": "lane_bu",
+        "degree": 0.5,
+        "in_handovers": 250,
+        "out_handovers": 200,
+        "closeness": 0.4,
+        "betweenness": 0.5,
+        "pagerank": 0.2
+      },
+      {
+        "lane_id": "lane_dev",
+        "degree": 0.5,
+        "in_handovers": 350,
+        "out_handovers": 300,
+        "closeness": 0.4,
+        "betweenness": 0.5,
+        "pagerank": 0.2
+      },
+      {
+        "lane_id": "lane_ld",
+        "degree": 0.5,
+        "in_handovers": 300,
+        "out_handovers": 250,
+        "closeness": 0.4,
+        "betweenness": 0.5,
+        "pagerank": 0.2
+      },
+      {
+        "lane_id": "lane_ops",
+        "degree": 0.5,
+        "in_handovers": 200,
+        "out_handovers": 400,
+        "closeness": 0.4,
+        "betweenness": 0.5,
+        "pagerank": 0.2
+      },
+      {
+        "lane_id": "lane_qa",
+        "degree": 0.5,
+        "in_handovers": 400,
+        "out_handovers": 350,
+        "closeness": 0.4,
+        "betweenness": 0.5,
+        "pagerank": 0.2
+      }
+    ]
   },
   "changes": [
     {
