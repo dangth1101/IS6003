@@ -8,6 +8,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
+  <!-- bpmn.io draws step 1 from models/as_is.bpmn, the same version as the report page -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.28.0/dist/assets/diagram-js.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bpmn-js@18.28.0/dist/assets/bpmn-js.css">
   <style>
     /* No wording in this file: every visible string comes from demo.vi.json,
        every number from replay.json (the sample run) or ../results.json (the official results). */
@@ -63,11 +66,19 @@
     .top p { margin: 2px 0 0; color: var(--muted); font-size: var(--t-sm); }
     .top a { color: var(--teal); }
 
-    .views { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
-    .views button {
-      border: 0; background: none; padding: var(--s1) var(--s4); border-radius: 999px; cursor: pointer; font-weight: 600; color: var(--muted);
-    }
-    .views button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+    /* step bar: back, the six numbered steps, next */
+    .views { display: flex; align-items: center; gap: var(--s2); }
+    .step-list { display: flex; gap: 2px; margin: 0; padding: 3px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; }
+    .step { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: var(--s1) var(--s3) var(--s1) var(--s1); border-radius: 999px; cursor: pointer; font-weight: 600; color: var(--muted); white-space: nowrap; }
+    .step-n { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--lane-alt); color: var(--ink); font-size: var(--t-sm); }
+    .step[aria-current="step"] { background: var(--ink); color: #fff; }
+    .step[aria-current="step"] .step-n { background: #fff; color: var(--ink); }
+    .step-move { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 7px 10px; cursor: pointer; font-weight: 600; color: var(--ink); }
+    .step-move.next { background: var(--orange); border-color: var(--orange); color: #fff; padding-left: var(--s4); }
+    .step-move:disabled { opacity: 0.35; cursor: default; }
+    @media (max-width: 1240px) { .step:not([aria-current="step"]) .step-name { display: none; } .step:not([aria-current="step"]) { padding-right: var(--s1); } }
+    /* still steps: the subtitle about dots belongs to the replay */
+    body:not([data-step^="sim_"]) .top p #subtitle { display: none; }
 
     main { overflow: auto; padding: 0 var(--gutter) var(--s3); overscroll-behavior: contain; }
     .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin: 0 0 var(--s3); overflow: hidden; }
@@ -166,6 +177,66 @@
     .chart-block svg { display: block; width: 100%; height: auto; }
     .result .fine { color: var(--muted); font-size: var(--t-sm); margin: 6px 0 0; max-width: 80ch; }
 
+    /* groups view: case groups (graph2vec) and the flow tinted by node2vec phase.
+       Phase colours are categorical slots 7, 4, 6 (violet, yellow, green), validated all-pairs; fills are 30% tints. */
+    :root {
+      --phase-0: #6250d6; --phase-0-fill: #d0caf3;
+      --phase-1: #eda100; --phase-1-fill: #fae3b3;
+      --phase-2: #008300; --phase-2-fill: #b3dab3;
+    }
+    .panel.still { padding: var(--s4) var(--s5) var(--s4); }
+    .panel.still h2 { margin: 0 0 var(--s1); font-size: var(--t-xl); }
+    .panel.still h3 { margin: var(--s3) 0 6px; font-size: var(--t-lg); }
+    .panel.still .method { margin: 0 0 var(--s2); color: var(--muted); max-width: 100ch; }
+    .panel.still .fine { color: var(--muted); font-size: var(--t-sm); margin: 6px 0 0; max-width: 90ch; }
+    svg.vector-map { display: block; width: 100%; max-width: 980px; height: auto; background: var(--lane); border: 1px solid var(--line); border-radius: 10px; }
+    .map-narrow { max-width: 560px; }
+    svg.vector-map circle { fill: var(--faint); opacity: 0.35; }
+    svg.vector-map .task-dot circle { fill: var(--ink); opacity: 1; }
+    svg.vector-map .other-dot circle { fill: var(--faint); opacity: 1; }
+    svg.vector-map .picked circle { fill: var(--teal); opacity: 1; }
+    .chain-scroll { overflow-x: auto; background: var(--lane); border: 1px solid var(--line); border-radius: 10px; }
+    svg.chain { display: block; width: 100%; min-width: 900px; height: auto; }
+    .sil-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 380px)); gap: var(--s3) var(--s5); }
+    svg.sil { display: block; width: 100%; height: auto; }
+    .follows-scroll { overflow-x: auto; background: var(--lane); border: 1px solid var(--line); border-radius: 10px; margin: var(--s2) 0; }
+    svg.follows { display: block; width: 100%; min-width: 1100px; height: auto; }
+    svg.follows path { opacity: 0.55; transition: opacity 0.2s; }
+    svg.follows path.off { opacity: 0.22; }
+    svg.follows path.on { opacity: 1; stroke: var(--teal); }
+    svg.follows .dfg-node.off { opacity: 0.35; }
+    .path-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 6px; margin: var(--s2) 0 var(--s3); }
+    .path-row { display: grid; grid-template-columns: 2em 1fr auto; gap: 0 var(--s2); align-items: baseline; text-align: left; cursor: pointer; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px var(--s3); }
+    .path-row:hover { border-color: var(--teal-soft); }
+    .path-row[aria-pressed="true"] { border-color: var(--teal); box-shadow: inset 4px 0 0 var(--teal); }
+    .path-rank { grid-column: 1; grid-row: 1 / 3; font-weight: 700; color: var(--muted); }
+    .path-name { grid-column: 2; grid-row: 1; font-weight: 600; }
+    .path-days { grid-column: 3; grid-row: 1; font-weight: 700; text-align: right; white-space: nowrap; }
+    .path-count { grid-column: 2 / 4; grid-row: 2; font-size: var(--t-sm); color: var(--muted); }
+    .findings { display: grid; gap: var(--s2); max-width: 100ch; }
+    .findings p { margin: 0; padding: 6px 0 6px var(--s3); border-left: 4px solid var(--teal); font-size: var(--t-lg); }
+    .panel-head .compare-toggle { margin-right: auto; }
+    .bpmn-canvas { height: max(420px, calc(100dvh - 300px)); background: #fff; }
+    .bpmn-canvas .bjs-powered-by { opacity: 0.6; }
+    .compare-toggle { border: 1px solid var(--teal); background: var(--surface); color: var(--teal); font-weight: 600; border-radius: 999px; padding: 6px var(--s4); cursor: pointer; }
+    .compare-toggle[aria-pressed="true"] { background: var(--teal); color: #fff; }
+    .groups-grid { display: grid; grid-template-columns: minmax(340px, 1.15fr) minmax(300px, 1fr); gap: var(--s4) var(--s5); align-items: start; }
+    .overall-key { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s2); font-size: var(--t-sm); color: var(--muted); }
+    .group-list { display: grid; gap: 6px; }
+    .group-row {
+      display: grid; gap: 2px; text-align: left; cursor: pointer; width: 100%;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: var(--s2) var(--s3);
+    }
+    .group-row:hover { border-color: var(--teal-soft); }
+    .group-row[aria-pressed="true"] { border-color: var(--teal); box-shadow: inset 4px 0 0 var(--teal); }
+    .group-name { font-weight: 700; }
+    .group-count, .group-sub { font-size: var(--t-sm); color: var(--muted); }
+    .group-track { position: relative; height: 22px; margin: 4px 0 2px; margin-right: 76px; }
+    .group-bar { position: absolute; left: 0; top: 4px; height: 14px; background: var(--teal-soft); border-radius: 0 4px 4px 0; }
+    .group-row[aria-pressed="true"] .group-bar { background: var(--teal); }
+    .group-overall { position: absolute; top: 0; bottom: 0; border-left: 1.6px dashed var(--ink); }
+    .group-days { position: absolute; top: 1px; padding-left: 8px; font-weight: 700; white-space: nowrap; }
+
     .error { margin: var(--s5) var(--s4); padding: 14px var(--s4); border-radius: 10px; background: var(--orange-soft); color: var(--orange-ink); }
 
     /* Up to 1500 px wide (a 1366 projector) the flows take the full width, so their text stays at 12 px or more. */
@@ -175,7 +246,8 @@
       svg.flow { min-width: 1360px; }
       main { padding-left: var(--gutter); padding-right: var(--gutter); }
       .scroll-hint { display: block; margin: 0; padding: var(--s1) var(--s4) var(--s2); font-size: var(--t-sm); color: var(--muted); border-top: 1px solid var(--line); }
-      .result-grid { grid-template-columns: 1fr; }
+      .result-grid, .groups-grid { grid-template-columns: 1fr; }
+      .groups { padding: var(--s3) var(--s3) var(--s4); }
       .top { padding-top: var(--s2); }
       .top h1 { font-size: var(--t-lg); }
       .views button { padding: 6px var(--s3); }
@@ -211,6 +283,7 @@
     <div class="speed"><span id="speed-label"></span><div class="speed-buttons" id="speed"></div></div>
     <div class="qchart" id="qchart"></div>
   </div>
-  <script type="module" src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bpmn-js@18.28.0/dist/bpmn-viewer.production.min.js"></script>
+  <script type="module" src="app.js?v=steps"></script>
 </body>
 </html>

@@ -1,14 +1,18 @@
-// Flow demo: draws the as-is and to-be flows in BPMN notation, replays the sample run from
-// replay.json, and shows the official results from ../results.json. Text comes from demo.vi.json.
+// Flow demo, one page in six steps: the as-is model in BPMN, its graphs and their vectors
+// (node2vec, graph2vec), the k-means groups, the replay of the sample run from replay.json for
+// as-is and to-be, and the official results. Groups and results come from ../results.json. Text comes from demo.vi.json.
 import { buildLayout, dotPosition, parkPosition, route, HEADER, POOL_W, LANES, TYPE, SPACE, GW, EV, CHIP } from "./layout.js";
 import { prepare, stateAt, qcQueueSeries, clock, along, rest, MONTH } from "./state.js";
 import { figures } from "./figures.js";
+import { caseGroups, overallDays, casePoints, activityGroups, findings } from "./groups.js";
 
 const SVG = "http://www.w3.org/2000/svg";
 const DAYS_PER_SECOND = 6.25; // 1x: the 375-day window in 60 s, a month in about 3.3 s
 const SPEEDS = [0.5, 1, 2, 4];
 const TRAVEL_MS = 520;
 const FADE_MS = 260;
+// The talk, in order. Steps 4 and 5 replay the sample run; the others are still.
+const STEPS = ["bpmn", "embed", "kmeans", "sim_as_is", "sim_to_be", "result"];
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 let T; // content
@@ -464,6 +468,431 @@ function legendShape(kind) {
     sv("path", { d: "M1,11 H28", stroke: "var(--flow)", "stroke-width": 1.5, "marker-end": "url(#legend-arrow)" }));
 }
 
+// ---------- steps 1 to 3: the model, the embeddings, the groups ----------
+
+/** A still flow (no tokens) in its scroll wrapper. tint(svg) may recolour its boxes. */
+function stillFlow(scenario, tint) {
+  const { svg } = drawFlow(buildLayout(scenario.id, "normal"), scenario);
+  if (tint) tint(svg);
+  return [el("div", { class: "flow-wrap" }, el("div", { class: "flow-scroll" }, svg)), el("p", { class: "scroll-hint", text: T.scroll_hint })];
+}
+
+function notationLegend(kinds) {
+  return el("ul", { class: "legend", "data-legend": "notation" }, kinds.map((k) => el("li", {}, legendShape(k), T.legend[k])));
+}
+
+/** The model's XML with the Vietnamese names of the content file, so bpmn.io shows the same words as the rest of the demo. */
+function vietnameseBpmn(xml, rework) {
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  const rates = Object.fromEntries(rework.map((r) => [r.gateway_id, r.rate]));
+  for (const node of doc.querySelectorAll("[id]")) {
+    const id = node.getAttribute("id");
+    let name = T.activities[id] ?? T.events[id] ?? T.lanes[id];
+    if (T.conditions[id]) {
+      const rate = rates[node.getAttribute("sourceRef")];
+      name = fill(T.conditions[id], { rate: rate == null ? "" : pct(rate, 0) });
+    }
+    if (node.localName === "participant") name = T.pool;
+    if (name != null) node.setAttribute("name", oneLine(name));
+  }
+  return new XMLSerializer().serializeToString(doc);
+}
+
+/** Step 1: the as-is model as bpmn.io draws it from models/as_is.bpmn, before anything runs. */
+function bpmnView(asIs, xml) {
+  const B = T.bpmn;
+  const canvas = el("div", { class: "bpmn-canvas", role: "img", "aria-label": B.title });
+  // bpmn.io needs the canvas on the page to fit the diagram, so draw on the next frame
+  requestAnimationFrame(async () => {
+    try {
+      const viewer = new BpmnJS({ container: canvas });
+      await viewer.importXML(vietnameseBpmn(xml, asIs.rework));
+      // as tall as the diagram is at full width, so no empty band under it
+      const c = viewer.get("canvas"), inner = c.viewbox().inner;
+      canvas.style.height = `${Math.ceil((canvas.clientWidth * inner.height) / inner.width) + 24}px`;
+      c.resized();
+      c.zoom("fit-viewport", "auto");
+    } catch (err) {
+      canvas.replaceChildren(el("p", { class: "error", text: fill(T.error, { error: err.message }) }));
+    }
+  });
+  return [el("section", { class: "panel", "aria-labelledby": "bpmn-title" },
+    el("div", { class: "panel-head" }, el("h2", { id: "bpmn-title", text: B.title })),
+    canvas,
+    el("div", { class: "below" }, el("div", { class: "legend-block" },
+      el("p", { class: "note", text: `${B.note} ${T.legend.share}` }))))];
+}
+
+/** Display name of a node of the as-is model: a task, an event, or a gateway named after the task before it. */
+function nodeName(id) {
+  if (T.activities[id]) return oneLine(T.activities[id]);
+  if (T.events[id]) return oneLine(T.events[id]);
+  const into = Object.values(buildLayout("as_is", "normal").flows).find((f) => f.target === id);
+  return fill(T.embed.gateway_after, { task: into && T.activities[into.source] ? oneLine(T.activities[into.source]) : id });
+}
+
+// A rework arc is one whose condition shows the rework share.
+const isLoop = (flowId) => (T.conditions[flowId] ?? "").includes("{rate}");
+const condition = (flowId) => (T.conditions[flowId] ?? flowId).replace(/\s*\(\{rate\}\)/, "");
+
+/** A 2D map of vectors. points: {x, y, cls?, title?, label?}. */
+function vectorMap(points, { width = 460, height = 330, labels = false } = {}) {
+  const pad = labels ? 14 : 10;
+  const xs = points.map((p) => p.x), ys = points.map((p) => p.y);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const right = labels ? 150 : 0; // room for the labels of the rightmost dots
+  const px = (x) => pad + ((x - x0) / (x1 - x0 || 1)) * (width - 2 * pad - right);
+  const py = (y) => height - pad - ((y - y0) / (y1 - y0 || 1)) * (height - 2 * pad);
+  const svg = sv("svg", { class: "vector-map", viewBox: `0 0 ${width} ${height}`, role: "img" });
+  // Each label tries right, left, above and below its dot, and takes the first spot that hits no label or dot.
+  const placed = points.map((p) => ({ x: px(p.x) - 5, y: py(p.y) - 5, w: 10, h: 10 }));
+  const hits = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  const free = (box, self) => box.x >= 0 && box.x + box.w <= width && box.y >= 0 && box.y + box.h <= height
+    && placed.every((o, i) => i === self || !hits(box, o));
+  const dots = points.map((p, i) => {
+    const g = sv("g", { class: p.cls ?? "" }, p.title ? sv("title", { text: p.title }) : null,
+      sv("circle", { cx: px(p.x).toFixed(1), cy: py(p.y).toFixed(1), r: labels ? 4.5 : 2.6 }));
+    if (labels && p.label) {
+      const w = textWidth(p.label, 12, 500) + 2, h = 14, cx = px(p.x), cy = py(p.y);
+      const spots = [[cx + 8, cy - h / 2], [cx - 8 - w, cy - h / 2], [cx - w / 2, cy - 8 - h], [cx - w / 2, cy + 8],
+        [cx + 8, cy - h - 4], [cx + 8, cy + 4], [cx - 8 - w, cy - h - 4], [cx - 8 - w, cy + 4]];
+      const spot = spots.map(([x, y]) => ({ x, y, w, h })).find((b) => free(b, -1)) ?? { x: cx + 8, y: cy - h / 2, w, h };
+      placed.push(spot);
+      g.append(sv("text", { x: spot.x.toFixed(1), y: (spot.y + 11).toFixed(1), "font-size": 12, "font-weight": 500, fill: "var(--ink)", text: p.label }));
+    }
+    svg.append(g);
+    return g;
+  });
+  return { svg, dots };
+}
+
+/** One path as graph2vec reads it: a chain of BPMN nodes, wrapped onto rows, with the branch taken at each gateway. */
+function chainSvg(labels) {
+  const W = 1180, boxW = 88, boxH = 42, rowH = 104, gap = 22;
+  const items = labels.map((label) => {
+    const [id, flow] = label.split(">");
+    const kind = flow ? "gateway" : id.startsWith("Start_") ? "start" : id.startsWith("End_") ? "end" : "task";
+    const w = kind === "task" ? boxW : kind === "gateway" ? 2 * GW : 2 * EV;
+    const out = flow ? Math.max(gap, textWidth(condition(flow), 11, 600) + 14) : gap; // room for the condition on the arc after a gateway
+    return { id, flow, kind, w, out };
+  });
+  let x = 12, row = 0;
+  for (const it of items) {
+    if (x + it.w > W - 12) { x = 12; row += 1; }
+    it.x = x; it.cy = 30 + row * rowH;
+    x += it.w + it.out;
+  }
+  const H = 30 + row * rowH + 44;
+  const svg = sv("svg", { class: "chain", viewBox: `0 0 ${W} ${H}`, role: "img" },
+    sv("defs", {}, arrowMarker("chain-arrow", "var(--flow)"), arrowMarker("chain-arrow-hot", "var(--orange)")));
+  items.forEach((it, k) => {
+    const next = items[k + 1];
+    if (next) {
+      const hot = it.flow && isLoop(it.flow);
+      const stroke = hot ? "var(--orange)" : "var(--flow)";
+      const marker = `url(#${hot ? "chain-arrow-hot" : "chain-arrow"})`;
+      const d = next.cy === it.cy
+        ? `M${it.x + it.w},${it.cy} H${next.x - 1}`
+        : `M${it.x + it.w / 2},${it.cy + (it.kind === "task" ? boxH / 2 : it.w / 2)} V${it.cy + rowH / 2} H${next.x - 10} V${next.cy} H${next.x - 1}`;
+      svg.append(sv("path", { d, fill: "none", stroke, "stroke-width": hot ? 2 : 1.5, "marker-end": marker }));
+      if (it.flow) {
+        const same = next.cy === it.cy;
+        svg.append(sv("text", {
+          x: same ? it.x + it.w + 6 : it.x + it.w / 2 - 6, y: same ? it.cy - 7 : it.cy + it.w / 2 + 14,
+          "text-anchor": same ? "start" : "end", "font-size": 11, "font-weight": 600, fill: hot ? "var(--orange-ink)" : "var(--ink)", text: condition(it.flow),
+        }));
+      }
+    }
+    const title = sv("title", { text: nodeName(it.id) });
+    if (it.kind === "start") svg.append(sv("g", {}, title, shape.start(it.x + EV, it.cy)));
+    else if (it.kind === "end") svg.append(sv("g", {}, title, shape.end(it.x + EV, it.cy)));
+    else if (it.kind === "gateway") svg.append(sv("g", {}, title, shape.gateway(it.x + GW, it.cy, "exclusiveGateway")));
+    else {
+      const g = sv("g", {}, title, shape.task(it.x, it.cy - boxH / 2, boxW, boxH));
+      const text = lines(T.activities[it.id] ?? it.id);
+      text.forEach((line, i) => g.append(sv("text", {
+        x: it.x + boxW / 2, y: it.cy + 4 + (i - (text.length - 1) / 2) * 13, "text-anchor": "middle", "font-size": 11, "font-weight": 600, fill: "var(--ink)", text: line,
+      })));
+      svg.append(g);
+    }
+  });
+  return svg;
+}
+
+/** How a path reads: the loops it takes and how often, or the clean path. */
+function pathName(labels) {
+  const G = T.groups, E = T.embed;
+  const counts = {};
+  for (const l of labels) {
+    const [gateway, flow] = l.split(">");
+    if (flow && isLoop(flow)) counts[gateway] = (counts[gateway] ?? 0) + 1;
+  }
+  const order = Object.keys(G.loop_parts);
+  const parts = Object.keys(counts).sort((a, b) => order.indexOf(a) - order.indexOf(b))
+    .map((g) => fill(E.path_times, { part: G.loop_parts[g], n: counts[g] }));
+  if (labels.at(-1) === "End_ProposalRejected") parts.push(E.path_rejected);
+  if (!parts.length) return E.path_clean;
+  const text = new Intl.ListFormat(T.lang, { type: "conjunction" }).format(parts);
+  return text[0].toLocaleUpperCase(T.lang) + text.slice(1);
+}
+
+/** The directly-follows graph node2vec ran on, nodes where the model has them; highlight(labels) lights up one path. */
+function followsGraph(edges, points) {
+  const layout = buildLayout("as_is", "normal");
+  const pad = 30;
+  const at = (id) => layout.nodes[id];
+  const W = layout.width + 2 * pad, H = layout.height + 2 * pad;
+  const svg = sv("svg", { class: "follows", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": T.embed.graph_title },
+    sv("defs", {}, arrowMarker("dfg-arrow", "var(--edge)"), arrowMarker("dfg-arrow-back", "var(--orange)"), arrowMarker("dfg-arrow-on", "var(--teal)")));
+  const max = Math.max(...edges.map((e) => e.count));
+  const R = (id) => (at(id).type === "task" ? 11 : 8);
+  const edgeEls = new Map();
+  const pairs = new Set(edges.map((e) => `${e.source}|${e.target}`));
+  for (const e of edges) {
+    const a = at(e.source), b = at(e.target);
+    if (!a || !b) continue;
+    const [x1, y1, x2, y2] = [a.cx + pad, a.cy + pad, b.cx + pad, b.cy + pad];
+    const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+    // bend each edge a little to its left, more when the reverse edge exists, so the two never overlap
+    const bend = (pairs.has(`${e.target}|${e.source}`) ? 0.22 : 0.1) * len;
+    const mx = (x1 + x2) / 2 - (dy / len) * bend, my = (y1 + y2) / 2 + (dx / len) * bend;
+    const unit = (x, y, tx, ty) => { const d = Math.hypot(tx - x, ty - y) || 1; return [(tx - x) / d, (ty - y) / d]; };
+    const [sx, sy] = unit(x1, y1, mx, my), [ex, ey] = unit(x2, y2, mx, my);
+    const back = b.cx < a.cx - 1; // the edge goes back along the process: a loop
+    const width = 1 + 5 * Math.sqrt(e.count / max);
+    const path = sv("path", {
+      d: `M${x1 + sx * R(e.source)},${y1 + sy * R(e.source)} Q${mx},${my} ${x2 + ex * (R(e.target) + 3)},${y2 + ey * (R(e.target) + 3)}`,
+      fill: "none", stroke: back ? "var(--orange)" : "var(--edge)", "stroke-width": width.toFixed(2),
+      "marker-end": `url(#${back ? "dfg-arrow-back" : "dfg-arrow"})`, "data-back": String(back),
+    }, sv("title", { text: fill(T.embed.edge_title, { from: nodeName(e.source), to: nodeName(e.target), n: NUM(0).format(e.count) }) }));
+    svg.append(path);
+    edgeEls.set(`${e.source}|${e.target}`, path);
+  }
+  const nodeEls = new Map();
+  for (const p of points) {
+    const n = at(p.activity_id);
+    if (!n) continue;
+    const g = sv("g", { class: "dfg-node" }, sv("title", { text: nodeName(p.activity_id) }),
+      sv("circle", { cx: n.cx + pad, cy: n.cy + pad, r: R(p.activity_id), fill: n.type === "task" ? "var(--ink)" : "var(--surface)", stroke: "var(--ink)", "stroke-width": 2 }));
+    const label = T.activities[p.activity_id] ?? T.events[p.activity_id];
+    if (label) lines(label).forEach((line, i) => g.append(sv("text", {
+      x: n.cx + pad, y: n.cy + pad + R(p.activity_id) + 16 + i * 16, "text-anchor": "middle", "font-size": 15, "font-weight": 600, fill: "var(--ink)",
+      stroke: "var(--surface)", "stroke-width": 4, "paint-order": "stroke", text: line,
+    })));
+    svg.append(g);
+    nodeEls.set(p.activity_id, g);
+  }
+  const highlight = (labels) => {
+    const ids = labels.map((l) => l.split(">")[0]);
+    const on = new Set(ids.slice(1).map((id, i) => `${ids[i]}|${id}`));
+    for (const [key, el] of edgeEls) {
+      const lit = on.has(key);
+      el.classList.toggle("on", lit);
+      el.classList.toggle("off", !lit);
+      el.setAttribute("marker-end", `url(#${lit ? "dfg-arrow-on" : el.dataset.back === "true" ? "dfg-arrow-back" : "dfg-arrow"})`);
+      if (lit) svg.insertBefore(el, svg.querySelector(".dfg-node")); // lit edges over the others, under the nodes
+    }
+    const visited = new Set(ids);
+    for (const [id, el] of nodeEls) el.classList.toggle("off", !visited.has(id));
+  };
+  return { svg, highlight };
+}
+
+/** Panel A of step 2: the graph, the real paths through it, and the chosen path as graph2vec reads it. */
+function pathsPanel(results) {
+  const E = T.embed;
+  const cases = results.clusters.cases;
+  const total = cases.points.length;
+  const graph = followsGraph(results.clusters.activities.edges, results.clusters.activities.points);
+  const chainHost = el("div", { class: "chain-scroll" });
+  const chosen = el("h3", {});
+  const buttons = [];
+  const pick = (k) => {
+    const p = cases.paths[k];
+    buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(i === k)));
+    graph.highlight(p.labels);
+    chosen.textContent = fill(E.chosen_path, { name: pathName(p.labels) });
+    chainHost.replaceChildren(chainSvg(p.labels));
+  };
+  const rows = cases.paths.map((p, k) => {
+    const b = el("button", { type: "button", class: "path-row", "aria-pressed": "false" },
+      el("span", { class: "path-rank", text: NUM(0).format(k + 1) }),
+      el("span", { class: "path-name", text: pathName(p.labels) }),
+      el("span", { class: "path-count", text: fill(E.path_cases, { n: NUM(0).format(p.case_count), share: pct(p.case_count / total, 0) }) }),
+      el("span", { class: "path-days", text: fill(E.path_days, { days: fmt(p.cycle_time) }) }));
+    b.addEventListener("click", () => pick(k));
+    buttons.push(b);
+    return b;
+  });
+  const shown = cases.paths.reduce((sum, p) => sum + p.case_count, 0);
+  const legendEdge = (color, w) => sv("svg", { width: 34, height: 14, "aria-hidden": "true" }, sv("line", { x1: 2, x2: 32, y1: 7, y2: 7, stroke: color, "stroke-width": w, "stroke-linecap": "round" }));
+  const legendNode = (filled) => sv("svg", { width: 18, height: 18, "aria-hidden": "true" }, sv("circle", { cx: 9, cy: 9, r: 6, fill: filled ? "var(--ink)" : "var(--surface)", stroke: "var(--ink)", "stroke-width": 2 }));
+  const panel = el("section", { class: "panel still", "aria-labelledby": "dfg-title" },
+    el("h2", { id: "dfg-title", text: E.graph_title }),
+    el("p", { class: "method", text: E.graph_intro }),
+    el("div", { class: "follows-scroll" }, graph.svg),
+    el("ul", { class: "legend" },
+      el("li", {}, legendNode(true), E.legend_task), el("li", {}, legendNode(false), E.legend_other),
+      el("li", {}, legendEdge("var(--edge)", 3), E.legend_edge), el("li", {}, legendEdge("var(--orange)", 3), E.legend_back),
+      el("li", {}, legendEdge("var(--teal)", 4), E.legend_on)),
+    el("h3", { text: E.paths_title }),
+    el("p", { class: "fine", text: fill(E.paths_note, { shown: cases.paths.length, total: NUM(0).format(cases.path_count), share: pct(shown / total, 0) }) }),
+    el("div", { class: "path-list" }, rows),
+    chosen, chainHost);
+  pick(0);
+  return panel;
+}
+
+/** Step 2: the log as a graph with its paths, then each step and each project turned into a vector. */
+function embedView(results) {
+  const E = T.embed;
+  const acts = results.clusters.activities, cases = results.clusters.cases;
+  const actMap = vectorMap(acts.points.map((p) => ({
+    x: p.x, y: p.y, title: nodeName(p.activity_id), label: T.activities[p.activity_id] ? oneLine(T.activities[p.activity_id]) : null,
+    cls: T.activities[p.activity_id] ? "task-dot" : "other-dot",
+  })), { width: 900, height: 420, labels: true });
+  actMap.svg.setAttribute("aria-label", E.node_map);
+  const nodes = el("section", { class: "panel still", "aria-labelledby": "node-title" },
+    el("h2", { id: "node-title", text: E.node_title }),
+    el("p", { class: "method", text: fill(E.node_method, { p: fmt(acts.method.p, 0), q: fmt(acts.method.q, 1), dimensions: acts.method.dimensions }) }),
+    el("h3", { text: E.node_map }), actMap.svg, el("p", { class: "fine", text: E.node_map_note }));
+
+  const caseMap = vectorMap(cases.points.map((p) => ({ x: p.x, y: p.y })));
+  caseMap.svg.setAttribute("aria-label", fill(E.case_map, { cases: NUM(0).format(cases.points.length) }));
+  const graphs = el("section", { class: "panel still", "aria-labelledby": "graph-title" },
+    el("h2", { id: "graph-title", text: E.g2v_title }),
+    el("p", { class: "method", text: fill(E.graph_method, { iterations: cases.method.wl_iterations, dimensions: cases.method.dimensions }) }),
+    el("h3", { text: fill(E.case_map, { cases: NUM(0).format(cases.points.length) }) }),
+    el("div", { class: "map-narrow" }, caseMap.svg), el("p", { class: "fine", text: E.case_map_note }));
+  return [pathsPanel(results), nodes, graphs];
+}
+
+/** Silhouette per k, the chosen k in teal. */
+function silhouetteChart(rows, chosen, title) {
+  const W = 340, H = 190, left = 30, bottom = 34, top = 22;
+  const max = Math.max(...rows.map((r) => r.silhouette)) * 1.15;
+  const bw = (W - left - 10) / rows.length;
+  const svg = sv("svg", { class: "sil", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": title });
+  svg.append(sv("line", { x1: left, x2: W - 6, y1: H - bottom, y2: H - bottom, stroke: "var(--line)" }));
+  rows.forEach((r, i) => {
+    const h = (r.silhouette / max) * (H - bottom - top);
+    const x = left + i * bw + bw * 0.18, w = bw * 0.64, y = H - bottom - h;
+    const pick = r.k === chosen;
+    svg.append(sv("g", {}, sv("title", { text: `k = ${r.k}: ${fmt(r.silhouette, 3)}` }),
+      sv("path", { d: `M${x},${H - bottom} V${y + 4} q0,-4 4,-4 H${x + w - 4} q4,0 4,4 V${H - bottom} z`, fill: pick ? "var(--teal)" : "var(--teal-soft)" }),
+      sv("text", { x: x + w / 2, y: y - 6, "text-anchor": "middle", "font-size": 12, "font-weight": pick ? 700 : 500, fill: "var(--ink)", text: fmt(r.silhouette, 2) }),
+      sv("text", { x: x + w / 2, y: H - bottom + 16, "text-anchor": "middle", "font-size": 12, "font-weight": pick ? 700 : 500, fill: pick ? "var(--ink)" : "var(--muted)", text: r.k })));
+  });
+  svg.append(sv("text", { x: left + (W - left) / 2, y: H - 4, "text-anchor": "middle", "font-size": 12, fill: "var(--muted)", text: T.kmeans.k_axis }));
+  return svg;
+}
+
+/** Step 3: what k-means found. The findings first, then the project groups, the phases on the flow, and last how k was picked. */
+function kmeansView(results, asIs) {
+  const K = T.kmeans, G = T.groups;
+  const cases = results.clusters.cases, acts = results.clusters.activities;
+  const [kMin, kMax] = cases.method.k_range;
+  const list = new Intl.ListFormat(T.lang, { type: "conjunction" });
+  const order = Object.keys(G.loop_parts); // loops in process order, the order of loop_parts in the content file
+  const loopNames = (ids) => list.format([...ids].sort((a, b) => order.indexOf(a) - order.indexOf(b)).map((id) => G.loop_parts[id]));
+
+  const f = findings(results);
+  const said = [
+    f.clean ? fill(K.f_clean, { share: pct(f.clean.share, 0), days: fmt(f.clean.days) }) : null,
+    fill(f.slowest.ratio ? K.f_slowest : K.f_slowest_alone, { parts: loopNames(f.slowest.loops), days: fmt(f.slowest.days), ratio: fmt(f.slowest.ratio ?? 0) }),
+    f.qc ? fill(K.f_qc, { share: pct(f.qc.share, 0), low: fmt(f.qc.low, 0), high: fmt(f.qc.high, 0) }) : null,
+    f.features.length ? fill(K.f_features, { features: list.format(f.features.map((x) => G.features[x] ?? x)) }) : null,
+  ].filter(Boolean);
+  const found = el("section", { class: "panel still", "aria-labelledby": "found-title" },
+    el("h2", { id: "found-title", text: K.findings_title }),
+    el("div", { class: "findings" }, said.map((text) => el("p", { text }))));
+
+  const choose = el("section", { class: "panel still", "aria-labelledby": "k-title" },
+    el("h2", { id: "k-title", text: K.title }),
+    el("p", { class: "method", text: fill(K.what_k, { k: cases.k }) }),
+    el("p", { class: "method", text: fill(K.method, { k_min: kMin, k_max: kMax }) }),
+    el("div", { class: "sil-grid" },
+      el("div", {}, el("h3", { text: K.sil_cases }), silhouetteChart(cases.silhouette, cases.k, K.sil_cases), el("p", { class: "fine", text: fill(K.chosen, { k: cases.k }) })),
+      el("div", {}, el("h3", { text: K.sil_activities }), silhouetteChart(acts.silhouette, acts.k, K.sil_activities), el("p", { class: "fine", text: fill(K.chosen, { k: acts.k }) }))),
+    cases.k === kMax ? el("p", { class: "fine", text: fill(K.cap_note, { k: kMax }) }) : null);
+
+  // project groups: the list, slowest first, and the map with the picked group in teal
+  const rows = caseGroups(results);
+  const overall = overallDays(results);
+  const name = (g) => (g.loops.length ? fill(G.loops, { parts: loopNames(g.loops) }) : G.clean);
+  const valueName = (feature, value) => G.values[feature]?.[value] ?? String(value);
+  const max = Math.max(overall, ...rows.map((g) => g.days)) * 1.08;
+  const at = (days) => `${(days / max) * 100}%`;
+  const map = vectorMap(casePoints(results).map((p) => ({ x: p.x, y: p.y, cls: `g${p.group}` })));
+  map.svg.setAttribute("aria-label", G.map_title);
+  const buttons = [];
+  const pick = (id) => {
+    for (const b of buttons) b.setAttribute("aria-pressed", String(Number(b.dataset.group) === id));
+    for (const d of map.dots) {
+      const on = d.getAttribute("class") === `g${id}`;
+      d.classList.toggle("picked", on);
+      if (on) map.svg.append(d); // picked dots on top
+    }
+  };
+  const items = rows.map((g) => {
+    const rejected = g.ends.find((e) => e.end_event_id === "End_ProposalRejected");
+    const often = g.profile.map((p) => fill(G.often_item, {
+      feature: G.features[p.feature] ?? p.feature, value: valueName(p.feature, p.value),
+      share: pct(p.share, 0), overall: pct(p.overall_share, 0),
+    }));
+    const b = el("button", { type: "button", class: "group-row", "data-group": g.id, "aria-pressed": "false" },
+      el("span", { class: "group-name", text: name(g) }),
+      el("span", { class: "group-count", text: fill(G.count, { n: NUM(0).format(g.cases), share: pct(g.share, 0) }) }),
+      el("span", { class: "group-track" },
+        el("span", { class: "group-bar", style: `width: ${at(g.days)}` }),
+        el("span", { class: "group-overall", style: `left: ${at(overall)}` }),
+        el("span", { class: "group-days", style: `left: ${at(g.days)}`, text: fill(G.days, { days: fmt(g.days) }) })),
+      rejected ? el("span", { class: "group-sub", text: fill(G.rejected, { share: pct(rejected.share, 0) }) }) : null,
+      often.length ? el("span", { class: "group-sub", text: fill(G.often, { items: list.format(often) }) }) : null);
+    b.addEventListener("click", () => pick(g.id));
+    buttons.push(b);
+    return b;
+  });
+  const projects = el("section", { class: "panel still", "aria-labelledby": "groups-title" },
+    el("h2", { id: "groups-title", text: G.title }),
+    el("p", { class: "method", text: fill(G.method, { k: rows.length }) }),
+    el("div", { class: "groups-grid" },
+      el("div", {},
+        el("h3", { text: G.cycle_title }),
+        el("p", { class: "overall-key" }, sv("svg", { width: 14, height: 18, "aria-hidden": "true" },
+          sv("line", { x1: 7, x2: 7, y1: 1, y2: 17, stroke: "var(--ink)", "stroke-width": 1.6, "stroke-dasharray": "3 2" })),
+          fill(G.overall, { days: fmt(overall) })),
+        el("div", { class: "group-list" }, items)),
+      el("div", {}, el("h3", { text: G.map_title }), map.svg, el("p", { class: "fine", text: G.map_note }))),
+    el("p", { class: "fine", text: G.note }));
+  pick(rows[0].id);
+
+  // phases: the as-is flow, each task tinted by its node2vec group (numbered in process order)
+  const phases = activityGroups(results);
+  // each phase is named by its first and last task along the flow
+  const layout = buildLayout("as_is", "normal");
+  const span = (g) => {
+    const tasks = acts.groups[g].activity_ids.filter((id) => T.activities[id] && layout.nodes[id]).sort((a, b) => layout.nodes[a].cx - layout.nodes[b].cx);
+    return tasks.length ? fill(G.phase_span, { n: g + 1, first: oneLine(T.activities[tasks[0]]), last: oneLine(T.activities[tasks.at(-1)]) }) : fill(G.phase, { n: g + 1 });
+  };
+  const tint = (svg) => {
+    for (const box of svg.querySelectorAll("[data-box]")) {
+      const g = phases.of[box.dataset.box];
+      if (g != null && g < 3) { box.setAttribute("fill", `var(--phase-${g}-fill)`); box.setAttribute("stroke", `var(--phase-${g})`); box.setAttribute("stroke-width", 2); }
+    }
+  };
+  const legend = el("ul", { class: "legend" }, Array.from({ length: Math.min(phases.k, 3) }, (_, g) => el("li", {},
+    sv("svg", { width: 30, height: 20, "aria-hidden": "true" },
+      sv("rect", { x: 1, y: 1, width: 28, height: 18, rx: 5, fill: `var(--phase-${g}-fill)`, stroke: `var(--phase-${g})`, "stroke-width": 2 })),
+    span(g))));
+  const flow = el("section", { class: "panel", "aria-labelledby": "phases-title" },
+    el("div", { class: "panel-head" }, el("h2", { id: "phases-title", text: G.activities_title })),
+    ...stillFlow(asIs, tint),
+    el("div", { class: "below" }, el("div", { class: "legend-block" }, legend,
+      el("p", { class: "note", text: fill(G.activities_method, { k: phases.k }) }))));
+  return [found, projects, flow, choose];
+}
+
 // ---------- result view ----------
 
 function resultView(results) {
@@ -561,10 +990,14 @@ function shareChart(rows, goal) {
 async function main() {
   const [content, replay, results] = await Promise.all(
     ["demo.vi.json", "replay.json", "../results.json"].map(async (u) => {
-      const r = await fetch(u);
+      const r = await fetch(u, { cache: "no-store" }); // a rerun of the notebook must show at once
       if (!r.ok) throw new Error(`${u}: HTTP ${r.status}`);
       return r.json();
     }));
+  // the as-is model, copied next to the results by the notebook
+  const modelResponse = await fetch(new URL(results.models.as_is.bpmn, new URL("../results.json", location.href)), { cache: "no-store" });
+  if (!modelResponse.ok) throw new Error(`${results.models.as_is.bpmn}: HTTP ${modelResponse.status}`);
+  const asIsXml = await modelResponse.text();
   T = content;
   const formats = new Map();
   NUM = (d, style = "decimal") => {
@@ -586,11 +1019,11 @@ async function main() {
   const series = Object.fromEntries(replay.scenarios.map((s) => [s.id, qcQueueSeries(preps[s.id], 1)]));
   const COLORS = { as_is: "var(--ink)", to_be: "var(--teal)" };
 
-  const params = new URLSearchParams(location.search);
-  const sim = { t: win.start, playing: false, speed: 1, view: params.get("view") ?? "as_is" };
-  if (!["as_is", "to_be", "compare", "result"].includes(sim.view)) sim.view = "as_is";
-  const at = Number(params.get("at"));
-  if (at > 0 && at <= 1) sim.t = win.start + at * (win.end - win.start);
+  // One address for the whole talk: drop any ?view=... left from the old tabbed page.
+  if (location.search) history.replaceState(null, "", location.pathname);
+  // An older results file without the clusters section skips steps 2 and 3.
+  const steps = STEPS.filter((st) => results.clusters || !["embed", "kmeans"].includes(st));
+  const sim = { t: win.start, playing: false, speed: 1, step: steps[0], compare: false };
 
   const stage = document.getElementById("stage");
   const bar = document.getElementById("bar");
@@ -600,15 +1033,23 @@ async function main() {
   let views = []; // {flow: FlowView, counters}
   let chart = null;
 
-  // view switch
+  // step bar: back, the numbered steps, next
   const nav = document.getElementById("views");
-  nav.setAttribute("aria-label", T.views.label);
-  const viewButtons = ["as_is", "to_be", "compare", "result"].map((v) => {
-    const b = el("button", { type: "button", "data-view": v, text: T.views[v] });
-    b.addEventListener("click", () => setView(v));
-    nav.append(b);
+  nav.setAttribute("aria-label", T.steps.label);
+  const chevron = (d) => sv("svg", { width: 16, height: 16, viewBox: "0 0 16 16", "aria-hidden": "true" },
+    sv("path", { d, fill: "none", stroke: "currentColor", "stroke-width": 2.2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+  const backBtn = el("button", { type: "button", class: "step-move", "aria-label": T.steps.back }, chevron("M10 3L5 8l5 5"));
+  const nextBtn = el("button", { type: "button", class: "step-move next" }, el("span", { text: T.steps.next }), chevron("M6 3l5 5-5 5"));
+  const stepButtons = steps.map((st, i) => {
+    const b = el("button", { type: "button", class: "step", "data-step": st },
+      el("span", { class: "step-n", text: NUM(0).format(i + 1) }), el("span", { class: "step-name", text: T.steps.names[st] }));
+    b.addEventListener("click", () => setStep(st));
     return b;
   });
+  const move = (d) => setStep(steps[Math.min(steps.length - 1, Math.max(0, steps.indexOf(sim.step) + d))]);
+  backBtn.addEventListener("click", () => move(-1));
+  nextBtn.addEventListener("click", () => move(1));
+  nav.append(backBtn, el("ol", { class: "step-list" }, stepButtons.map((b) => el("li", {}, b))), nextBtn);
 
   function panel(id, metrics) {
     const s = scen[id];
@@ -631,8 +1072,8 @@ async function main() {
     return { id, flow, counters, node };
   }
 
-  function legend() {
-    const withAnd = sim.view !== "as_is";
+  function legend(ids) {
+    const withAnd = ids.includes("to_be");
     const tokens = [["work", T.legend.work], ["wait", T.legend.wait], ...(withAnd ? [["park", T.legend.park]] : []), ["live", T.legend.live]];
     const notation = ["start", "end", "task", "xor", ...(withAnd ? ["and"] : []), "flow"];
     return el("div", { class: "legend-block" },
@@ -650,32 +1091,45 @@ async function main() {
       el("span", { text: fill(T.changes[c].detail, { from: before[qc], to: caps[qc] }) }))));
   }
 
-  function setView(v) {
-    sim.view = v;
-    viewButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === v)));
-    const url = new URL(location.href);
-    url.searchParams.set("view", v);
-    url.searchParams.delete("at");
-    history.replaceState(null, "", url);
+  function compareToggle() {
+    const b = el("button", { type: "button", class: "compare-toggle", "aria-pressed": String(sim.compare), text: sim.compare ? T.steps.compare_off : T.steps.compare_on });
+    b.addEventListener("click", () => { sim.compare = !sim.compare; setStep("sim_to_be"); });
+    return b;
+  }
+
+  function setStep(st) {
+    sim.step = st;
+    const i = steps.indexOf(st);
+    stepButtons.forEach((b) => (b.dataset.step === st ? b.setAttribute("aria-current", "step") : b.removeAttribute("aria-current")));
+    backBtn.disabled = i === 0;
+    nextBtn.disabled = i === steps.length - 1;
     for (const x of views) x.flow.reset();
     views = [];
     stage.replaceChildren();
-    stage.classList.toggle("compare", v === "compare");
-    document.body.classList.toggle("compare", v === "compare");
-    if (v === "result") {
+    stage.scrollTop = 0;
+    const compare = st === "sim_to_be" && sim.compare;
+    stage.classList.toggle("compare", compare);
+    document.body.classList.toggle("compare", compare);
+    document.body.dataset.step = st;
+    if (!st.startsWith("sim_")) {
       sim.playing = false;
       bar.hidden = true;
-      stage.append(resultView(results));
+      const still = { bpmn: () => bpmnView(scen.as_is, asIsXml), embed: () => embedView(results), kmeans: () => kmeansView(results, scen.as_is), result: () => [resultView(results)] };
+      stage.append(...still[st]());
       return;
     }
     bar.hidden = false;
-    const ids = v === "compare" ? ["as_is", "to_be"] : [v];
-    views = ids.map((id) => panel(id, v === "compare" ? "compact" : "normal"));
+    const ids = st === "sim_as_is" ? ["as_is"] : compare ? ["as_is", "to_be"] : ["to_be"];
+    views = ids.map((id) => panel(id, compare ? "compact" : "normal"));
     for (const x of views) stage.append(x.node);
     const below = el("div", { class: "below" });
-    if (v === "to_be") below.append(changesList());
-    below.append(legend());
-    if (v === "compare") stage.append(el("div", { class: "panel" }, below));
+    if (st === "sim_to_be") {
+      below.append(changesList());
+      // the switch sits in the to-be panel's header, so the transport bar never covers it
+      views.find((x) => x.id === "to_be").node.querySelector(".panel-head h2").after(compareToggle());
+    }
+    below.append(legend(ids));
+    if (compare) stage.append(el("div", { class: "panel" }, below));
     else views[0].node.append(below);
     chart = queueChart(ids.map((id) => ({ id, name: scen[id].name, color: COLORS[id], points: series[id] })), sim);
     qchartHost.replaceChildren(chart.node);
@@ -700,9 +1154,12 @@ async function main() {
   playBtn.addEventListener("click", togglePlay);
   addEventListener("keydown", (ev) => {
     if (ev.target.closest?.("input, textarea")) return;
-    if (ev.code === "Space" && sim.view !== "result") { ev.preventDefault(); togglePlay(); }
+    if (ev.code === "Space" && sim.step.startsWith("sim_")) { ev.preventDefault(); togglePlay(); }
+    // arrows, and the page keys a presentation clicker sends
+    if (ev.key === "ArrowRight" || ev.key === "PageDown") { ev.preventDefault(); move(1); }
+    if (ev.key === "ArrowLeft" || ev.key === "PageUp") { ev.preventDefault(); move(-1); }
     const k = Number(ev.key);
-    if (k >= 1 && k <= 4) setView(["as_is", "to_be", "compare", "result"][k - 1]);
+    if (k >= 1 && k <= steps.length) setStep(steps[k - 1]);
   });
 
   function togglePlay() {
@@ -746,10 +1203,10 @@ async function main() {
     requestAnimationFrame(frame);
   }
 
-  setView(sim.view);
+  setStep(sim.step);
   requestAnimationFrame(frame);
   // For the browser checks: read the clock and the counters the page shows.
-  window.demo = { sim, win, figures: () => figures(results), state: (id) => stateAt(preps[id], sim.t), setView, togglePlay, views: () => views };
+  window.demo = { sim, win, figures: () => figures(results), groups: () => caseGroups(results), state: (id) => stateAt(preps[id], sim.t), setStep, steps, togglePlay, views: () => views };
 }
 
 main().catch((err) => {

@@ -3,12 +3,20 @@
   "title": "Quy trình phát triển ứng dụng",
   "subtitle": "Mỗi chấm là một dự án đang đi qua quy trình",
   "report_link": "Báo cáo đầy đủ (tiếng Anh)",
-  "views": {
-    "label": "Chế độ xem",
-    "as_is": "As-is",
-    "to_be": "To-be",
-    "compare": "So sánh",
-    "result": "Kết quả"
+  "steps": {
+    "label": "Các bước của bài trình bày",
+    "back": "Quay lại",
+    "next": "Tiếp theo",
+    "names": {
+      "bpmn": "Quy trình As-is",
+      "embed": "Phân tích đồ thị",
+      "kmeans": "Phân cụm K-means",
+      "sim_as_is": "Mô phỏng As-is",
+      "sim_to_be": "Mô phỏng To-be",
+      "result": "Báo cáo"
+    },
+    "compare_on": "Xem song song với As-is",
+    "compare_off": "Chỉ xem To-be"
   },
   "lanes": {
     "Lane_BusinessUnit": "Nghiệp vụ\nvà PMO",
@@ -120,6 +128,101 @@
     "ci_note": "Vạch mảnh trên mỗi thanh là khoảng tin cậy 95%.",
     "sample_vs_official": "Các con số trong phần mô phỏng chỉ là một lần chạy mẫu nên có thể khác các số ở đây.",
     "goal_share": 0.2
+  },
+  "bpmn": {
+    "title": "Quy trình hiện tại theo BPMN",
+    "note": "Mô hình As-is đã được sửa theo các quy tắc vẽ BPMN của sách Fundamentals of BPM: mỗi quyết định đi qua một cổng XOR, điều kiện ghi trên từng nhánh."
+  },
+  "embed": {
+    "node_title": "Mỗi bước là một nút: node2vec",
+    "node_method": "Từ event log, dựng một đồ thị các bước: hai bước được nối khi bước này đi ngay sau bước kia trong một dự án, càng nhiều dự án đi như vậy thì cạnh càng nặng. node2vec thả các lần đi ngẫu nhiên trên đồ thị này (p = {p}, q = {q}) và học cho mỗi bước một vector {dimensions} chiều. Hai bước hay gặp nhau trên các lần đi sẽ có vector gần nhau.",
+    "node_map": "Vector của các bước, chiếu xuống hai chiều",
+    "node_map_note": "Mỗi chấm là một bước. Chấm không có tên là cổng XOR hoặc sự kiện bắt đầu, kết thúc; rê chuột lên để xem.",
+    "gateway_after": "Cổng XOR sau bước {task}",
+    "graph_title": "Đồ thị các bước và các đường đi thật",
+    "graph_method": "Đường đi của một dự án là một chuỗi nút: các bước nó đã làm, và ở mỗi cổng XOR là nhánh nó đã đi. graph2vec cắt đồ thị này thành nhiều mảnh nhỏ, mỗi mảnh là một nút cùng các nút kề nó ({iterations} vòng Weisfeiler-Lehman), rồi học cho cả đồ thị một vector {dimensions} chiều. Hai dự án có nhiều mảnh giống nhau thì vector gần nhau.",
+    "case_map": "Vector của {cases} dự án, chiếu xuống hai chiều",
+    "case_map_note": "Mỗi chấm là một dự án. Các dự án đi cùng một đường nằm chồng lên nhau. Chưa tô màu: K-means ở bước sau mới chia nhóm.",
+    "g2v_title": "Mỗi dự án là một đồ thị: graph2vec",
+    "graph_intro": "Từ event log của lần chạy mô phỏng As-is: mỗi nút là một bước, mỗi cạnh có hướng nối một bước với bước đi ngay sau nó trong ít nhất một dự án. Cạnh càng dày thì càng nhiều lần dự án đi qua. Các nút đặt đúng vị trí của chúng trong sơ đồ BPMN ở bước một. Rê chuột lên cạnh để xem số lần.",
+    "edge_title": "{from} rồi đến {to}: {n} lần",
+    "legend_task": "Công việc",
+    "legend_other": "Cổng XOR hoặc sự kiện",
+    "legend_edge": "Đi tiếp, dày theo số lần",
+    "legend_back": "Quay lại làm lại",
+    "legend_on": "Đường đang chọn",
+    "paths_title": "Các đường đi thật",
+    "paths_note": "{shown} đường phổ biến nhất trong {total} đường khác nhau, chiếm {share} số dự án. Bấm một đường để tô nó trên đồ thị.",
+    "path_clean": "Đi thẳng, không làm lại",
+    "path_times": "{part} {n} lần",
+    "path_rejected": "bị từ chối ở bước duyệt đề xuất",
+    "path_cases": "{n} dự án, {share}",
+    "path_days": "{days} ngày",
+    "chosen_path": "Đường đã chọn, đúng chuỗi nút mà graph2vec đọc: {name}"
+  },
+  "kmeans": {
+    "findings_title": "Kết quả phân cụm",
+    "f_clean": "{share} dự án đi thẳng, không phải làm lại, mất trung bình {days} ngày.",
+    "f_slowest": "Nhóm chậm nhất phải {parts}: trung bình {days} ngày, gấp {ratio} lần nhóm đi thẳng.",
+    "f_slowest_alone": "Nhóm chậm nhất phải {parts}: trung bình {days} ngày.",
+    "f_qc": "{share} dự án rơi vào các nhóm phải sửa lỗi sau kiểm thử, chậm hơn nhóm đi thẳng từ {low} đến {high} ngày. Đây là vòng làm lại mà C1 và C2 của To-be nhắm vào.",
+    "f_features": "Trong các nhóm chậm hơn mức trung bình, thuộc tính hay gặp là {features}. Nhóm được tìm mà không nhìn vào thuộc tính, nên đây là bằng chứng thứ hai cho các yếu tố gây chậm.",
+    "title": "Vì sao chia thành bấy nhiêu nhóm",
+    "what_k": "k là số nhóm mà K-means phải chia. graph2vec và node2vec chỉ tạo ra vector, còn chia mấy nhóm là do ta chọn. Với dự án, k nhỏ thì nhóm thô: hai nhóm chỉ tách được dự án có làm lại và dự án không làm lại. k lớn hơn thì tách ra từng kiểu làm lại. Ở đây chọn k = {k}.",
+    "method": "Ta thử k từ {k_min} đến {k_max} và đo silhouette cho mỗi k: càng gần một thì các nhóm càng tách bạch. Chọn k có silhouette cao nhất.",
+    "sil_cases": "Dự án (graph2vec)",
+    "sil_activities": "Các bước (node2vec)",
+    "k_axis": "Số nhóm k",
+    "chosen": "Chọn k = {k}",
+    "cap_note": "Với dự án, silhouette vẫn tăng đến k = {k}: mỗi kiểu đường đi là một biến thể riêng, nên thêm nhóm luôn khớp hơn một chút. Ta dừng ở {k} nhóm để còn đọc được."
+  },
+  "groups": {
+    "title": "Dự án đi theo những đường nào",
+    "method": "graph2vec biến đường đi của mỗi dự án thành một vector, nên các dự án đi qua cùng những vòng làm lại sẽ nằm gần nhau. K-means chia chúng thành {k} nhóm. Bước này không nhìn vào thuộc tính nào của dự án.",
+    "clean": "Đi thẳng, không phải làm lại",
+    "loops": "Phải {parts}",
+    "loop_parts": {
+      "Gateway_ProposalSplit": "sửa đề xuất",
+      "Gateway_PlanSplit": "sửa kế hoạch",
+      "Gateway_TestSplit": "sửa lỗi sau kiểm thử",
+      "Gateway_ReleaseSplit": "làm lại khi bị từ chối phát hành"
+    },
+    "count": "{n} dự án, {share} tổng số",
+    "days": "{days} ngày",
+    "overall": "Trung bình mọi dự án: {days} ngày",
+    "rejected": "{share} bị từ chối ngay ở bước duyệt đề xuất",
+    "often": "Hay gặp: {items}",
+    "often_item": "{feature} {value} ({share} trong nhóm, {overall} ở mọi dự án)",
+    "features": {
+      "project_type": "loại dự án",
+      "complexity": "độ phức tạp",
+      "integrations": "số tích hợp",
+      "security_level": "mức bảo mật",
+      "requesting_unit": "đơn vị yêu cầu",
+      "team_workload": "tải của đội"
+    },
+    "values": {
+      "project_type": {
+        "enhancement": "nâng cấp",
+        "new_system": "hệ thống mới",
+        "regulatory": "theo quy định"
+      },
+      "requesting_unit": {
+        "corporate": "khối doanh nghiệp",
+        "operations": "khối vận hành",
+        "retail": "khối bán lẻ",
+        "risk_compliance": "khối rủi ro và tuân thủ",
+        "treasury": "khối nguồn vốn"
+      }
+    },
+    "cycle_title": "Cycle time trung bình của nhóm",
+    "map_title": "Bản đồ các dự án",
+    "map_note": "Mỗi chấm là một dự án, đặt theo vector của nó. Hai chấm gần nhau là hai dự án đi đường giống nhau. Bấm vào một nhóm để tô các dự án của nhóm đó.",
+    "activities_title": "Các bước hay đi liền nhau",
+    "activities_method": "node2vec xếp các bước theo việc chúng hay đi liền nhau, không theo loại phần tử: mỗi giai đoạn có cả công việc, cổng XOR và sự kiện. Kết quả là {k} giai đoạn của quy trình.",
+    "phase": "Giai đoạn {n}",
+    "note": "Nhóm được tìm từ đường đi của dự án. Thuộc tính chỉ được đem ra so sau khi đã có nhóm, nên nếu thuộc tính khớp với nhóm thì đó là bằng chứng thứ hai cho các yếu tố gây chậm.",
+    "phase_span": "Giai đoạn {n}: từ {first} đến {last}"
   },
   "error": "Không tải được dữ liệu: {error}. Trang cần chạy qua một static server, ví dụ python -m http.server trong thư mục web.",
   "pool": "Ngân hàng",

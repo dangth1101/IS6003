@@ -5,11 +5,11 @@ Plan: `PLAN.md`. Spec and tickets: `.scratch/bpmn-time-optimization/`.
 ## Layout
 
 - `models/`: the corrected as-is model (`as_is.bpmn`, the source of truth for the process), its change log against the original `current_process.bpmn`, its parameter file (proposed defaults for a bank IT division), and the attribute effects put into those parameters on purpose, to check the ML findings against: `as_is.planted_effects.toml` for the notebook, `as_is_planted_effects.md` to explain them. The redesign: `to_be.bpmn` (full to-be), `to_be_c1.bpmn` and `to_be_c2.bpmn` (one structural change each), the change catalog `to_be.catalog.toml`, and why each change exists in `to_be_changelog.md`
-- `src/bpmopt/`: the Python package (BPMN reader, linter, simulator, flow analysis, log analysis, CSV export of the event log, case features and ML, scenario runner, results export)
+- `src/bpmopt/`: the Python package (BPMN reader, linter, simulator, flow analysis, log analysis, CSV export of the event log, case features and ML, graph2vec and node2vec groups (`embedding.py`, `clustering.py`), scenario runner, results export)
 - `src/bpmopt/schema/results.schema.json`: the results contract between the notebook and the page
 - `src/bpmopt/content/page.en.toml`: all page text, copied into every results file
 - `tests/`: pytest suite, fixture models in `tests/fixtures/`
-- `notebooks/time_optimization.ipynb`: runs the whole study (lint, simulation, baseline, value-added, ML, drivers vs planted effects, redesign, all 16 scenarios with 30 replications, ablation) and writes `web/results.json`, plus the event log as CSV in `notebooks/output/` (not committed). Takes about 8 minutes
+- `notebooks/time_optimization.ipynb`: runs the whole study (lint, simulation, baseline, value-added, ML, drivers vs planted effects, case and activity groups, redesign, all 16 scenarios with 30 replications, ablation) and writes `web/results.json`, plus the event log as CSV in `notebooks/output/` (not committed). Takes about 8 minutes
 - `docs/analysis/phase1-qualitative.md`: Phase 1 draft (value-added, waste, issue register, objective), awaiting the student's review
 - `web/`: the static page, `results.json` and the two BPMN models it shows (`web/models/`, copied there by the notebook)
 - `web/demo/`: the flow demo for the presentation, in Vietnamese: the as-is and to-be flows as swimlanes, an animated replay of one simulation run (`replay.json`), both side by side, and the official results from `results.json`. Text in `demo.vi.json`. Open http://localhost:8000/demo/ with the server below

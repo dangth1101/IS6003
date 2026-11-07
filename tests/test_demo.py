@@ -8,6 +8,7 @@ import json
 import re
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -76,9 +77,10 @@ def _strings(node):
 
 
 def test_the_content_types_no_result_numbers(content):
-    # Numbers come from results.json or replay.json through {placeholders}. Allowed: change IDs and the CI level.
+    # Numbers come from results.json or replay.json through {placeholders}. Allowed: change IDs, the CI level
+    # and the method names graph2vec and node2vec.
     for s in _strings(content):
-        assert not re.search(r"\d", re.sub(r"C[1-4]|95%", "", s)), s
+        assert not re.search(r"\d", re.sub(r"C[1-4]|95%|(?:graph|node)2vec", "", s)), s
     assert content["result"]["goal_share"] == 0.2  # the objective from the report's problem section
 
 
@@ -129,6 +131,57 @@ def test_the_result_panel_numbers_are_the_official_ones_from_results_json(result
     assert round(shown["full"]["saving"]["value"], 1) == 36.3
     assert round(shown["full"]["share"]["value"] * 100, 1) == 25.7
     assert round(shown["best"]["share"]["value"] * 100, 1) == 27.8
+
+
+def test_the_groups_step_names_every_loop_and_every_attribute(content):
+    groups = content["groups"]
+    assert set(groups["loop_parts"]) == set(loop_back_flows(read_bpmn(MODELS["as_is"])))
+    page = tomllib.loads((ROOT / "src/bpmopt/content/page.en.toml").read_text(encoding="utf-8"))
+    assert set(groups["features"]) == set(page["features"])
+
+
+@needs_node
+def test_the_groups_step_shows_the_groups_from_results_json(results):
+    script = (
+        "import { caseGroups, overallDays, activityGroups } from './web/demo/groups.js';"
+        "import fs from 'node:fs';"
+        "const r = JSON.parse(fs.readFileSync('web/results.json'));"
+        "console.log(JSON.stringify({ rows: caseGroups(r), overall: overallDays(r), phases: activityGroups(r) }));"
+    )
+    out = subprocess.run([NODE, "--input-type=module", "-e", script], cwd=ROOT, capture_output=True, text=True, check=True)
+    shown = json.loads(out.stdout)
+    groups = {g["id"]: g for g in results["clusters"]["cases"]["groups"]}
+
+    assert sorted(row["id"] for row in shown["rows"]) == sorted(groups)
+    assert [row["days"] for row in shown["rows"]] == sorted((g["cycle_time"]["mean"] for g in groups.values()), reverse=True)
+    for row in shown["rows"]:
+        g = groups[row["id"]]
+        assert row["cases"] == g["case_count"]
+        assert row["loops"] == [loop["gateway_id"] for loop in g["loops"] if loop["mean"] >= 0.5]
+    assert shown["overall"] == results["baseline"]["cycle_time"]["mean"]
+    assert shown["phases"]["k"] == results["clusters"]["activities"]["k"]
+
+
+@needs_node
+def test_the_findings_of_step_three_are_read_off_the_groups(results):
+    script = (
+        "import { findings } from './web/demo/groups.js';"
+        "import fs from 'node:fs';"
+        "console.log(JSON.stringify(findings(JSON.parse(fs.readFileSync('web/results.json')))));"
+    )
+    out = subprocess.run([NODE, "--input-type=module", "-e", script], cwd=ROOT, capture_output=True, text=True, check=True)
+    shown = json.loads(out.stdout)
+    groups = results["clusters"]["cases"]["groups"]
+    total = sum(g["case_count"] for g in groups)
+    clean = next(g for g in groups if all(loop["mean"] < 0.5 for loop in g["loops"]))
+    slowest = max(groups, key=lambda g: g["cycle_time"]["mean"])
+    qc = [g for g in groups if any(loop["gateway_id"] == "Gateway_TestSplit" and loop["mean"] >= 0.5 for loop in g["loops"])]
+
+    assert shown["clean"]["share"] == pytest.approx(clean["case_count"] / total)
+    assert shown["slowest"]["days"] == slowest["cycle_time"]["mean"]
+    assert shown["slowest"]["ratio"] == pytest.approx(slowest["cycle_time"]["mean"] / clean["cycle_time"]["mean"])
+    assert shown["qc"]["share"] == pytest.approx(sum(g["case_count"] for g in qc) / total)
+    assert shown["qc"]["high"] == pytest.approx(max(g["cycle_time"]["mean"] for g in qc) - clean["cycle_time"]["mean"])
 
 
 def _drawing(model_id, metrics):

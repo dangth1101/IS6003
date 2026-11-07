@@ -26,7 +26,7 @@ from bpmopt.lint import lint
 from bpmopt.parameters import Parameters, assumptions
 from bpmopt.scenarios import Catalog, ablation, find_scenario, headline, saving_share
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 def build_results(
@@ -38,6 +38,7 @@ def build_results(
     replications: int | None = None,
     value_added: dict | None = None,
     ml: dict | None = None,
+    clusters: dict | None = None,
     catalog: Catalog | None = None,
     scenarios: list[dict] | None = None,
     lang: str = "en",
@@ -50,7 +51,7 @@ def build_results(
     cut-off (cycle_time_end), if they set one.
 
     The optional sections go in as given: value_added (load_value_added), ml
-    (ml_section), the change catalog and the scenarios run_scenarios returned
+    (ml_section), clusters (clusters_section), the change catalog and the scenarios run_scenarios returned
     for it. With scenarios, the ablation and the headline are derived from them
     and `replications` defaults to the runs per scenario (else 1). The catalog's
     overrides join the assumptions table after the as-is rows, each marked with
@@ -84,6 +85,8 @@ def build_results(
         results["value_added"] = value_added
     if ml is not None:
         results["ml"] = ml
+    if clusters is not None:
+        results["clusters"] = clusters
     if catalog is not None:
         results["changes"] = catalog.entries()
     if scenarios is not None:
@@ -154,8 +157,8 @@ def validate_results(results: dict) -> None:
     are the full factorial of the change catalog, every CI holds its estimate,
     each scenario has one mean per replication that average to its estimate,
     every saving share is its saving over the as-is mean, assumptions marked
-    with a change name one in the catalog, and the ablation and the headline
-    match the scenarios.
+    with a change name one in the catalog, the ablation and the headline
+    match the scenarios, and the groups match their points.
     """
     error = jsonschema.exceptions.best_match(validator().iter_errors(results))
     if error is not None:
@@ -202,6 +205,34 @@ def _cross_field_errors(results: dict) -> Iterator[str]:
                 yield f"scenarios[{i}].saving_share: must be the saving and its CI divided by the as-is mean cycle time, expected {want}"
 
     yield from _summary_errors(results, scenarios)
+    yield from _cluster_errors(results)
+
+
+def _cluster_errors(results: dict) -> Iterator[str]:
+    """Each grouping has groups 0..k-1, k is one it tried, and its groups agree with its points."""
+    clusters = results.get("clusters")
+    if clusters is None:
+        return
+    for name, size_of in (("cases", lambda g: g["case_count"]), ("activities", lambda g: len(g["activity_ids"]))):
+        section = clusters[name]
+        k = section["k"]
+        if [g["id"] for g in section["groups"]] != list(range(k)):
+            yield f"clusters.{name}.groups: expected ids 0 to {k - 1} in order"
+        if k not in {row["k"] for row in section["silhouette"]}:
+            yield f"clusters.{name}.k: {k} isn't one of the k in silhouette"
+        sizes = Counter(point["group"] for point in section["points"])
+        for g in section["groups"]:
+            if sizes[g["id"]] != size_of(g):
+                yield f"clusters.{name}.groups[{g['id']}]: {size_of(g)} members, but {sizes[g['id']]} points"
+        if set(sizes) - set(range(k)):
+            yield f"clusters.{name}.points: groups {sorted(set(sizes) - set(range(k)))} don't exist"
+    if len(clusters["cases"]["points"]) != results["meta"]["case_count"]:
+        yield f"clusters.cases.points: {len(clusters['cases']['points'])} cases, but meta.case_count is {results['meta']['case_count']}"
+    by_activity = {p["activity_id"]: p["group"] for p in clusters["activities"]["points"]}
+    for g in clusters["activities"]["groups"]:
+        wrong = [a for a in g["activity_ids"] if by_activity.get(a) != g["id"]]
+        if wrong:
+            yield f"clusters.activities.groups[{g['id']}]: {', '.join(wrong)} aren't in that group in points"
 
 
 def _summary_errors(results: dict, scenarios: list[dict]) -> Iterator[str]:

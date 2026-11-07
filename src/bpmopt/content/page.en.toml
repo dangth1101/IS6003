@@ -46,6 +46,15 @@ paragraphs = [
   "Expect low scores. Much of a case's cycle time depends on luck, such as how often work is sent back and how long the queues are when it arrives. No attribute known at the start can predict that. The ranking of the drivers matters more here than the scores.",
 ]
 
+[sections.clusters]
+heading = "Groups found from the paths"
+paragraphs = [
+  "The models above only see what is known when a request comes in. Here we look at the other side: the path each case actually took. No attribute goes in. If the groups still line up with the attributes, that backs up the drivers from a second angle.",
+  "Cases: each case becomes a small graph, one node per step it went through, with the branch it took at each gateway. Graph2vec turns each graph into a vector, so cases that went through the same loops end up close together. K-means then splits the vectors into groups, and the number of groups is the one with the best silhouette.",
+  "Activities: node2vec takes random walks on the directly-follows graph of the log, where two steps are linked when one follows the other in some case, weighted by how often. Activities that the walks often visit together end up in one group. Our process runs in sequence, so this mostly finds its phases. Read it as a check that the method works, more than as a finding.",
+  "Read the case groups as path types, not as kinds of projects. The table describes each group by the loops its cases took, then lists the attribute values that are more common in it than in all cases.",
+]
+
 [sections.redesign]
 heading = "Redesign"
 paragraphs = [
@@ -141,6 +150,22 @@ metric_roc_auc = "ROC-AUC"
 metric_f1 = "F1"
 drivers = "Drivers"
 mean_abs_shap = "Mean |SHAP|"
+clusters_cases = "Groups of cases (graph2vec)"
+clusters_cases_method = "Graph2vec (Narayanan et al., 2017): {dimensions} dimensions, {iterations} Weisfeiler-Lehman rounds, {epochs} epochs. K-means on the vectors, k from {k_min} to {k_max}, picked by silhouette: {k} groups."
+clusters_activities = "Groups of activities (node2vec)"
+clusters_activities_method = "Node2vec (Grover and Leskovec, 2016): {dimensions} dimensions, p = {p}, q = {q}, {walks} walks of {length} steps from each activity, window {window}. K-means on the vectors, k from {k_min} to {k_max}, picked by silhouette: {k} groups."
+cluster_group = "Group"
+cluster_name = "Group {n}"
+cluster_panel = "Group {n}: {cases} cases, mean cycle time {days} days"
+cluster_case = "Case {id}"
+cluster_scatter = "Each dot is a case, placed by the first two principal components of its vector ({variance} of the variance). Each panel shows one group in color over all other cases in gray."
+cluster_k = "Number of groups"
+cluster_silhouette = "Silhouette"
+cluster_loops = "Loops back per case at: {gateway}"
+cluster_profile = "More common in this group"
+cluster_profile_item = "{feature} = {value}: {share} of the group, {overall} of all cases"
+cluster_activity_model = "As-is model, activities colored by node2vec group"
+cluster_activities_list = "Activities"
 change_catalog = "Change catalog"
 change_id = "ID"
 driver = "Targets"
@@ -191,6 +216,10 @@ detail = "Durations, branch probabilities, the arrival rate and lane capacities 
 [[threats]]
 title = "The effects of the changes are assumed"
 detail = "C3 is the least certain. How much longer the extended requirements take, and how many fewer defects they lead to, are both guesses. C2 assumes how long a retest takes, and that it finds new defects as often as a full test round. These values are in the assumptions table, marked with their change. Other values in models/to_be.catalog.toml could change which change helps most."
+
+[[threats]]
+title = "The groups depend on choices"
+detail = "The number of groups is picked by silhouette from a fixed range. For the cases the silhouette still rises at the top of that range: the paths are distinct variants, so more groups always fit a little better, and we cap the count to keep the groups readable. The vectors also depend on the embedding settings and the seed. The groups describe simulated paths, so they can only find attribute effects the simulator put in."
 
 [[threats]]
 title = "No working calendar"

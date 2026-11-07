@@ -207,11 +207,12 @@ def test_every_placeholder_in_the_page_prose_names_a_result_the_page_fills():
 def test_the_page_prose_types_in_no_result():
     # Results come from results.json through placeholders, so a rerun can't leave
     # stale numbers in the text. What may stay: book citations, change and guideline
-    # IDs, the 95% confidence level, the 20% objective, the 30-element limit of G7
-    # and the year of the method paper.
+    # IDs, the 95% confidence level, the 20% objective, the 30-element limit of G7,
+    # the year of the method paper and the names graph2vec and node2vec.
     allowed = [
         r"§[\d.]+", r"\bpp?\.[\d-]+", r"\b(?:Appendix|Eq\.|Fig\.|Table) [A-Z]?[\d.]*\d", r"\b[CG]\d\b",
         r"\b95%", r"\b20%", r"\b30[- ]elements?", r"\b7PMG", r"Peffers et al\., 2007", r"\b2nd ed\.",
+        r"\b(?:[Gg]raph|[Nn]ode)2vec\b",
     ]
     content = tomllib.loads(PAGE_CONTENT.read_text(encoding="utf-8"))
 
@@ -222,7 +223,7 @@ def test_the_page_prose_types_in_no_result():
 
 def test_fake_results_fill_every_section_of_the_spec(fake):
     # Spec, "Results contract", plus `text` for the page wording and the ablation and headline derived from the scenarios.
-    spec_sections = {"meta", "assumptions", "models", "value_added", "baseline", "ml", "changes", "scenarios", "threats"}
+    spec_sections = {"meta", "assumptions", "models", "value_added", "baseline", "ml", "clusters", "changes", "scenarios", "threats"}
 
     assert set(fake) == spec_sections | {"text", "ablation", "headline"}
     assert set(fake["models"]) == {"as_is", "to_be"}

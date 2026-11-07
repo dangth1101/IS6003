@@ -76,6 +76,29 @@
     .va-VA:not(.djs-connection) .djs-visual > :first-child { fill: color-mix(in srgb, var(--va-VA) 28%, white) !important; }
     .va-BVA:not(.djs-connection) .djs-visual > :first-child { fill: color-mix(in srgb, var(--va-BVA) 28%, white) !important; }
     .va-NVA:not(.djs-connection) .djs-visual > :first-child { fill: color-mix(in srgb, var(--va-NVA) 28%, white) !important; }
+    /* node2vec activity groups on the diagram: categorical slots 7, 4, 6 (violet, yellow, green), validated all-pairs,
+       so they don't reuse the value-added colors. The diagram canvas stays light in dark mode, so one set of fills. */
+    .group-0:not(.djs-connection) .djs-visual > :first-child { fill: color-mix(in srgb, #6250d6 30%, white) !important; }
+    .group-1:not(.djs-connection) .djs-visual > :first-child { fill: color-mix(in srgb, #eda100 30%, white) !important; }
+    .group-2:not(.djs-connection) .djs-visual > :first-child { fill: color-mix(in srgb, #008300 30%, white) !important; }
+    .swatch.group-0 { background: #6250d6; }
+    .swatch.group-1 { background: #eda100; }
+    .swatch.group-2 { background: #008300; }
+    @media (prefers-color-scheme: dark) {
+      .swatch.group-0 { background: #9085e9; }
+      .swatch.group-1 { background: #c98500; }
+    }
+
+    .panels { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin: 12px 0 16px; }
+    .panel { margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px 4px; }
+    .panel figcaption { font-size: 0.85rem; color: var(--muted); }
+    .panel svg { display: block; width: 100%; height: auto; }
+    .panel .others { fill: var(--muted); opacity: 0.18; }
+    .panel .members { fill: var(--accent); }
+    .panel .members circle:hover { fill: var(--text); }
+    td ul { margin: 0; padding-left: 16px; }
+    tr.chosen td { font-weight: 600; }
+    .narrow table { width: auto; min-width: 280px; }
 
     .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 16px 0; }
     .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
@@ -438,6 +461,89 @@
       return out;
     }
 
+    /** Groups from graph embeddings: cases (graph2vec) as small multiples and a table, activities (node2vec) on the diagram. */
+    function clustersSection(results, names, diagram) {
+      const out = [prose("clusters")];
+      const clusters = results.clusters;
+      if (!clusters) return [...out, pending()];
+      const { cases, activities } = clusters;
+      const groupName = (id) => t("cluster_name", { n: id + 1 });
+      const silhouetteTable = (section) => el("div", { class: "narrow" }, table([t("cluster_k"), t("cluster_silhouette")],
+        section.silhouette.map((row) => ({
+          className: row.k === section.k ? "chosen" : undefined,
+          cells: [NUM(0).format(row.k), fmt(row.silhouette, 3)],
+        })), { numeric: [0, 1] }));
+      const methodVars = (section) => ({
+        dimensions: section.method.dimensions, epochs: section.method.epochs,
+        k_min: section.method.k_range[0], k_max: section.method.k_range[1], k: section.k,
+      });
+
+      out.push(el("h3", {}, t("clusters_cases")));
+      out.push(el("p", { class: "muted small" }, t("clusters_cases_method", { ...methodVars(cases), iterations: cases.method.wl_iterations })));
+      out.push(scatterPanels(cases, groupName));
+      out.push(el("p", { class: "muted small" }, t("cluster_scatter", {
+        variance: NUM(0, "percent").format(cases.explained_variance[0] + cases.explained_variance[1]),
+      })));
+
+      const features = TEXT.features ?? {};
+      const gateways = cases.groups[0]?.loops.map((l) => l.gateway_id) ?? [];
+      const list = (items) => items.length ? el("ul", {}, items.map((x) => el("li", {}, x))) : "";
+      out.push(table(
+        [t("cluster_group"), t("cases"), `${t("cycle_time")} (${t("mean")})`,
+          ...gateways.map((g) => t("cluster_loops", { gateway: names[g] ?? g })), t("outcome"), t("cluster_profile")],
+        cases.groups.map((g) => [
+          groupName(g.id), NUM(0).format(g.case_count), fmt(g.cycle_time.mean),
+          ...g.loops.map((l) => fmt(l.mean, 2)),
+          list(g.outcomes.map((o) => `${names[o.end_event_id] ?? o.end_event_id} ${NUM(0, "percent").format(o.share)}`)),
+          list(g.profile.map((p) => t("cluster_profile_item", {
+            feature: features[p.feature] ?? p.feature, value: p.value,
+            share: NUM(0, "percent").format(p.share), overall: NUM(0, "percent").format(p.overall_share),
+          }))),
+        ]),
+        { numeric: [1, 2, ...gateways.map((_, i) => 3 + i)] }));
+      out.push(silhouetteTable(cases));
+
+      out.push(el("h3", {}, t("clusters_activities")));
+      out.push(el("p", { class: "muted small" }, t("clusters_activities_method", {
+        ...methodVars(activities), p: activities.method.p, q: activities.method.q,
+        walks: activities.method.walks_per_node, length: activities.method.walk_length, window: activities.method.window,
+      })));
+      out.push(diagram.node);
+      out.push(el("ul", { class: "legend", "aria-label": t("clusters_activities") },
+        activities.groups.map((g) => el("li", {}, el("span", { class: `swatch group-${g.id}` }), groupName(g.id)))));
+      out.push(table([t("cluster_group"), t("cluster_activities_list")],
+        activities.groups.map((g) => [groupName(g.id), g.activity_ids.map((id) => names[id] ?? id).join(", ")])));
+      out.push(silhouetteTable(activities));
+      return out;
+    }
+
+    /** One small scatter per case group: its cases in the accent color over every other case in gray. */
+    function scatterPanels(section, groupName) {
+      const svgNs = "http://www.w3.org/2000/svg";
+      const svg = (tag, attrs = {}, ...children) => {
+        const node = document.createElementNS(svgNs, tag);
+        for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+        node.append(...children);
+        return node;
+      };
+      const xs = section.points.map((p) => p.x), ys = section.points.map((p) => p.y);
+      const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+      const W = 260, H = 180, pad = 6;
+      const px = (x) => pad + ((x - x0) / (x1 - x0 || 1)) * (W - 2 * pad);
+      const py = (y) => H - pad - ((y - y0) / (y1 - y0 || 1)) * (H - 2 * pad);
+      return el("div", { class: "panels" }, section.groups.map((g) => {
+        const caption = t("cluster_panel", { n: g.id + 1, cases: NUM(0).format(g.case_count), days: fmt(g.cycle_time.mean) });
+        const others = svg("g", { class: "others" }, ...section.points.filter((p) => p.group !== g.id)
+          .map((p) => svg("circle", { cx: px(p.x).toFixed(1), cy: py(p.y).toFixed(1), r: 1.8 })));
+        const members = svg("g", { class: "members" }, ...section.points.filter((p) => p.group === g.id)
+          .map((p) => svg("circle", { cx: px(p.x).toFixed(1), cy: py(p.y).toFixed(1), r: 2.4 },
+            svg("title", {}, t("cluster_case", { id: p.case_id })))));
+        return el("figure", { class: "panel" },
+          el("figcaption", {}, caption),
+          svg("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${groupName(g.id)}. ${caption}` }, others, members));
+      }));
+    }
+
     function redesignSection(results, names, diagram) {
       const out = [prose("redesign")];
       out.push(diagram ? diagram.node : el("p", { class: "muted" }, t("to_be_missing")));
@@ -541,15 +647,16 @@
 
     // ---------- diagrams ----------
 
-    async function drawDiagram(diagram, xml, valueAdded) {
+    /** markers: element ID -> CSS class to put on it (value-added class, activity group). */
+    async function drawDiagram(diagram, xml, markers) {
       try {
         const viewer = new BpmnJS({ container: diagram.canvas });
         await viewer.importXML(xml);
         const canvas = viewer.get("canvas");
         canvas.zoom("fit-viewport");
         const registry = viewer.get("elementRegistry");
-        for (const [id, v] of Object.entries(valueAdded ?? {})) {
-          if (registry.get(id)) canvas.addMarker(id, `va-${v.class}`);
+        for (const [id, marker] of Object.entries(markers ?? {})) {
+          if (registry.get(id)) canvas.addMarker(id, marker);
         }
       } catch (err) {
         diagram.canvas.replaceChildren(el("p", { style: "padding:12px", class: "small" }, t("diagram_error", { error: err.message })));
@@ -581,6 +688,7 @@
 
       const asIsDiagram = diagramBlock(t("as_is_model"));
       const toBeDiagram = toBeXml ? diagramBlock(t("to_be_model")) : null;
+      const groupDiagram = results.clusters ? diagramBlock(t("cluster_activity_model")) : null;
 
       document.getElementById("page").append(
         ...[
@@ -588,13 +696,19 @@
           prose("problem"),
           asIsSection(results, asIsNames, asIsDiagram),
           mlSection(results, asIsNames),
+          clustersSection(results, asIsNames, groupDiagram),
           redesignSection(results, toBeNames, toBeDiagram),
           evaluationSection(results),
           assumptionsSection(results),
         ].flat(Infinity).filter(Boolean),
       );
 
-      await drawDiagram(asIsDiagram, asIsXml, results.value_added);
+      const vaMarkers = Object.fromEntries(Object.entries(results.value_added ?? {}).map(([id, v]) => [id, `va-${v.class}`]));
+      await drawDiagram(asIsDiagram, asIsXml, vaMarkers);
+      if (groupDiagram) {
+        const groupMarkers = Object.fromEntries(results.clusters.activities.points.map((p) => [p.activity_id, `group-${p.group}`]));
+        await drawDiagram(groupDiagram, asIsXml, groupMarkers);
+      }
       if (toBeDiagram) await drawDiagram(toBeDiagram, toBeXml, null);
     }
 

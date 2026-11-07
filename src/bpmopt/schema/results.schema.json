@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/dangth1101/IS6003/results.schema.json",
   "title": "IS6003 results file",
-  "description": "Contract between the notebook (writer) and the static page (reader). Version 4: every section from the spec, with per-replication means in the scenarios, the ablation and the headline. Sections other than meta, text, models and baseline are optional until the step that fills them is done; inside a section, the shape is fixed. All times are in working days. All human-readable text is in `text`, in the catalog entries (`changes`, `assumptions`, `threats`, `value_added` reasons, lint messages) or in the BPMN labels.",
+  "description": "Contract between the notebook (writer) and the static page (reader). Version 5: every section from the spec, with per-replication means in the scenarios, the ablation and the headline, plus the case and activity groups from graph embeddings (clusters). Sections other than meta, text, models and baseline are optional until the step that fills them is done; inside a section, the shape is fixed. All times are in working days. All human-readable text is in `text`, in the catalog entries (`changes`, `assumptions`, `threats`, `value_added` reasons, lint messages) or in the BPMN labels.",
   "type": "object",
   "required": ["meta", "text", "models", "baseline"],
   "additionalProperties": false,
@@ -12,7 +12,7 @@
       "required": ["schema_version", "seed", "replications", "case_count", "warm_up", "parameter_version", "generated_at"],
       "additionalProperties": false,
       "properties": {
-        "schema_version": { "const": 4 },
+        "schema_version": { "const": 5 },
         "seed": { "type": "integer" },
         "replications": { "type": "integer", "minimum": 1, "description": "Replications per scenario. 1 for a single baseline run." },
         "case_count": { "type": "integer", "minimum": 1, "description": "Cases per run, after the warm-up is dropped." },
@@ -140,6 +140,175 @@
         "tasks": { "type": "array", "items": { "$ref": "#/$defs/ml_task" } }
       }
     },
+    "clusters": {
+      "type": "object",
+      "description": "Groups found without the attributes: cases by graph2vec on each case's chain of events, activities by node2vec on the directly-follows graph (bpmopt.clustering). Case groups are numbered by size, largest first; activity groups in process order, by the first of their activities to appear in the log.",
+      "required": ["cases", "activities"],
+      "additionalProperties": false,
+      "properties": {
+        "cases": {
+          "type": "object",
+          "required": ["method", "silhouette", "k", "explained_variance", "groups", "path_count", "paths", "points"],
+          "additionalProperties": false,
+          "properties": {
+            "path_count": { "type": "integer", "minimum": 1, "description": "Number of distinct paths among the cases." },
+            "paths": {
+              "type": "array",
+              "description": "The most common paths, most cases first: node labels as graph2vec read them, how many cases took each, their mean cycle time and the group most of them are in.",
+              "items": {
+                "type": "object",
+                "required": ["labels", "case_count", "cycle_time", "group"],
+                "additionalProperties": false,
+                "properties": {
+                  "labels": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+                  "case_count": { "type": "integer", "minimum": 1 },
+                  "cycle_time": { "type": "number", "minimum": 0 },
+                  "group": { "type": "integer", "minimum": 0 }
+                }
+              }
+            },
+            "method": {
+              "type": "object",
+              "required": ["embedding", "dimensions", "wl_iterations", "epochs", "k_range"],
+              "additionalProperties": false,
+              "properties": {
+                "embedding": { "const": "graph2vec" },
+                "dimensions": { "type": "integer", "minimum": 1 },
+                "wl_iterations": { "type": "integer", "minimum": 1, "description": "Weisfeiler-Lehman relabeling rounds." },
+                "epochs": { "type": "integer", "minimum": 1 },
+                "k_range": { "$ref": "#/$defs/k_range" }
+              }
+            },
+            "silhouette": { "$ref": "#/$defs/silhouettes" },
+            "k": { "type": "integer", "minimum": 2, "description": "Number of groups: the k with the highest silhouette." },
+            "explained_variance": { "$ref": "#/$defs/explained_variance" },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "case_count", "cycle_time", "loops", "outcomes", "profile", "path"],
+                "additionalProperties": false,
+                "properties": {
+                  "id": { "type": "integer", "minimum": 0 },
+                  "case_count": { "type": "integer", "minimum": 1 },
+                  "cycle_time": { "$ref": "#/$defs/stats" },
+                  "loops": {
+                    "type": "array",
+                    "description": "Per rework gateway, in model order: loop-backs per case of the group.",
+                    "items": {
+                      "type": "object",
+                      "required": ["gateway_id", "mean"],
+                      "additionalProperties": false,
+                      "properties": { "gateway_id": { "type": "string" }, "mean": { "type": "number", "minimum": 0 } }
+                    }
+                  },
+                  "outcomes": {
+                    "type": "array",
+                    "description": "Share of the group's cases that ended at each end event, most common first.",
+                    "items": {
+                      "type": "object",
+                      "required": ["end_event_id", "share"],
+                      "additionalProperties": false,
+                      "properties": { "end_event_id": { "type": "string" }, "share": { "$ref": "#/$defs/share" } }
+                    }
+                  },
+                  "path": {
+                    "type": "object",
+                    "description": "The group's most common path: the node labels of its chain graph, as graph2vec read them (an activity ID, or for a gateway its ID, '>' and the flow taken), and the share of the group's cases that took exactly this path.",
+                    "required": ["labels", "share"],
+                    "additionalProperties": false,
+                    "properties": { "labels": { "type": "array", "minItems": 1, "items": { "type": "string" } }, "share": { "$ref": "#/$defs/share" } }
+                  },
+                  "profile": {
+                    "type": "array",
+                    "description": "Attribute values over-represented in the group, highest lift first.",
+                    "items": {
+                      "type": "object",
+                      "required": ["feature", "value", "share", "overall_share"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "feature": { "type": "string" },
+                        "value": { "type": ["string", "number"] },
+                        "share": { "$ref": "#/$defs/share" },
+                        "overall_share": { "$ref": "#/$defs/share" }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "points": {
+              "type": "array",
+              "description": "One per case: its first two principal components and its group.",
+              "items": {
+                "type": "object",
+                "required": ["case_id", "x", "y", "group"],
+                "additionalProperties": false,
+                "properties": { "case_id": { "type": "integer" }, "x": { "type": "number" }, "y": { "type": "number" }, "group": { "type": "integer", "minimum": 0 } }
+              }
+            }
+          }
+        },
+        "activities": {
+          "type": "object",
+          "required": ["method", "silhouette", "k", "explained_variance", "groups", "edges", "points"],
+          "additionalProperties": false,
+          "properties": {
+            "edges": {
+              "type": "array",
+              "description": "The directly-follows graph node2vec ran on: one edge per pair of activities where the target directly follows the source in some case, with how often.",
+              "items": {
+                "type": "object",
+                "required": ["source", "target", "count"],
+                "additionalProperties": false,
+                "properties": { "source": { "type": "string" }, "target": { "type": "string" }, "count": { "type": "integer", "minimum": 1 } }
+              }
+            },
+            "method": {
+              "type": "object",
+              "required": ["embedding", "dimensions", "p", "q", "walk_length", "walks_per_node", "window", "epochs", "k_range"],
+              "additionalProperties": false,
+              "properties": {
+                "embedding": { "const": "node2vec" },
+                "dimensions": { "type": "integer", "minimum": 1 },
+                "p": { "type": "number", "exclusiveMinimum": 0, "description": "Return parameter: higher means a walk steps back less often." },
+                "q": { "type": "number", "exclusiveMinimum": 0, "description": "In-out parameter: lower means a walk moves away more often." },
+                "walk_length": { "type": "integer", "minimum": 2 },
+                "walks_per_node": { "type": "integer", "minimum": 1 },
+                "window": { "type": "integer", "minimum": 1 },
+                "epochs": { "type": "integer", "minimum": 1 },
+                "k_range": { "$ref": "#/$defs/k_range" }
+              }
+            },
+            "silhouette": { "$ref": "#/$defs/silhouettes" },
+            "k": { "type": "integer", "minimum": 2 },
+            "explained_variance": { "$ref": "#/$defs/explained_variance" },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "activity_ids"],
+                "additionalProperties": false,
+                "properties": {
+                  "id": { "type": "integer", "minimum": 0 },
+                  "activity_ids": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+                }
+              }
+            },
+            "points": {
+              "type": "array",
+              "description": "One per activity of the directly-follows graph: its first two principal components and its group.",
+              "items": {
+                "type": "object",
+                "required": ["activity_id", "x", "y", "group"],
+                "additionalProperties": false,
+                "properties": { "activity_id": { "type": "string" }, "x": { "type": "number" }, "y": { "type": "number" }, "group": { "type": "integer", "minimum": 0 } }
+              }
+            }
+          }
+        }
+      }
+    },
     "changes": {
       "type": "array",
       "description": "Change catalog.",
@@ -190,6 +359,32 @@
   },
   "$defs": {
     "id": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$" },
+    "share": { "type": "number", "minimum": 0, "maximum": 1 },
+    "k_range": {
+      "type": "array",
+      "description": "Smallest and largest k tried.",
+      "prefixItems": [{ "type": "integer", "minimum": 2 }, { "type": "integer", "minimum": 2 }],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "silhouettes": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Silhouette of the k-means groups for each k tried, with cosine distance.",
+      "items": {
+        "type": "object",
+        "required": ["k", "silhouette"],
+        "additionalProperties": false,
+        "properties": { "k": { "type": "integer", "minimum": 2 }, "silhouette": { "type": "number", "minimum": -1, "maximum": 1 } }
+      }
+    },
+    "explained_variance": {
+      "type": "array",
+      "description": "Share of the variance each of the two plotted principal components explains.",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "$ref": "#/$defs/share" }
+    },
     "stats": {
       "type": "object",
       "required": ["mean", "median", "p90"],
@@ -390,12 +585,13 @@
         "subtitle": { "type": "string" },
         "sections": {
           "type": "object",
-          "required": ["problem", "as_is", "ml", "redesign", "evaluation", "assumptions"],
+          "required": ["problem", "as_is", "ml", "clusters", "redesign", "evaluation", "assumptions"],
           "additionalProperties": false,
           "properties": {
             "problem": { "$ref": "#/$defs/section_text" },
             "as_is": { "$ref": "#/$defs/section_text" },
             "ml": { "$ref": "#/$defs/section_text" },
+            "clusters": { "$ref": "#/$defs/section_text" },
             "redesign": { "$ref": "#/$defs/section_text" },
             "evaluation": { "$ref": "#/$defs/section_text" },
             "assumptions": { "$ref": "#/$defs/section_text" }
@@ -427,6 +623,9 @@
         "ml_split", "ml_task_cycle_time", "ml_task_rework", "ml_model", "model_reference_regression", "model_reference_classification",
         "model_linear_regression", "model_linear_classification", "model_gradient_boosting",
         "metric_mae", "metric_r2", "metric_roc_auc", "metric_f1", "drivers", "mean_abs_shap",
+        "clusters_cases", "clusters_cases_method", "clusters_activities", "clusters_activities_method", "cluster_group", "cluster_name", "cluster_panel", "cluster_case",
+        "cluster_scatter", "cluster_k", "cluster_silhouette", "cluster_loops", "cluster_profile", "cluster_profile_item",
+        "cluster_activity_model", "cluster_activities_list",
         "change_catalog", "change_id", "driver", "heuristic", "expected_effect", "trade_off",
         "dq_time", "dq_cost", "dq_quality", "dq_flexibility", "effect_better", "effect_worse", "effect_neutral",
         "demo_link", "toggles", "scenario_as_is", "scenario_selected", "saving", "saving_share", "scenario_missing",
